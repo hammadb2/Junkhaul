@@ -18,12 +18,12 @@ export default function Home() {
         className="flex justify-center pt-2"
       >
         <Image
-          src="/logo/full.png"
+          src="/logo/stampede-banner.png"
           alt="Junk Haul Calgary. Same Day. Calgary."
-          width={260}
-          height={260}
+          width={300}
+          height={200}
           priority
-          className="w-44 h-auto"
+          className="w-56 h-auto"
         />
       </motion.div>
 
