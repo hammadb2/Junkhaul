@@ -37,7 +37,7 @@ Deno.serve(async () => {
     // MSG 13 — customer no-show SMS
     await sendSMS(
       b.phone,
-      `Hi ${b.name} — we're at ${b.address} for your Junk Haul Calgary pickup (Ref: ${b.booking_ref}).\n\nCan't find your items. Please reply or call us.\n\nWe'll wait 15 more minutes before our next job.`,
+      `Hi ${b.name}, we're at ${b.address} for your Junk Haul Calgary pickup (Ref: ${b.booking_ref}).\n\nWe can't find your items. Please reply or call us at (587) 325-0751.\n\nWe'll wait 15 minutes before heading to our next job.`,
       b.id,
       'noshow_customer',
     );
@@ -45,7 +45,7 @@ Deno.serve(async () => {
     // Operator alert
     await sendSMS(
       Deno.env.get('HAMMAD_PHONE')!,
-      `⏰ Possible no-show — ${b.booking_ref}\n${b.name} (${b.phone})\nScheduled ${formatTime(b.job_time)} at ${b.address} — still not completed.\nMark no-show in dispatch if they're not there.`,
+      `Possible no-show: ${b.booking_ref}\n${b.name} (${b.phone})\nScheduled ${formatTime(b.job_time)} at ${b.address}, still not completed.\nMark no-show in dispatch if they're not there.`,
       b.id,
       'noshow_alert',
     );

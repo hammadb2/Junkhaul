@@ -1,8 +1,11 @@
 import { supabase } from '../_shared/clients.ts';
 import { edmontonNow } from '../_shared/time.ts';
 
-// Operating days: Thursday (4) and Sunday (0). Slot times (Calgary local).
-const SLOT_TIMES = ['07:30', '09:00', '11:00', '13:00', '15:00'];
+// Default operating day: Sunday only (0).
+// Admin can manually add slots for other days via the admin dashboard.
+// Slot times are calibrated so the last job finishes before dumps close at 5 PM.
+// East Calgary Landfill is open Sundays (6 AM - 5 PM); Spyhill & Shepard are closed Sundays.
+const SLOT_TIMES = ['07:30', '09:00', '11:00', '13:00'];
 const MAX_JOBS = 5;
 const WEEKS_AHEAD = 8;
 
@@ -21,9 +24,10 @@ Deno.serve(async () => {
     const d = new Date(start);
     d.setUTCDate(start.getUTCDate() + i);
     const dow = d.getUTCDay();
-    if (dow !== 0 && dow !== 4) continue;
+    // Only generate Sunday slots by default.
+    if (dow !== 0) continue;
     const dateStr = d.toISOString().slice(0, 10);
-    const day_type = dow === 0 ? 'sunday' : 'thursday';
+    const day_type = 'sunday';
     for (const t of SLOT_TIMES) {
       rows.push({ slot_date: dateStr, slot_time: t, day_type, max_jobs: MAX_JOBS });
     }

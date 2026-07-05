@@ -15,9 +15,9 @@ Deno.serve(async () => {
 
   let sent = 0;
   for (const b of bookings || []) {
-    const body = `Thanks for choosing Junk Haul Calgary, ${b.name}! 🙌
+    const body = `Thanks for choosing Junk Haul Calgary, ${b.name}!
 
-Hope everything's cleared out nicely. A quick ⭐⭐⭐⭐⭐ review means the world to a local small business:
+Hope everything's cleared out. If we did a good job, a quick 5-star review means a lot to a local small business:
 
 ${reviewLink}
 

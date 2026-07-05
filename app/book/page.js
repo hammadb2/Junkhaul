@@ -46,7 +46,9 @@ export default function BookPage() {
     load_size: 'quarter',
     same_day: false,
     stairs: 0,
+    stairs_confirmed: false,
     has_freon: false,
+    freon_count: 0,
     job_date: null,
     job_time: null,
     name: '',
@@ -65,6 +67,7 @@ export default function BookPage() {
     same_day: state.same_day,
     stairs: state.stairs,
     has_freon: state.has_freon,
+    freon_count: state.freon_count,
     job_date: state.job_date,
     job_time: state.job_time,
   });
@@ -238,6 +241,7 @@ function PhotoStep({ state, update, onNext }) {
         analysis: data.analysis,
         load_size: data.analysis.load_size,
         has_freon: data.analysis.has_freon || false,
+        freon_count: data.analysis.freon_count || (data.analysis.has_freon ? 1 : 0),
         photoUrls: data.photoUrls || [],
         photo_skipped: false,
       });
@@ -380,6 +384,35 @@ function LoadStep({ state, update, price, onNext }) {
         )}
       </div>
 
+      {/* Itemized AI breakdown */}
+      {state.analysis?.items_detected?.length > 0 && (
+        <div className="bg-blue-50 rounded-xl p-3 space-y-2">
+          <p className="text-xs font-semibold text-blue-900">Here&apos;s what we see in your photos:</p>
+          <ul className="text-sm text-blue-800 space-y-1">
+            {state.analysis.items_detected.map((item, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-blue-400 mt-0.5">•</span>
+                <span>
+                  {item.quantity > 1 ? `${item.quantity}x ` : ''}{item.name}
+                  {item.is_freon && <span className="text-blue-600 font-medium"> (freon +${PRICING.freon_per_item})</span>}
+                  {item.is_hazmat && <span className="text-red-600 font-medium"> (cannot take)</span>}
+                  {item.estimated_weight_kg && <span className="text-blue-400"> ~{item.estimated_weight_kg}kg</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {state.analysis.notes && (
+            <p className="text-xs text-blue-600 italic">{state.analysis.notes}</p>
+          )}
+          {state.analysis.has_hazmat && (
+            <p className="text-xs text-red-600 font-medium bg-red-50 rounded p-2">
+              ⚠️ We cannot take hazmat items (paint, chemicals, propane, tires). Please remove them before pickup.
+            </p>
+          )}
+          <p className="text-xs text-blue-500">Wrong? Adjust your load size and add-ons below.</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         {LOADS.map((l) => (
           <LoadCard
@@ -395,15 +428,41 @@ function LoadStep({ state, update, price, onNext }) {
       </div>
 
       <div className="space-y-3 mt-2">
-        <Toggle
-          label="Freon appliance (fridge, freezer, AC)"
-          sub={`+$${PRICING.freon}`}
-          checked={state.has_freon}
-          onChange={(v) => update({ has_freon: v })}
-        />
+        {/* Freon: per-item count */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-medium text-gray-900">Stairs</div>
+            <div className="font-medium text-gray-900">Freon appliances</div>
+            <div className="text-xs text-gray-500">
+              Fridge, freezer, AC, water cooler. +${PRICING.freon_per_item} each
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => update({
+                freon_count: Math.max(0, state.freon_count - 1),
+                has_freon: Math.max(0, state.freon_count - 1) > 0,
+              })}
+              className="w-8 h-8 rounded-full border border-gray-300 text-lg"
+            >
+              −
+            </button>
+            <span className="w-4 text-center">{state.freon_count}</span>
+            <button
+              onClick={() => update({
+                freon_count: state.freon_count + 1,
+                has_freon: true,
+              })}
+              className="w-8 h-8 rounded-full border border-gray-300 text-lg"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        {/* Stairs: with confirmation */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium text-gray-900">Stairs (flights)</div>
             <div className="text-xs text-gray-500">
               +${PRICING.stairs_per_flight} per flight
             </div>
@@ -424,6 +483,19 @@ function LoadStep({ state, update, price, onNext }) {
             </button>
           </div>
         </div>
+
+        {/* Stairs confirmation when 0 */}
+        {state.stairs === 0 && (
+          <label className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg p-2">
+            <input
+              type="checkbox"
+              checked={state.stairs_confirmed}
+              onChange={(e) => update({ stairs_confirmed: e.target.checked })}
+              className="w-4 h-4 rounded"
+            />
+            I confirm there are no stairs at my pickup location
+          </label>
+        )}
       </div>
 
       <div className="mt-4 flex items-end justify-between">
@@ -431,6 +503,16 @@ function LoadStep({ state, update, price, onNext }) {
         <span className="text-3xl font-bold text-gray-900">
           $<AnimatedPrice price={price.total} />
         </span>
+      </div>
+
+      {/* Price breakdown */}
+      <div className="text-xs text-gray-400 space-y-0.5">
+        <div className="flex justify-between"><span>Base ({LOAD_LABELS[state.load_size]})</span><span>${price.base_price}</span></div>
+        {price.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span><span>${price.freon_fee}</span></div>}
+        {price.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span><span>${price.stairs_fee}</span></div>}
+        {price.same_day_fee > 0 && <div className="flex justify-between"><span>Same-day</span><span>${price.same_day_fee}</span></div>}
+        <div className="flex justify-between font-medium text-gray-600 pt-1 border-t"><span>Deposit today</span><span>$50</span></div>
+        <div className="flex justify-between font-medium text-gray-600"><span>Balance on pickup</span><span>${price.balance_due}</span></div>
       </div>
 
       <BookButton onClick={onNext}>Choose a time →</BookButton>
@@ -502,7 +584,7 @@ function ScheduleStep({ state, update, onNext }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-2xl font-bold text-gray-900">Pick a time</h2>
-      <p className="text-gray-500 text-sm -mt-2">We run Thursdays & Sundays.</p>
+      <p className="text-gray-500 text-sm -mt-2">We run Sundays. Same-day available if you book before 11 AM.</p>
 
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {days.map((d) => (
@@ -576,6 +658,7 @@ function DetailsStep({ state, update, price, onCreated }) {
           same_day: state.same_day,
           stairs: state.stairs,
           has_freon: state.has_freon,
+          freon_count: state.freon_count,
           job_date: state.job_date,
           job_time: state.job_time,
           photos: state.photoUrls,

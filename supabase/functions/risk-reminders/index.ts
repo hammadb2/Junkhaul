@@ -25,10 +25,10 @@ Deno.serve(async () => {
 
   let sent = 0;
   for (const b of bookings || []) {
-    const body = `Hi ${b.name}! Just confirming your Junk Haul Calgary pickup tomorrow, ${formatDateLong(b.job_date)} at ${formatTime(b.job_time)}. 🚛
+    const body = `Hi ${b.name}, just confirming your Junk Haul Calgary pickup tomorrow, ${formatDateLong(b.job_date)} at ${formatTime(b.job_time)}.
 
-📍 ${b.address}
-💳 Balance due: $${b.balance_due}
+${b.address}
+Balance due: $${b.balance_due}
 
 Reply YES to confirm, or reply to reschedule. See you then!`;
     try {
