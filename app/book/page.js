@@ -584,7 +584,7 @@ function ScheduleStep({ state, update, onNext }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-2xl font-bold text-gray-900">Pick a time</h2>
-      <p className="text-gray-500 text-sm -mt-2">We run Sundays. Same-day available if you book before 11 AM.</p>
+      <p className="text-gray-500 text-sm -mt-2">We run Thursdays and Sundays. Same-day available if you book before 11 AM.</p>
 
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {days.map((d) => (
