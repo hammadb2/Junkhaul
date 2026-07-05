@@ -1258,45 +1258,71 @@ function LeadsView() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = () => {
     fetch('/api/admin/leads')
       .then((r) => r.json())
       .then((d) => { setLeads(d.leads || []); setLoading(false); });
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
 
   if (loading) return <p className="text-center text-gray-400 py-10">Loading leads…</p>;
 
+  const withPrice = leads.filter((l) => l.ai_price_estimate);
+  const withoutPrice = leads.filter((l) => !l.ai_price_estimate);
+
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-gray-500">{leads.length} unconverted lead{leads.length !== 1 ? 's' : ''} who got a price but didn&apos;t book.</p>
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">{leads.length} unconverted lead{leads.length !== 1 ? 's' : ''}</p>
       {leads.length === 0 && <p className="text-center text-gray-400 py-10">No unconverted leads right now.</p>}
-      {leads.map((lead) => (
-        <div key={lead.id} className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <a href={`tel:${lead.phone}`} className="text-orange-600 font-semibold text-sm">{lead.phone}</a>
-              <div className="flex gap-2 mt-1 flex-wrap">
-                {lead.ai_price_estimate && (
-                  <span className="text-xs bg-green-50 text-green-700 rounded px-1.5 py-0.5 font-medium">${lead.ai_price_estimate} quote</span>
-                )}
-                {lead.load_size && (
-                  <span className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 capitalize">{lead.load_size.replace('_', ' ')}</span>
-                )}
-                <span className="text-xs text-gray-400">
-                  {new Date(lead.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </span>
-                {lead.follow_up_sent && <span className="text-xs bg-blue-50 text-blue-600 rounded px-1.5 py-0.5">Followed up</span>}
+
+      {withPrice.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Got a price — didn&apos;t book</p>
+          {withPrice.map((lead) => (
+            <div key={lead.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <a href={`tel:${lead.phone}`} className="text-orange-600 font-semibold text-sm">{lead.phone}</a>
+                  <div className="flex gap-2 mt-1 flex-wrap">
+                    <span className="text-xs bg-green-50 text-green-700 rounded px-1.5 py-0.5 font-medium">${lead.ai_price_estimate} quote</span>
+                    {lead.load_size && (
+                      <span className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 capitalize">{lead.load_size.replace('_', ' ')}</span>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      {new Date(lead.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {lead.follow_up_sent && <span className="text-xs bg-blue-50 text-blue-600 rounded px-1.5 py-0.5">Followed up</span>}
+                  </div>
+                </div>
+                <a href={`tel:${lead.phone}`} className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
               </div>
             </div>
-            <a
-              href={`tel:${lead.phone}`}
-              className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0"
-            >
-              Call
-            </a>
-          </div>
+          ))}
         </div>
-      ))}
+      )}
+
+      {withoutPrice.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Entered phone — no price yet</p>
+          {withoutPrice.map((lead) => (
+            <div key={lead.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <a href={`tel:${lead.phone}`} className="text-orange-600 font-semibold text-sm">{lead.phone}</a>
+                  <div className="flex gap-2 mt-1 flex-wrap">
+                    <span className="text-xs bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5">No photos uploaded</span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(lead.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+                <a href={`tel:${lead.phone}`} className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
