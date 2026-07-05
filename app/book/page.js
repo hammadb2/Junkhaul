@@ -305,7 +305,7 @@ function PhotoStep({ state, update, onNext }) {
           </button>
 
           <a
-            href="tel:+14127149201"
+            href="tel:+15873250751"
             className="text-sm text-orange-600 font-medium underline text-center"
           >
             Prefer to call? Ring us — we&apos;ll price it over the phone
