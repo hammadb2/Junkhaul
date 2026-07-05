@@ -19,7 +19,7 @@ export default function Home() {
       >
         <Image
           src="/logo/full.png"
-          alt="Junk Haul Calgary — Same Day. Calgary."
+          alt="Junk Haul Calgary. Same Day. Calgary."
           width={260}
           height={260}
           priority

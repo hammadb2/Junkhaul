@@ -13,7 +13,7 @@ export default function FAQPage() {
 
       <h1 className="text-2xl font-bold text-gray-900 mb-1">What we haul</h1>
       <p className="text-gray-500 text-sm mb-6">
-        Almost anything — here&apos;s the full list.
+        Almost anything, here&apos;s the full list.
       </p>
 
       <Section title="✅ We haul these (included in base price)">
@@ -41,14 +41,14 @@ export default function FAQPage() {
 
       <Section title="🚫 We cannot haul these (no exceptions)">
         <ul className="space-y-1.5 text-sm text-gray-700">
-          <li>Open or liquid paint cans (dried solid paint only — harden with kitty litter first)</li>
+          <li>Open or liquid paint cans (dried solid paint only, harden with kitty litter first)</li>
           <li>Pool chemicals, pesticides, cleaning solvents, acids</li>
           <li>Gasoline, diesel, motor oil, hydraulic fluid</li>
           <li>Propane tanks (full or empty)</li>
           <li>Asbestos-containing materials (requires certified HAZMAT removal)</li>
           <li>Medical waste, sharps, biohazardous materials</li>
           <li>Car batteries (Canadian Tire accepts these free)</li>
-          <li>Tires (City of Calgary accepts these — calgary.ca/waste)</li>
+          <li>Tires (City of Calgary accepts these, calgary.ca/waste)</li>
           <li>Ammunition or explosives</li>
           <li>Compressed gas cylinders</li>
         </ul>

@@ -52,7 +52,7 @@ export default function PayPage() {
             Pay your deposit
           </h1>
           <p className="text-gray-500 text-sm mb-5">
-            Hi {data.booking.name} — a $50 deposit locks in booking{' '}
+            Hi {data.booking.name}, a $50 deposit locks in booking{' '}
             {data.booking.booking_ref}.
           </p>
           <PaymentStep
