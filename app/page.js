@@ -72,7 +72,9 @@ export default function Home() {
         </motion.div>
       </div>
 
-      <p className="text-center text-xs text-gray-400 mt-6">Same Day. Calgary.</p>
+      <p className="text-center text-xs text-gray-400 mt-6">
+        <Link href="/faq" className="underline">What do we haul?</Link> · Same Day. Calgary.
+      </p>
     </main>
   );
 }

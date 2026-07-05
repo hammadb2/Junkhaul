@@ -24,7 +24,10 @@ Today's your pickup: ${formatTime(b.job_time)}
 📍 ${b.address}
 💳 Balance due: $${b.balance_due} (cash or card)
 
-We'll text when we're on the way. Reply here with any questions!`;
+Reply CANCEL to cancel (deposit kept within 24hrs)
+Reply RESCHEDULE to move your booking
+
+We'll text when we're on the way!`;
     try {
       await sendSMS(b.phone, body, b.id, 'reminder');
       await supabase.from('bookings').update({ morning_reminder_sent: true }).eq('id', b.id);
