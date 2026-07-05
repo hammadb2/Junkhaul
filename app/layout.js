@@ -16,13 +16,13 @@ export const metadata = {
     siteName: 'Junk Haul Calgary',
     locale: 'en_CA',
     type: 'website',
-    images: [{ url: '/logo/stampede-banner.png', width: 800, height: 533, alt: 'Junk Haul Calgary' }],
+    images: [{ url: '/logo/stampede-alt.png', width: 256, height: 256, alt: 'Junk Haul Calgary' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Junk Haul Calgary. Same Day. Calgary.',
     description: 'Instant price. Same day. No hidden fees.',
-    images: ['/logo/stampede-banner.png'],
+    images: ['/logo/stampede-alt.png'],
   },
 };
 
