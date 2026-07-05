@@ -11,6 +11,7 @@ const RouteMap = dynamic(() => import('@/components/admin/RouteMap'), { ssr: fal
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const [view, setView] = useState('dispatch');
   const [bookings, setBookings] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -76,7 +77,19 @@ export default function AdminDashboard() {
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <Logo className="h-7" />
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-gray-500">Dispatch</span>
+          <div className="flex gap-1 text-xs">
+            {['dispatch', 'earnings', 'waitlist'].map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-3 py-1.5 rounded-lg capitalize font-medium ${
+                  view === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
           <button onClick={logout} className="text-sm text-gray-400 underline">
             Log out
           </button>
@@ -84,97 +97,107 @@ export default function AdminDashboard() {
       </header>
 
       <div className="max-w-3xl mx-auto p-4 space-y-4">
-        {stats && (
-          <div className="grid grid-cols-4 gap-2">
-            <Stat label="Jobs" value={stats.jobs} />
-            <Stat label="Revenue" value={`$${stats.revenue}`} />
-            <Stat label="Flagged" value={stats.flagged} accent={stats.flagged > 0} />
-            <Stat label="High risk" value={stats.high_risk} accent={stats.high_risk > 0} />
-          </div>
-        )}
-
-        {loading ? (
-          <p className="text-gray-500 text-center py-10">Loading…</p>
-        ) : dates.length === 0 ? (
-          <p className="text-gray-500 text-center py-10">No upcoming jobs.</p>
-        ) : (
+        {view === 'dispatch' && (
           <>
-            <div className="flex gap-2 overflow-x-auto no-scrollbar">
-              {dates.map((d) => (
-                <button
-                  key={d}
-                  onClick={() => {
-                    setActiveDate(d);
-                    setRouteOrder(null);
-                  }}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap ${
-                    activeDate === d ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-700'
-                  }`}
-                >
-                  {formatDateLong(d)}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={optimise}
-              disabled={optimising}
-              className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl disabled:bg-orange-300"
-            >
-              {optimising ? 'Optimising route…' : '🗺️ Optimise route for this day'}
-            </button>
-
-            {routeOrder && routeOrder.length > 0 && (
-              <div className="space-y-2">
-                <RouteMap stops={routeOrder} />
-                {routeSummary && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-3 grid grid-cols-4 gap-2 text-center text-xs">
-                    <div><div className="font-bold text-gray-900">{routeSummary.jobs}</div><div className="text-gray-400">Jobs</div></div>
-                    <div><div className="font-bold text-gray-900">${routeSummary.total_revenue}</div><div className="text-gray-400">Revenue</div></div>
-                    <div><div className="font-bold text-gray-900">${routeSummary.total_est_profit}</div><div className="text-gray-400">Est. Profit</div></div>
-                    <div><div className="font-bold text-gray-900">{routeSummary.avg_margin}</div><div className="text-gray-400">Margin</div></div>
-                  </div>
-                )}
-                <ol className="bg-white rounded-xl border border-gray-200 divide-y">
-                  {routeOrder.map((s) => (
-                    <li key={s.id} className="px-3 py-2 flex items-center gap-3 text-sm">
-                      <span className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold">
-                        {s.position}
-                      </span>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{s.name}</span>
-                          <span className="text-gray-400">{s.quadrant}</span>
-                        </div>
-                        <div className="text-xs text-gray-500">{s.address}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">${s.total_price}</div>
-                        {s.est_profit !== undefined && (
-                          <div className="text-xs text-green-600">~${s.est_profit} profit</div>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+            {stats && (
+              <div className="grid grid-cols-4 gap-2">
+                <Stat label="Jobs" value={stats.jobs} />
+                <Stat label="Revenue" value={`$${stats.revenue}`} />
+                <Stat label="Flagged" value={stats.flagged} accent={stats.flagged > 0} />
+                <Stat label="High risk" value={stats.high_risk} accent={stats.high_risk > 0} />
               </div>
             )}
 
-            <div className="space-y-3">
-              {dayBookings.map((b) => (
-                <JobCard key={b.id} b={b} act={act} />
-              ))}
-            </div>
+            {loading ? (
+              <p className="text-gray-500 text-center py-10">Loading…</p>
+            ) : dates.length === 0 ? (
+              <p className="text-gray-500 text-center py-10">No upcoming jobs.</p>
+            ) : (
+              <>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                  {dates.map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => {
+                        setActiveDate(d);
+                        setRouteOrder(null);
+                      }}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap ${
+                        activeDate === d ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {formatDateLong(d)}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={optimise}
+                  disabled={optimising}
+                  className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl disabled:bg-orange-300"
+                >
+                  {optimising ? 'Optimising route…' : '🗺️ Optimise route for this day'}
+                </button>
+
+                {routeOrder && routeOrder.length > 0 && (
+                  <div className="space-y-2">
+                    <RouteMap stops={routeOrder} />
+                    {routeSummary && (
+                      <div className="bg-white rounded-xl border border-gray-200 p-3 grid grid-cols-4 gap-2 text-center text-xs">
+                        <div><div className="font-bold text-gray-900">{routeSummary.jobs}</div><div className="text-gray-400">Jobs</div></div>
+                        <div><div className="font-bold text-gray-900">${routeSummary.total_revenue}</div><div className="text-gray-400">Revenue</div></div>
+                        <div><div className="font-bold text-gray-900">${routeSummary.total_est_profit}</div><div className="text-gray-400">Est. Profit</div></div>
+                        <div><div className="font-bold text-gray-900">{routeSummary.avg_margin}</div><div className="text-gray-400">Margin</div></div>
+                      </div>
+                    )}
+                    <ol className="bg-white rounded-xl border border-gray-200 divide-y">
+                      {routeOrder.map((s) => (
+                        <li key={s.id} className="px-3 py-2 flex items-center gap-3 text-sm">
+                          <span className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold">
+                            {s.position}
+                          </span>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{s.name}</span>
+                              <span className="text-gray-400">{s.quadrant}</span>
+                            </div>
+                            <div className="text-xs text-gray-500">{s.address}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">${s.total_price}</div>
+                            {s.est_profit !== undefined && (
+                              <div className="text-xs text-green-600">~${s.est_profit} profit</div>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {dayBookings.map((b) => (
+                    <JobCard key={b.id} b={b} act={act} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            <ManualBookingButton onCreated={load} />
+            <AddCustomDateButton onAdded={load} />
           </>
         )}
 
-        <ManualBookingButton onCreated={load} />
-        <AddCustomDateButton onAdded={load} />
+        {view === 'earnings' && <EarningsDashboard />}
+        {view === 'waitlist' && <WaitlistView />}
       </div>
     </main>
   );
 }
 
+// ============================================================
+// STAT
+// ============================================================
 function Stat({ label, value, accent }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
@@ -186,18 +209,48 @@ function Stat({ label, value, accent }) {
   );
 }
 
+// ============================================================
+// JOB CARD — upgraded with all improvements
+// ============================================================
 function JobCard({ b, act }) {
   const [open, setOpen] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState(b.job_date);
+  const [rescheduleTime, setRescheduleTime] = useState(b.job_time);
+  const [rescheduleSlots, setRescheduleSlots] = useState([]);
+  const [lightbox, setLightbox] = useState(null);
   const done = b.status === 'completed';
+  const isNoShow = b.status === 'no_show';
+
+  const loadRescheduleSlots = async (date) => {
+    setRescheduleDate(date);
+    if (!date) return;
+    const res = await fetch('/api/slots');
+    const data = await res.json();
+    const day = (data.days || []).find((d) => d.date === date);
+    setRescheduleSlots(day?.slots || []);
+  };
 
   return (
-    <div className={`bg-white rounded-2xl border p-4 ${b.flag_for_review ? 'border-orange-300' : 'border-gray-200'}`}>
+    <div className={`bg-white rounded-2xl border p-4 ${
+      b.flag_for_review ? 'border-orange-300' :
+      isNoShow ? 'border-gray-300' :
+      'border-gray-200'
+    }`}>
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900">{b.name}</span>
             {b.quadrant && <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5">{b.quadrant}</span>}
+            {b.source && b.source !== 'web' && (
+              <span className="text-xs bg-blue-50 text-blue-600 rounded px-1.5 py-0.5 capitalize">{b.source}</span>
+            )}
+            {!b.deposit_paid && (
+              <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5">⚠️ No deposit</span>
+            )}
             {done && <span className="text-xs bg-green-100 text-green-700 rounded px-1.5 py-0.5">Done</span>}
+            {isNoShow && <span className="text-xs bg-gray-100 text-gray-500 rounded px-1.5 py-0.5">No-show</span>}
           </div>
           <a href={`tel:${b.phone}`} className="text-sm text-orange-600">{b.phone}</a>
           <p className="text-sm text-gray-500">{b.address}</p>
@@ -209,28 +262,57 @@ function JobCard({ b, act }) {
         </div>
       </div>
 
+      {/* Flags */}
       {b.flag_for_review && (
         <p className="mt-2 text-xs text-orange-700 bg-orange-50 rounded p-2">
           🚨 {b.flag_reason || 'Flagged for review'}
         </p>
       )}
-      {b.has_freon && <p className="mt-1 text-xs text-blue-700">🌡️ Freon appliance, bring straps</p>}
+      {b.has_freon && <p className="mt-1 text-xs text-blue-700">🌡️ Freon appliance ({b.freon_count || 1}), bring straps</p>}
       {(b.no_show_risk_score || 0) >= 50 && (
         <p className="mt-1 text-xs text-red-600">⚠️ No-show risk {b.no_show_risk_score}%</p>
       )}
-      {b.photos?.length > 0 && (
-        <div className="mt-2 flex gap-2 overflow-x-auto no-scrollbar">
-          {b.photos.map((p, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={p} alt="job" className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
-          ))}
-        </div>
+
+      {/* Booking notes (from customer at booking time) */}
+      {b.description_text && (
+        <p className="mt-2 text-xs text-gray-500 bg-gray-50 rounded p-2">
+          📋 {b.description_text}
+        </p>
       )}
 
-      {!done && (
+      {/* Photos with lightbox */}
+      {b.photos?.length > 0 && (
+        <>
+          <div className="mt-2 flex gap-2 overflow-x-auto no-scrollbar">
+            {b.photos.map((p, i) => (
+              <button key={i} onClick={() => setLightbox(p)} className="flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p} alt="job" className="h-16 w-16 rounded-lg object-cover" />
+              </button>
+            ))}
+          </div>
+          {lightbox && (
+            <div
+              className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+              onClick={() => setLightbox(null)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={lightbox} alt="job photo" className="max-w-full max-h-full rounded-xl object-contain" />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Operator notes */}
+      <OperatorNotes bookingId={b.id} initial={b.operator_notes} />
+
+      {/* Action buttons */}
+      {!done && !isNoShow && (
         <div className="mt-3 flex gap-2">
           <button
-            onClick={() => act('complete', { booking_id: b.id })}
+            onClick={() =>
+              act('complete', { booking_id: b.id }, `Mark ${b.name}'s job as complete and collect $${b.balance_due} balance?`)
+            }
             className="flex-1 bg-green-600 text-white text-sm font-semibold py-2 rounded-lg"
           >
             ✓ Complete
@@ -239,43 +321,319 @@ function JobCard({ b, act }) {
             onClick={() => setOpen((o) => !o)}
             className="flex-1 border border-gray-300 text-sm font-semibold py-2 rounded-lg"
           >
-            Manage
+            ···
           </button>
         </div>
       )}
 
-      {open && !done && (
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={() =>
-              act(
-                'cancel',
-                { booking_id: b.id, reason: 'Operator cancelled', by: 'operator' },
-                'Cancel this job and refund the $50 deposit?'
-              )
-            }
-            className="flex-1 border border-red-300 text-red-600 text-sm py-2 rounded-lg"
-          >
-            Cancel + refund
-          </button>
-          <button
-            onClick={() => {
-              const nd = window.prompt('New date (YYYY-MM-DD)?', b.job_date);
-              if (!nd) return;
-              const nt = window.prompt('New time (HH:MM 24h)?', b.job_time);
-              if (!nt) return;
-              act('reschedule', { booking_id: b.id, new_date: nd, new_time: nt });
-            }}
-            className="flex-1 border border-gray-300 text-sm py-2 rounded-lg"
-          >
-            Reschedule
-          </button>
+      {/* Management panel */}
+      {open && !done && !isNoShow && !rescheduling && (
+        <div className="mt-3 space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() =>
+                act('cancel', { booking_id: b.id, reason: 'Operator cancelled', by: 'operator' }, 'Cancel job and refund $50?')
+              }
+              className="border border-red-300 text-red-600 text-sm py-2 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => act('no-show', { booking_id: b.id }, `Mark ${b.name} as a no-show?`)}
+              className="border border-orange-300 text-orange-600 text-sm py-2 rounded-lg"
+            >
+              No-show
+            </button>
+            <button
+              onClick={() => { setRescheduling(true); loadRescheduleSlots(b.job_date); }}
+              className="border border-gray-300 text-sm py-2 rounded-lg"
+            >
+              Reschedule
+            </button>
+          </div>
+          <QuickSMS bookingId={b.id} phone={b.phone} name={b.name} />
+        </div>
+      )}
+
+      {/* Inline reschedule UI */}
+      {rescheduling && !done && !isNoShow && (
+        <div className="mt-3 space-y-2 border border-gray-200 rounded-xl p-3">
+          <p className="text-xs font-semibold text-gray-600">Reschedule to:</p>
+          <input
+            type="date"
+            value={rescheduleDate}
+            onChange={(e) => loadRescheduleSlots(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+          {rescheduleSlots.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {rescheduleSlots.map((s) => (
+                <button
+                  key={s.time}
+                  onClick={() => setRescheduleTime(s.time)}
+                  className={`px-2 py-1 rounded text-xs ${
+                    rescheduleTime === s.time ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setRescheduling(false)}
+              className="flex-1 border border-gray-300 text-sm py-2 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                act('reschedule', {
+                  booking_id: b.id,
+                  new_date: rescheduleDate,
+                  new_time: rescheduleTime,
+                });
+                setRescheduling(false);
+              }}
+              className="flex-1 bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg"
+            >
+              Confirm reschedule
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
+// ============================================================
+// OPERATOR NOTES
+// ============================================================
+function OperatorNotes({ bookingId, initial }) {
+  const [notes, setNotes] = useState(initial || '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    await fetch('/api/admin/update-notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: bookingId, operator_notes: notes }),
+    });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div className="mt-2 space-y-1">
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Operator notes (e.g. gate code, extra items, cash collected)"
+        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs h-14 resize-none"
+      />
+      <button
+        onClick={save}
+        disabled={saving}
+        className="text-xs text-orange-600 font-medium"
+      >
+        {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save notes'}
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
+// QUICK SMS
+// ============================================================
+function QuickSMS({ bookingId, phone, name }) {
+  const [msg, setMsg] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const send = async () => {
+    if (!msg.trim()) return;
+    setSending(true);
+    await fetch('/api/admin/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: bookingId, phone, message: msg }),
+    });
+    setSending(false);
+    setSent(true);
+    setMsg('');
+    setTimeout(() => setSent(false), 3000);
+  };
+
+  return (
+    <div className="space-y-1">
+      <textarea
+        value={msg}
+        onChange={(e) => setMsg(e.target.value)}
+        placeholder={`Quick text to ${name}…`}
+        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs h-14 resize-none"
+      />
+      <button
+        onClick={send}
+        disabled={sending || !msg.trim()}
+        className="w-full bg-gray-800 text-white text-sm py-2 rounded-lg font-medium disabled:bg-gray-300"
+      >
+        {sending ? 'Sending…' : sent ? '✓ Sent' : `📱 Send to ${name}`}
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
+// EARNINGS DASHBOARD
+// ============================================================
+function EarningsDashboard() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/earnings')
+      .then((r) => r.json())
+      .then((d) => { setData(d); setLoading(false); });
+  }, []);
+
+  if (loading) return <p className="text-center text-gray-400 py-10">Loading earnings…</p>;
+  if (!data) return null;
+
+  const sources = Object.entries(data.sourceBreakdown || {}).sort((a, b) => b[1].count - a[1].count);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="text-2xl font-bold text-gray-900">${data.totalEarned.toLocaleString()}</div>
+          <div className="text-sm text-gray-500 mt-1">Total earned</div>
+          <div className="text-xs text-gray-400">{data.completedJobs} jobs completed</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="text-2xl font-bold text-orange-600">${data.totalPipeline.toLocaleString()}</div>
+          <div className="text-sm text-gray-500 mt-1">In pipeline</div>
+          <div className="text-xs text-gray-400">{data.upcomingJobs} confirmed upcoming</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="text-2xl font-bold text-gray-900">${data.avgJobValue}</div>
+          <div className="text-sm text-gray-500 mt-1">Avg job value</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="text-2xl font-bold text-green-600">
+            ${(data.totalEarned + data.totalPipeline).toLocaleString()}
+          </div>
+          <div className="text-sm text-gray-500 mt-1">Total + pipeline</div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-200 p-4">
+        <h3 className="font-semibold text-gray-900 mb-3">Where bookings come from</h3>
+        <div className="space-y-2">
+          {sources.map(([source, stats]) => (
+            <div key={source} className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="capitalize font-medium text-gray-800">{source}</span>
+                <span className="text-gray-400">{stats.count} jobs</span>
+              </div>
+              <span className="font-semibold text-gray-700">${stats.revenue}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-200 p-4">
+        <h3 className="font-semibold text-gray-900 mb-3">Revenue by work day</h3>
+        <div className="space-y-2">
+          {Object.entries(data.byDate).map(([date, stats]) => (
+            <div key={date} className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">{date}</span>
+              <div className="flex gap-3">
+                <span className="text-gray-400">{stats.jobs} jobs</span>
+                <span className="font-semibold">${stats.revenue}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// WAITLIST VIEW
+// ============================================================
+function WaitlistView() {
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    fetch('/api/admin/waitlist')
+      .then((r) => r.json())
+      .then((d) => { setList(d.waitlist || []); setLoading(false); });
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const notify = async (entry) => {
+    if (!window.confirm(`Text ${entry.name} a slot-open notification?`)) return;
+    await fetch('/api/admin/waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: entry.id, phone: entry.phone, name: entry.name }),
+    });
+    load();
+  };
+
+  if (loading) return <p className="text-center text-gray-400 py-10">Loading waitlist…</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-500">{list.length} {list.length === 1 ? 'person' : 'people'} waiting for a slot</p>
+      {list.length === 0 && (
+        <p className="text-center text-gray-400 py-10">Waitlist is empty.</p>
+      )}
+      {list.map((entry) => (
+        <div key={entry.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="font-semibold text-gray-900">{entry.name}</p>
+              <a href={`tel:${entry.phone}`} className="text-sm text-orange-600">{entry.phone}</a>
+              {entry.address && <p className="text-xs text-gray-500 mt-0.5">{entry.address}</p>}
+              <div className="flex gap-2 mt-1 flex-wrap">
+                {entry.preferred_day_type && (
+                  <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5 capitalize">{entry.preferred_day_type}</span>
+                )}
+                {entry.load_size && (
+                  <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5 capitalize">{entry.load_size}</span>
+                )}
+                <span className="text-xs text-gray-400">
+                  Joined {new Date(entry.created_at).toLocaleDateString()}
+                </span>
+                {entry.notified && (
+                  <span className="text-xs bg-blue-50 text-blue-600 rounded px-1.5 py-0.5">Notified</span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => notify(entry)}
+              className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg ml-3 flex-shrink-0"
+            >
+              Notify
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================
+// MANUAL BOOKING
+// ============================================================
 function ManualBookingButton({ onCreated }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -339,7 +697,6 @@ function ManualBookingButton({ onCreated }) {
     );
   }
 
-  // Calculate live price
   const livePrice = calculatePrice({
     load_size: form.load_size,
     same_day: form.same_day,
@@ -404,7 +761,6 @@ function ManualBookingButton({ onCreated }) {
 
       <textarea value={form.notes} onChange={set('notes')} placeholder="Internal notes (optional, not sent to customer)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm h-16" />
 
-      {/* Live price summary */}
       <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
         <div className="flex justify-between"><span>Base ({LOAD_LABELS[form.load_size]})</span><span>${livePrice.base_price}</span></div>
         {livePrice.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({form.freon_count})</span><span>${livePrice.freon_fee}</span></div>}
@@ -426,6 +782,9 @@ function ManualBookingButton({ onCreated }) {
   );
 }
 
+// ============================================================
+// ADD CUSTOM DATE
+// ============================================================
 function AddCustomDateButton({ onAdded }) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState('');
@@ -479,7 +838,7 @@ function AddCustomDateButton({ onAdded }) {
         <label className="text-xs text-gray-500">Max jobs per slot</label>
         <input type="number" min="1" max="10" value={maxJobs} onChange={(e) => setMaxJobs(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
       </div>
-      <p className="text-xs text-gray-400">Slots: 7:30 AM, 9:00 AM, 11:00 AM, 1:00 PM (last job starts by 1 PM so you finish before dump closes at 5 PM)</p>
+      <p className="text-xs text-gray-400">Slots: 7:30 AM, 9:00 AM, 11:00 AM, 1:00 PM</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button onClick={() => setOpen(false)} className="flex-1 border border-gray-300 text-sm py-2 rounded-lg">Cancel</button>
