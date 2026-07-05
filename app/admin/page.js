@@ -146,6 +146,8 @@ export default function AdminDashboard() {
             </div>
           </>
         )}
+
+        <ManualBookingButton onCreated={load} />
       </div>
     </main>
   );
@@ -248,6 +250,76 @@ function JobCard({ b, act }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ManualBookingButton({ onCreated }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: '', phone: '', address: '', load_size: 'quarter',
+    job_date: '', job_time: '09:00', same_day: false, stairs: 0, has_freon: false,
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/create-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, source: 'phone', photo_skipped: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setOpen(false);
+      setForm({ name: '', phone: '', address: '', load_size: 'quarter', job_date: '', job_time: '09:00', same_day: false, stairs: 0, has_freon: false });
+      onCreated();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-sm font-semibold text-gray-600 hover:border-orange-400 hover:text-orange-600"
+      >
+        + Add manual booking
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+      <h3 className="font-bold text-gray-900">Manual booking</h3>
+      <input value={form.name} onChange={set('name')} placeholder="Customer name" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+      <input value={form.phone} onChange={set('phone')} placeholder="Phone (+1...)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+      <input value={form.address} onChange={set('address')} placeholder="Pickup address" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+      <div className="grid grid-cols-2 gap-2">
+        <select value={form.load_size} onChange={set('load_size')} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="single_item">1-2 items ($99)</option>
+          <option value="quarter">Small ($160)</option>
+          <option value="half">Half ($240)</option>
+          <option value="full">Full ($380)</option>
+        </select>
+        <input type="date" value={form.job_date} onChange={set('job_date')} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <input type="time" value={form.job_time} onChange={set('job_time')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={() => setOpen(false)} className="flex-1 border border-gray-300 text-sm py-2 rounded-lg">Cancel</button>
+        <button onClick={submit} disabled={submitting || !form.name || !form.phone || !form.address || !form.job_date} className="flex-1 bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg disabled:bg-orange-300">
+          {submitting ? 'Creating…' : 'Create + send deposit link'}
+        </button>
+      </div>
     </div>
   );
 }

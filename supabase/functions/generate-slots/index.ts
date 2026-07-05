@@ -2,7 +2,7 @@ import { supabase } from '../_shared/clients.ts';
 import { edmontonNow } from '../_shared/time.ts';
 
 // Operating days: Thursday (4) and Sunday (0). Slot times (Calgary local).
-const SLOT_TIMES = ['07:30', '09:00', '10:30', '12:00', '13:30', '15:00', '16:30'];
+const SLOT_TIMES = ['07:30', '09:00', '11:00', '13:00', '15:00'];
 const MAX_JOBS = 5;
 const WEEKS_AHEAD = 8;
 

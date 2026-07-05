@@ -113,15 +113,17 @@ select cron.schedule(
   $$
 );
 
--- ── CRON 7: Waitlist expiry cleanup (every hour, pure SQL) ──
+-- ── CRON 7: Waitlist expiry cleanup + SMS (every hour) ──
 select cron.schedule(
   'waitlist-cleanup',
   '0 * * * *',
   $$
-  update waitlist
-  set notified = false
-  where notified = true
-    and expires_at < now()
-    and converted_to_booking_id is null;
+  select net.http_post(
+    url := '{SUPABASE_URL}/functions/v1/waitlist-expiry',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer {SUPABASE_ANON_KEY}',
+      'Content-Type', 'application/json'
+    )
+  );
   $$
 );

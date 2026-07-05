@@ -167,10 +167,34 @@ function PhotoStep({ state, update, onNext }) {
   const [showDescribe, setShowDescribe] = useState(false);
   const fileRef = useRef(null);
 
-  const toBase64 = (file) =>
+  // Resize + compress images client-side before base64 encoding.
+  // Phone photos are 3-10MB each; without this the /api/analyze request
+  // body blows past Vercel's 4.5MB limit and Groq's payload limits.
+  const toCompressedBase64 = (file, maxDim = 1024, quality = 0.8) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl.split(',')[1]);
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
@@ -178,7 +202,7 @@ function PhotoStep({ state, update, onNext }) {
   const handleFiles = async (e) => {
     const files = Array.from(e.target.files || []).slice(0, 5);
     if (files.length === 0) return;
-    const base64s = await Promise.all(files.map(toBase64));
+    const base64s = await Promise.all(files.map((f) => toCompressedBase64(f)));
     update({ photos: base64s });
     analyze(base64s, null);
   };
@@ -279,6 +303,13 @@ function PhotoStep({ state, update, onNext }) {
           >
             Skip — I&apos;ll pick my load size myself
           </button>
+
+          <a
+            href="tel:+14127149201"
+            className="text-sm text-orange-600 font-medium underline text-center"
+          >
+            Prefer to call? Ring us — we&apos;ll price it over the phone
+          </a>
         </>
       )}
     </div>

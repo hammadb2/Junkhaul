@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { calculatePrice } from '@/lib/pricing';
+import { cancelBooking } from '@/lib/cancellations';
+import { rescheduleBooking } from '@/lib/reschedule';
+import { edmontonNowParts } from '@/lib/dates';
 
 export const runtime = 'nodejs';
 
@@ -65,6 +68,75 @@ export async function POST(req) {
   }
   if (upper === 'HELP') {
     await sendSMS(from, 'Junk Haul Calgary — same-day junk removal. Book at junkhaul.ca or call us. Reply STOP to opt out.', recentBooking?.id, 'help');
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── CANCEL — customer cancels their booking via SMS ──
+  if (upper === 'CANCEL' && recentBooking && recentBooking.status !== 'cancelled' && recentBooking.status !== 'completed') {
+    try {
+      await cancelBooking(recentBooking.id, 'Customer requested via SMS', 'customer');
+      // SMS to customer + operator sent inside cancelBooking()
+    } catch (err) {
+      await sendSMS(from, `Sorry, I couldn't cancel booking ${recentBooking.booking_ref}. Please call us.`, recentBooking.id, 'error');
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── RESCHEDULE — send day options ──
+  if (upper === 'RESCHEDULE' && recentBooking && recentBooking.status !== 'cancelled' && recentBooking.status !== 'completed') {
+    await sendSMS(
+      from,
+      `To reschedule booking ${recentBooking.booking_ref}, reply with:\n\nTHURSDAY — next available Thursday\nSUNDAY — next available Sunday\n\nOr call us to pick a specific time.`,
+      recentBooking.id,
+      'reschedule_options'
+    );
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── THURSDAY / SUNDAY — pick next available slot for reschedule ──
+  if ((upper === 'THURSDAY' || upper === 'SUNDAY') && recentBooking && recentBooking.status !== 'cancelled' && recentBooking.status !== 'completed') {
+    const dayType = upper.toLowerCase();
+    const today = edmontonNowParts().date;
+    const { data: nextSlot } = await supabaseAdmin
+      .from('schedule')
+      .select('*')
+      .eq('day_type', dayType)
+      .eq('is_available', true)
+      .gt('slot_date', today)
+      .order('slot_date', { ascending: true })
+      .order('slot_time', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (nextSlot) {
+      const result = await rescheduleBooking(recentBooking.id, nextSlot.slot_date, nextSlot.slot_time);
+      if (!result.success) {
+        await sendSMS(from, `${result.error}\n\nBook at junkhaul.ca`, recentBooking.id, 'error');
+      }
+      // Success SMS sent inside rescheduleBooking()
+    } else {
+      await sendSMS(
+        from,
+        `Sorry, no ${upper} slots available right now. Check junkhaul.ca or call us.`,
+        recentBooking.id,
+        'no_slots'
+      );
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── NO — decline a pending load upgrade ──
+  if (upper === 'NO' && recentBooking?.upgrade_pending) {
+    await supabaseAdmin
+      .from('bookings')
+      .update({ upgrade_pending: false })
+      .eq('id', recentBooking.id);
+    await sendSMS(
+      from,
+      `No problem — your original booking stands. See you ${recentBooking.job_date} at ${recentBooking.job_time}! Ref: ${recentBooking.booking_ref}`,
+      recentBooking.id,
+      'upgrade_declined'
+    );
     return NextResponse.json({ ok: true });
   }
 
