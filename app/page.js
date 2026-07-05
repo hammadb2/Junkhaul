@@ -20,10 +20,10 @@ export default function Home() {
         <Image
           src="/logo/stampede-banner.png"
           alt="Junk Haul Calgary. Same Day. Calgary."
-          width={300}
-          height={200}
+          width={320}
+          height={214}
           priority
-          className="w-56 h-auto"
+          className="w-64 h-auto object-contain"
         />
       </motion.div>
 
