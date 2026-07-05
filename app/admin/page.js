@@ -933,14 +933,31 @@ function DepartureCountdown() {
 // ============================================================
 function ScheduleView() {
   const [schedule, setSchedule] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [addingDate, setAddingDate] = useState('');
-  const [addingMax, setAddingMax] = useState(5);
+  const [addingMax, setAddingMax] = useState(1);
+  const [bulkMax, setBulkMax] = useState(1);
+  const [showBulk, setShowBulk] = useState(false);
+
+  // Calgary current time for past-slot detection
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' });
+  const currentTimeStr = now.toLocaleTimeString('en-CA', {
+    timeZone: 'America/Edmonton',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 
   const load = () => {
     fetch('/api/admin/schedule')
       .then((r) => r.json())
-      .then((d) => { setSchedule(d.schedule || []); setLoading(false); });
+      .then((d) => {
+        setSchedule(d.schedule || []);
+        setStats(d.stats || null);
+        setLoading(false);
+      });
   };
 
   useEffect(() => { load(); }, []);
@@ -960,15 +977,85 @@ function ScheduleView() {
     setAddingDate('');
   };
 
-  const TIME_LABELS = { '07:30': '7:30 AM', '09:00': '9:00 AM', '11:00': '11:00 AM', '13:00': '1:00 PM' };
+  const applyBulkMax = async () => {
+    if (!window.confirm(`Set ALL future empty slots to ${bulkMax} job/slot? This won't affect already-booked slots.`)) return;
+    await act({ action: 'bulk_set_max', max_jobs: bulkMax });
+    setShowBulk(false);
+  };
+
+  const TIME_LABELS = {
+    '07:30': '7:30 AM',
+    '09:00': '9:00 AM',
+    '11:00': '11:00 AM',
+    '13:00': '1:00 PM',
+  };
 
   if (loading) return <p className="text-center text-gray-400 py-10">Loading schedule…</p>;
 
   return (
     <div className="space-y-4">
-      {/* Add a new operating day */}
+
+      {/* Summary stats */}
+      {stats && (
+        <div className="grid grid-cols-4 gap-2">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+            <div className="text-xl font-bold text-gray-900">{stats.operatingDays}</div>
+            <div className="text-xs text-gray-400">Operating days</div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+            <div className="text-xl font-bold text-gray-900">{stats.totalBooked}</div>
+            <div className="text-xs text-gray-400">Booked</div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+            <div className="text-xl font-bold text-gray-900">{stats.totalUpcomingSlots}</div>
+            <div className="text-xs text-gray-400">Capacity</div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+            <div className={`text-xl font-bold ${stats.fillRate > 70 ? 'text-orange-600' : 'text-gray-900'}`}>
+              {stats.fillRate}%
+            </div>
+            <div className="text-xs text-gray-400">Fill rate</div>
+          </div>
+        </div>
+      )}
+
+      {/* Add operating day */}
       <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
-        <h3 className="font-bold text-gray-900">Add operating day</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">Add operating day</h3>
+          <button
+            onClick={() => setShowBulk((s) => !s)}
+            className="text-xs text-orange-600 font-medium"
+          >
+            Bulk update all →
+          </button>
+        </div>
+
+        {showBulk && (
+          <div className="bg-orange-50 rounded-xl p-3 space-y-2">
+            <p className="text-xs text-orange-700 font-medium">
+              Set capacity for ALL future empty slots at once. Use this if you add a second crew.
+            </p>
+            <div className="flex gap-2">
+              <select
+                value={bulkMax}
+                onChange={(e) => setBulkMax(parseInt(e.target.value))}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                {[1, 2, 3].map((n) => (
+                  <option key={n} value={n}>{n} job{n > 1 ? 's' : ''}/slot</option>
+                ))}
+              </select>
+              <button
+                onClick={applyBulkMax}
+                className="flex-1 bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg"
+              >
+                Apply to all future slots
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <input
             type="date"
@@ -981,7 +1068,7 @@ function ScheduleView() {
             onChange={(e) => setAddingMax(parseInt(e.target.value))}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
-            {[1,2,3,4,5].map((n) => (
+            {[1, 2, 3].map((n) => (
               <option key={n} value={n}>{n} job{n > 1 ? 's' : ''}/slot</option>
             ))}
           </select>
@@ -994,11 +1081,10 @@ function ScheduleView() {
           </button>
         </div>
         <p className="text-xs text-gray-400">
-          Slots auto-added at 7:30 AM, 9:00 AM, 11:00 AM, 1:00 PM. Only Thu/Sun generate automatically each week.
+          Thu/Sun auto-generate 16 weeks rolling every Monday. Stat holidays are blocked automatically.
         </p>
       </div>
 
-      {/* Schedule grid by date */}
       {schedule.length === 0 && (
         <p className="text-center text-gray-400 py-10">No upcoming slots in schedule.</p>
       )}
@@ -1007,15 +1093,15 @@ function ScheduleView() {
         const totalBooked = day.slots.reduce((s, sl) => s + sl.jobs_booked, 0);
         const totalMax = day.slots.reduce((s, sl) => s + sl.max_jobs, 0);
         const isFull = totalBooked >= totalMax;
+        const allClosed = day.slots.every((sl) => !sl.is_available);
         const isThursday = day.day_type === 'thursday';
         const isSunday = day.day_type === 'sunday';
 
         return (
-          <div key={day.date} className="bg-white rounded-2xl border border-gray-200 p-4">
-            {/* Day header */}
+          <div key={day.date} className={`bg-white rounded-2xl border p-4 ${isFull ? 'border-red-200' : 'border-gray-200'}`}>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-gray-900">
                     {new Date(`${day.date}T12:00:00Z`).toLocaleDateString('en-CA', {
                       weekday: 'long', month: 'short', day: 'numeric',
@@ -1028,49 +1114,78 @@ function ScheduleView() {
                   }`}>
                     {day.day_type}
                   </span>
-                  {isFull && <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded">FULL</span>}
+                  {isFull && <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-medium">FULL</span>}
+                  {allClosed && !isFull && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Closed</span>}
                 </div>
                 <div className="text-xs text-gray-400 mt-0.5">
-                  {totalBooked} / {totalMax} jobs booked across {day.slots.length} slots
+                  {totalBooked} / {totalMax} booked
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  if (window.confirm(`Remove ALL slots for ${day.date}? This cannot be undone.`))
-                    act({ action: 'delete_day', slot_date: day.date });
-                }}
-                className="text-xs text-red-500 border border-red-200 rounded-lg px-2 py-1"
-              >
-                Remove day
-              </button>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => act({ action: allClosed ? 'open_day' : 'close_day', slot_date: day.date })}
+                  className={`text-xs px-2 py-1 rounded-lg border font-medium ${
+                    allClosed
+                      ? 'border-green-200 text-green-600'
+                      : 'border-gray-200 text-gray-500'
+                  }`}
+                >
+                  {allClosed ? 'Open all' : 'Close day'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (totalBooked > 0) {
+                      alert(`Can't remove — ${totalBooked} job(s) already booked on this day.`);
+                      return;
+                    }
+                    if (window.confirm(`Remove all slots for ${day.date}?`))
+                      act({ action: 'delete_day', slot_date: day.date });
+                  }}
+                  className="text-xs text-red-500 border border-red-200 rounded-lg px-2 py-1"
+                >
+                  Remove
+                </button>
+              </div>
             </div>
 
-            {/* Slot rows */}
             <div className="space-y-2">
               {day.slots.map((slot) => {
-                const pct = slot.max_jobs > 0 ? Math.round((slot.jobs_booked / slot.max_jobs) * 100) : 0;
+                const isPast = slot.slot_date < todayStr ||
+                  (slot.slot_date === todayStr && slot.slot_time <= currentTimeStr);
+                const pct = slot.max_jobs > 0
+                  ? Math.round((slot.jobs_booked / slot.max_jobs) * 100)
+                  : 0;
                 const slotFull = slot.jobs_booked >= slot.max_jobs;
 
                 return (
                   <div
                     key={slot.slot_time}
-                    className={`flex items-center gap-3 p-2 rounded-xl ${
-                      !slot.is_available ? 'bg-gray-50 opacity-60' : 'bg-white border border-gray-100'
+                    className={`flex items-center gap-3 p-2 rounded-xl transition-opacity ${
+                      isPast
+                        ? 'opacity-30 pointer-events-none'
+                        : !slot.is_available
+                        ? 'bg-gray-50 opacity-60'
+                        : 'bg-white border border-gray-100'
                     }`}
                   >
-                    {/* Time */}
-                    <span className="text-sm font-semibold text-gray-700 w-16 flex-shrink-0">
-                      {TIME_LABELS[slot.slot_time] || slot.slot_time}
-                    </span>
+                    <div className="w-16 flex-shrink-0">
+                      <span className="text-sm font-semibold text-gray-700">
+                        {TIME_LABELS[slot.slot_time] || slot.slot_time}
+                      </span>
+                      {isPast && (
+                        <span className="block text-xs text-gray-400">passed</span>
+                      )}
+                    </div>
 
-                    {/* Fill bar */}
                     <div className="flex-1">
                       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${
-                            slotFull ? 'bg-red-400' : pct > 60 ? 'bg-orange-400' : 'bg-green-400'
+                            slotFull ? 'bg-red-400' :
+                            pct > 60 ? 'bg-orange-400' :
+                            'bg-green-400'
                           }`}
-                          style={{ width: `${pct}%` }}
+                          style={{ width: `${Math.max(pct, slotFull ? 100 : 0)}%` }}
                         />
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">
@@ -1078,7 +1193,6 @@ function ScheduleView() {
                       </div>
                     </div>
 
-                    {/* Max jobs adjuster */}
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => act({
@@ -1091,7 +1205,9 @@ function ScheduleView() {
                       >
                         −
                       </button>
-                      <span className="text-xs font-medium text-gray-700 w-4 text-center">{slot.max_jobs}</span>
+                      <span className="text-xs font-medium text-gray-700 w-4 text-center">
+                        {slot.max_jobs}
+                      </span>
                       <button
                         onClick={() => act({
                           action: 'set_max',
@@ -1105,14 +1221,13 @@ function ScheduleView() {
                       </button>
                     </div>
 
-                    {/* Toggle on/off */}
                     <button
                       onClick={() => act({
                         action: 'toggle',
                         slot_date: slot.slot_date,
                         slot_time: slot.slot_time,
                       })}
-                      className={`text-xs px-2 py-1 rounded-lg font-medium border ${
+                      className={`text-xs px-2 py-1 rounded-lg font-medium border flex-shrink-0 ${
                         slot.is_available
                           ? 'border-green-200 text-green-600 bg-green-50'
                           : 'border-gray-200 text-gray-400 bg-gray-50'

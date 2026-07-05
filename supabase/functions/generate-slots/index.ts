@@ -1,22 +1,50 @@
 import { supabase } from '../_shared/clients.ts';
 import { edmontonNow } from '../_shared/time.ts';
 
-// Operating days: Thursday (4) and Sunday (0).
-// Slot times calibrated so last job finishes before East Calgary Landfill closes at 5 PM.
-// East Calgary Landfill: open daily 6 AM - 5 PM (open Sundays — others are not).
 const SLOT_TIMES = ['07:30', '09:00', '11:00', '13:00'];
-const MAX_JOBS = 5;
-const WEEKS_AHEAD = 8;
+const MAX_JOBS = 1;
+const WEEKS_AHEAD = 16; // 4 months rolling — no hard end date
+
+// Canadian statutory holidays (add more years as needed)
+// Format: 'YYYY-MM-DD'
+const STAT_HOLIDAYS = new Set([
+  '2026-08-03', // Alberta Heritage Day
+  '2026-09-07', // Labour Day
+  '2026-10-12', // Thanksgiving
+  '2026-11-11', // Remembrance Day
+  '2026-12-25', // Christmas
+  '2026-12-26', // Boxing Day
+  '2027-01-01', // New Year's
+  '2027-02-15', // Family Day Alberta
+  '2027-04-02', // Good Friday
+  '2027-05-24', // Victoria Day
+  '2027-07-01', // Canada Day
+  '2027-08-02', // Alberta Heritage Day
+]);
 
 Deno.serve(async () => {
   const now = edmontonNow();
-  // Guard: only actually run at 5AM Monday Calgary time.
+
+  // Guard: only run at 5AM Monday Calgary time
   if (!(now.weekday === 'Mon' && now.hour === 5)) {
-    return new Response(JSON.stringify({ skipped: true, reason: 'not Monday 5AM Edmonton', now }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ skipped: true, reason: 'not Monday 5AM Edmonton', now }),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
+  // Step 1: Clean up old slots (older than 7 days) that have no bookings
+  const cutoff = new Date(`${now.date}T12:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - 7);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  await supabase
+    .from('schedule')
+    .delete()
+    .lt('slot_date', cutoffStr)
+    .eq('jobs_booked', 0);
+
+  // Step 2: Generate Thu + Sun slots 16 weeks ahead
   const rows: Record<string, unknown>[] = [];
   const start = new Date(`${now.date}T12:00:00Z`);
 
@@ -25,14 +53,23 @@ Deno.serve(async () => {
     d.setUTCDate(start.getUTCDate() + i);
     const dow = d.getUTCDay();
 
-    // Generate Thursday (4) and Sunday (0) slots.
-    if (dow !== 0 && dow !== 4) continue;
+    if (dow !== 0 && dow !== 4) continue; // Sunday=0, Thursday=4
 
     const dateStr = d.toISOString().slice(0, 10);
+
+    // Skip statutory holidays
+    if (STAT_HOLIDAYS.has(dateStr)) continue;
+
     const day_type = dow === 0 ? 'sunday' : 'thursday';
 
     for (const t of SLOT_TIMES) {
-      rows.push({ slot_date: dateStr, slot_time: t, day_type, max_jobs: MAX_JOBS });
+      rows.push({
+        slot_date: dateStr,
+        slot_time: t,
+        day_type,
+        max_jobs: MAX_JOBS,
+        is_available: true,
+      });
     }
   }
 
@@ -41,7 +78,7 @@ Deno.serve(async () => {
     .upsert(rows, { onConflict: 'slot_date,slot_time', ignoreDuplicates: true });
 
   return new Response(
-    JSON.stringify({ ok: !error, inserted: rows.length, error: error?.message }),
+    JSON.stringify({ ok: !error, generated: rows.length, error: error?.message }),
     { headers: { 'Content-Type': 'application/json' } }
   );
 });
