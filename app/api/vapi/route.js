@@ -53,7 +53,10 @@ export async function POST(req) {
         transcript: message.transcript || null,
         outcome: message.endedReason || null,
         agent_type:
-          message.assistant?.id === process.env.VAPI_CS_AGENT_ID ? 'customer_service' : 'booking',
+          message.assistant?.id === process.env.VAPI_BOOKING_AGENT_ID ? 'sales'
+          : message.assistant?.id === process.env.VAPI_CS_AGENT_ID ? 'service'
+          : message.assistant?.name === 'Riley' ? 'refunds'
+          : 'unknown',
       });
     } catch (e) {
       console.error('phone_calls log failed:', e);
