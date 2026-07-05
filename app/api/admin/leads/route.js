@@ -19,7 +19,6 @@ export async function GET() {
     .from('leads')
     .select('*')
     .is('converted_to_booking_id', null)
-    .not('ai_price_estimate', 'is', null)
     .order('created_at', { ascending: false })
     .limit(50);
 
