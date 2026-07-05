@@ -205,20 +205,33 @@ function PhoneStep({ sessionId, onNext }) {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const valid = /^[\d\s\-().+]{10,}$/.test(phone);
+
+  // Format phone as (XXX) XXX-XXXX while typing
+  const formatPhone = (raw) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 10);
+    if (digits.length === 0) return '';
+    if (digits.length <= 3) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  };
+
+  // Strip formatting to get raw digits for storage/sending
+  const rawPhone = phone.replace(/\D/g, '');
+  const valid = rawPhone.length === 10;
 
   const submit = async () => {
     setSubmitting(true);
     setError(null);
+    const phoneToSend = `+1${rawPhone}`;
     try {
       const res = await fetch('/api/capture-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, session_id: sessionId, action: 'init', source: 'web' }),
+        body: JSON.stringify({ phone: phoneToSend, session_id: sessionId, action: 'init', source: 'web' }),
       });
       if (!res.ok) throw new Error('Failed');
-      localStorage.setItem('jh_phone', phone);
-      onNext(phone);
+      localStorage.setItem('jh_phone', phoneToSend);
+      onNext(phoneToSend);
     } catch {
       setError('Something went wrong. Try again.');
     } finally {
@@ -237,7 +250,7 @@ function PhoneStep({ sessionId, onNext }) {
         inputMode="numeric"
         placeholder="(587) 000-0000"
         value={phone}
-        onChange={(e) => setPhone(e.target.value)}
+        onChange={(e) => setPhone(formatPhone(e.target.value))}
         onKeyDown={(e) => e.key === 'Enter' && valid && submit()}
         className="w-full border border-gray-300 rounded-2xl px-4 py-4 text-lg font-medium"
       />
