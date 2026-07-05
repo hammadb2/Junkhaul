@@ -200,11 +200,27 @@ function PhotoStep({ state, update, onNext }) {
     });
 
   const handleFiles = async (e) => {
-    const files = Array.from(e.target.files || []).slice(0, 5);
+    const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    const base64s = await Promise.all(files.map((f) => toCompressedBase64(f)));
-    update({ photos: base64s });
-    analyze(base64s, null);
+    const existing = state.photos || [];
+    const remaining = 5 - existing.length;
+    const toAdd = files.slice(0, remaining);
+    if (toAdd.length === 0) return;
+    const base64s = await Promise.all(toAdd.map((f) => toCompressedBase64(f)));
+    const allPhotos = [...existing, ...base64s];
+    update({ photos: allPhotos });
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
+  };
+
+  const removePhoto = (idx) => {
+    const photos = (state.photos || []).filter((_, i) => i !== idx);
+    update({ photos });
+  };
+
+  const analyzePhotos = () => {
+    if (!state.photos || state.photos.length === 0) return;
+    analyze(state.photos, null);
   };
 
   const analyze = async (photos, description) => {
@@ -250,14 +266,26 @@ function PhotoStep({ state, update, onNext }) {
         </div>
       ) : (
         <>
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 rounded-2xl py-12 flex flex-col items-center gap-2 text-gray-500"
-          >
-            <span className="text-4xl">📷</span>
-            <span className="font-semibold text-gray-700">Take / upload photos</span>
-            <span className="text-xs">Up to 5 photos</span>
-          </button>
+          {state.photos && state.photos.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {state.photos.map((p, i) => (
+                <div key={i} className="relative">
+                  <img
+                    src={`data:image/jpeg;base64,${p}`}
+                    alt={`Photo ${i + 1}`}
+                    className="w-full h-24 object-cover rounded-lg border border-gray-200"
+                  />
+                  <button
+                    onClick={() => removePhoto(i)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs font-bold flex items-center justify-center shadow"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <input
             ref={fileRef}
             type="file"
@@ -267,6 +295,25 @@ function PhotoStep({ state, update, onNext }) {
             className="hidden"
             onChange={handleFiles}
           />
+
+          {(state.photos || []).length < 5 && (
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-2xl py-8 flex flex-col items-center gap-1 text-gray-500"
+            >
+              <span className="text-3xl">📷</span>
+              <span className="font-semibold text-gray-700">
+                {(state.photos || []).length === 0 ? 'Take / upload photos' : 'Add more photos'}
+              </span>
+              <span className="text-xs">{5 - (state.photos || []).length} of 5 remaining</span>
+            </button>
+          )}
+
+          {(state.photos || []).length > 0 && (
+            <BookButton onClick={analyzePhotos}>
+              Get my price from {(state.photos || []).length} photo{(state.photos || []).length > 1 ? 's' : ''} →
+            </BookButton>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
