@@ -59,9 +59,9 @@ export default function Home() {
           className="space-y-2 text-sm text-gray-600"
         >
           <div className="flex items-center gap-2">
-            <span className="text-orange-500 font-semibold">⭐ 4.9</span>
+            <span className="text-orange-500 font-semibold">Canadian Owned.</span>
             <span className="text-gray-300">|</span>
-            <span>500+ Calgary jobs</span>
+            <span>Calgary Run.</span>
           </div>
           <p>⚡ Same day available</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-500">
