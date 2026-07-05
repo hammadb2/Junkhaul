@@ -20,7 +20,8 @@ create extension if not exists pg_cron;
 select cron.unschedule(jobname) from cron.job
 where jobname in (
   'generate-weekly-slots','morning-reminders','operator-day-summary',
-  'review-requests','no-show-check','risk-reminders','waitlist-cleanup'
+  'review-requests','no-show-check','risk-reminders','waitlist-cleanup',
+  'slot-fill-alert','day-before-fill','lead-followup'
 );
 
 -- ── CRON 1: Generate slots (Mondays ~5AM Edmonton; guarded in-function) ──
@@ -120,6 +121,51 @@ select cron.schedule(
   $$
   select net.http_post(
     url := '{SUPABASE_URL}/functions/v1/waitlist-expiry',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer {SUPABASE_ANON_KEY}',
+      'Content-Type', 'application/json'
+    )
+  );
+  $$
+);
+
+-- ── CRON 8: Slot fill alert (Tue + Fri 9AM Edmonton; guarded) ──
+select cron.schedule(
+  'slot-fill-alert',
+  '0 * * * 2,5',
+  $$
+  select net.http_post(
+    url := '{SUPABASE_URL}/functions/v1/slot-fill-alert',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer {SUPABASE_ANON_KEY}',
+      'Content-Type', 'application/json'
+    )
+  );
+  $$
+);
+
+-- ── CRON 9: Day-before urgency blast (Wed + Sat 8PM Edmonton; guarded) ──
+select cron.schedule(
+  'day-before-fill',
+  '0 * * * 3,6',
+  $$
+  select net.http_post(
+    url := '{SUPABASE_URL}/functions/v1/day-before-fill',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer {SUPABASE_ANON_KEY}',
+      'Content-Type', 'application/json'
+    )
+  );
+  $$
+);
+
+-- ── CRON 10: Lead follow-up (every 3 hours) ──
+select cron.schedule(
+  'lead-followup',
+  '0 */3 * * *',
+  $$
+  select net.http_post(
+    url := '{SUPABASE_URL}/functions/v1/lead-followup',
     headers := jsonb_build_object(
       'Authorization', 'Bearer {SUPABASE_ANON_KEY}',
       'Content-Type', 'application/json'

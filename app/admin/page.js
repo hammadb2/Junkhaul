@@ -32,7 +32,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    if (view === 'dispatch') {
+      const interval = setInterval(load, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [load, view]);
 
   const dates = [...new Set(bookings.map((b) => b.job_date))];
   const dayBookings = bookings.filter((b) => b.job_date === activeDate);
@@ -78,7 +82,7 @@ export default function AdminDashboard() {
         <Logo className="h-7" />
         <div className="flex items-center gap-3">
           <div className="flex gap-1 text-xs">
-            {['dispatch', 'schedule', 'earnings', 'waitlist'].map((v) => (
+            {['dispatch', 'schedule', 'earnings', 'waitlist', 'leads'].map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -192,6 +196,7 @@ export default function AdminDashboard() {
         {view === 'schedule' && <ScheduleView />}
         {view === 'earnings' && <EarningsDashboard />}
         {view === 'waitlist' && <WaitlistView />}
+        {view === 'leads' && <LeadsView />}
       </div>
     </main>
   );
@@ -1242,6 +1247,56 @@ function ScheduleView() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ============================================================
+// LEADS VIEW — unconverted leads who got a price but didn't book
+// ============================================================
+function LeadsView() {
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/leads')
+      .then((r) => r.json())
+      .then((d) => { setLeads(d.leads || []); setLoading(false); });
+  }, []);
+
+  if (loading) return <p className="text-center text-gray-400 py-10">Loading leads…</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-500">{leads.length} unconverted lead{leads.length !== 1 ? 's' : ''} who got a price but didn&apos;t book.</p>
+      {leads.length === 0 && <p className="text-center text-gray-400 py-10">No unconverted leads right now.</p>}
+      {leads.map((lead) => (
+        <div key={lead.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <a href={`tel:${lead.phone}`} className="text-orange-600 font-semibold text-sm">{lead.phone}</a>
+              <div className="flex gap-2 mt-1 flex-wrap">
+                {lead.ai_price_estimate && (
+                  <span className="text-xs bg-green-50 text-green-700 rounded px-1.5 py-0.5 font-medium">${lead.ai_price_estimate} quote</span>
+                )}
+                {lead.load_size && (
+                  <span className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 capitalize">{lead.load_size.replace('_', ' ')}</span>
+                )}
+                <span className="text-xs text-gray-400">
+                  {new Date(lead.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {lead.follow_up_sent && <span className="text-xs bg-blue-50 text-blue-600 rounded px-1.5 py-0.5">Followed up</span>}
+              </div>
+            </div>
+            <a
+              href={`tel:${lead.phone}`}
+              className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0"
+            >
+              Call
+            </a>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
