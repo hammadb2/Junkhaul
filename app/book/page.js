@@ -23,7 +23,7 @@ const LOADS = [
   { key: 'full', title: 'Full load', desc: 'Garage / estate cleanout', price: 380 },
 ];
 
-const STEPS = ['photos', 'load', 'schedule', 'details', 'payment', 'done'];
+const STEPS = ['phone', 'photos', 'load', 'schedule', 'details', 'payment', 'done'];
 
 const todayEdmonton = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -36,7 +36,20 @@ const todayEdmonton = () => {
 };
 
 export default function BookPage() {
-  const [step, setStep] = useState('photos');
+  const [sessionId] = useState(() => {
+    if (typeof window === 'undefined') return crypto.randomUUID();
+    const existing = localStorage.getItem('jh_session');
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    localStorage.setItem('jh_session', id);
+    return id;
+  });
+  const [capturedPhone, setCapturedPhone] = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('jh_phone') || '' : ''
+  );
+  const [step, setStep] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem('jh_phone') ? 'photos' : 'phone'
+  );
   const [state, setState] = useState({
     photos: [],
     photoUrls: [],
@@ -81,7 +94,7 @@ export default function BookPage() {
         </Link>
         {step !== 'done' && (
           <div className="flex gap-1">
-            {STEPS.slice(0, 5).map((s, i) => (
+            {STEPS.slice(1, 6).map((s, i) => (
               <div
                 key={s}
                 className={`h-1.5 w-6 rounded-full ${
@@ -102,8 +115,23 @@ export default function BookPage() {
           exit="exit"
           className="flex-1"
         >
+          {step === 'phone' && (
+            <PhoneStep
+              sessionId={sessionId}
+              onNext={(phone) => {
+                setCapturedPhone(phone);
+                setStep('photos');
+              }}
+            />
+          )}
           {step === 'photos' && (
-            <PhotoStep state={state} update={update} onNext={() => setStep('load')} />
+            <PhotoStep
+              state={state}
+              update={update}
+              capturedPhone={capturedPhone}
+              sessionId={sessionId}
+              onNext={() => setStep('load')}
+            />
           )}
           {step === 'load' && (
             <LoadStep
@@ -128,6 +156,15 @@ export default function BookPage() {
               onCreated={(b) => {
                 setBooking(b);
                 setStep('payment');
+                if (capturedPhone) {
+                  fetch('/api/capture-lead', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: capturedPhone, session_id: sessionId, action: 'convert', booking_id: b.id }),
+                  }).catch(() => {});
+                  localStorage.removeItem('jh_session');
+                  localStorage.removeItem('jh_phone');
+                }
               }}
             />
           )}
@@ -162,9 +199,63 @@ export default function BookPage() {
 }
 
 // ============================================================
+// STEP 0 — PHONE CAPTURE
+// ============================================================
+function PhoneStep({ sessionId, onNext }) {
+  const [phone, setPhone] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const valid = /^[\d\s\-().+]{10,}$/.test(phone);
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/capture-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, session_id: sessionId, action: 'init', source: 'web' }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      localStorage.setItem('jh_phone', phone);
+      onNext(phone);
+    } catch {
+      setError('Something went wrong. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Get your instant price</h2>
+        <p className="mt-2 text-gray-500 text-sm">Enter your number and we&apos;ll text you your quote. No spam, ever.</p>
+      </div>
+      <input
+        type="tel"
+        inputMode="numeric"
+        placeholder="(587) 000-0000"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && valid && submit()}
+        className="w-full border border-gray-300 rounded-2xl px-4 py-4 text-lg font-medium"
+      />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <BookButton disabled={!valid || submitting} onClick={submit}>
+        {submitting ? 'One sec…' : 'Get my price →'}
+      </BookButton>
+      <p className="text-center text-xs text-gray-400">
+        By continuing you agree to receive texts about your booking. Standard rates may apply.
+      </p>
+    </div>
+  );
+}
+
+// ============================================================
 // STEP 1 — PHOTOS
 // ============================================================
-function PhotoStep({ state, update, onNext }) {
+function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [showDescribe, setShowDescribe] = useState(false);
@@ -245,6 +336,26 @@ function PhotoStep({ state, update, onNext }) {
         photoUrls: data.photoUrls || [],
         photo_skipped: false,
       });
+      if (capturedPhone && data.analysis) {
+        const priceEstimate = calculatePrice({
+          load_size: data.analysis.load_size,
+          same_day: false,
+          stairs: 0,
+          has_freon: data.analysis.has_freon || false,
+          freon_count: data.analysis.freon_count || (data.analysis.has_freon ? 1 : 0),
+        });
+        fetch('/api/capture-lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: capturedPhone,
+            session_id: sessionId,
+            action: 'price_reveal',
+            ai_price_estimate: priceEstimate.total,
+            load_size: data.analysis.load_size,
+          }),
+        }).catch(() => {});
+      }
       setTimeout(onNext, 400);
     } catch (err) {
       setError(err.message || 'Could not analyse. Pick your size manually.');
