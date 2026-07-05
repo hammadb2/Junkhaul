@@ -192,7 +192,7 @@ function JobCard({ b, act }) {
           🚨 {b.flag_reason || 'Flagged for review'}
         </p>
       )}
-      {b.has_freon && <p className="mt-1 text-xs text-blue-700">🌡️ Freon appliance — bring straps</p>}
+      {b.has_freon && <p className="mt-1 text-xs text-blue-700">🌡️ Freon appliance, bring straps</p>}
       {(b.no_show_risk_score || 0) >= 50 && (
         <p className="mt-1 text-xs text-red-600">⚠️ No-show risk {b.no_show_risk_score}%</p>
       )}

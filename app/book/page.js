@@ -132,7 +132,7 @@ export default function BookPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-1">Confirm & pay</h2>
               <p className="text-gray-500 text-sm mb-5">
-                Just a $50 deposit today — the rest on pickup day.
+                Just a $50 deposit today, the rest on pickup day.
               </p>
               <PaymentStep
                 clientSecret={booking.client_secret}
@@ -301,14 +301,14 @@ function PhotoStep({ state, update, onNext }) {
             }}
             className="text-sm text-gray-400"
           >
-            Skip — I&apos;ll pick my load size myself
+            Skip, I&apos;ll pick my load size myself
           </button>
 
           <a
             href="tel:+15873250751"
             className="text-sm text-orange-600 font-medium underline text-center"
           >
-            Prefer to call? Ring us — we&apos;ll price it over the phone
+            Prefer to call? Ring us, we&apos;ll price it over the phone
           </a>
         </>
       )}
