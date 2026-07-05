@@ -52,7 +52,8 @@ export async function POST(req) {
     const flag_for_review = Boolean(analysis.flag_for_review) || weight.severity === 'hard';
 
     // Price range shown in the bottom sheet: base .. base+same-day.
-    const priced = calculatePrice({ load_size, has_freon: analysis.has_freon });
+    const freon_count = analysis.freon_count || (analysis.has_freon ? 1 : 0);
+    const priced = calculatePrice({ load_size, has_freon: analysis.has_freon, freon_count });
     const low = priced.total;
     const high = priced.total + PRICING.same_day;
 
@@ -60,10 +61,11 @@ export async function POST(req) {
       analysis: {
         ...analysis,
         load_size,
+        freon_count,
         flag_for_review,
         flag_reason: analysis.flag_reason || (weight.flag ? weight.reason : null),
       },
-      price: { low, high, base: priced.base_price },
+      price: { low, high, base: priced.base_price, freon_fee: priced.freon_fee },
       photoUrls,
     });
   } catch (err) {

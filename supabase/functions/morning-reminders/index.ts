@@ -18,16 +18,15 @@ Deno.serve(async () => {
 
   let sent = 0;
   for (const b of bookings || []) {
-    const body = `Good morning ${b.name}! 🚛 Junk Haul Calgary here.
+    const body = `Good morning ${b.name}, Junk Haul Calgary here!
 
-Today's your pickup: ${formatTime(b.job_time)}
-📍 ${b.address}
-💳 Balance due: $${b.balance_due} (cash or card)
+Your pickup is today at ${formatTime(b.job_time)}.
+${b.address}
+Balance due: $${b.balance_due} (cash or card on pickup)
 
-Reply CANCEL to cancel (deposit kept within 24hrs)
-Reply RESCHEDULE to move your booking
+Reply CANCEL to cancel or RESCHEDULE to move to another day.
 
-We'll text when we're on the way!`;
+We'll text you when we're on the way!`;
     try {
       await sendSMS(b.phone, body, b.id, 'reminder');
       await supabase.from('bookings').update({ morning_reminder_sent: true }).eq('id', b.id);

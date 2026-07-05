@@ -3,8 +3,8 @@ import { edmontonNow, formatTime, formatDateLong } from '../_shared/time.ts';
 
 Deno.serve(async () => {
   const now = edmontonNow();
-  // ~6:30AM on operating days (Thu/Sun). Cron fires at :30 each hour.
-  if (now.hour !== 6 || !(now.weekday === 'Thu' || now.weekday === 'Sun')) {
+  // ~6:30AM on operating days (Sundays). Cron fires at :30 each hour.
+  if (now.hour !== 6 || now.weekday !== 'Sun') {
     return new Response(JSON.stringify({ skipped: true, now }), {
       headers: { 'Content-Type': 'application/json' },
     });
@@ -20,7 +20,7 @@ Deno.serve(async () => {
   if (!bookings || bookings.length === 0) {
     await sendSMS(
       Deno.env.get('HAMMAD_PHONE')!,
-      `☀️ ${formatDateLong(now.date)} — no jobs booked today. Enjoy the day off!`,
+      `${formatDateLong(now.date)}, no jobs booked today. Enjoy the day off!`,
       null,
       'day_summary',
     );
@@ -37,11 +37,11 @@ Deno.serve(async () => {
     )
     .join('\n');
 
-  const body = `☀️ ${formatDateLong(now.date)} — ${bookings.length} jobs, $${revenue} expected
+  const body = `${formatDateLong(now.date)}, ${bookings.length} jobs, $${revenue} expected
 
 ${lines}
 
-Open dispatch: ${Deno.env.get('SITE_URL') || 'https://junkhaul.ca'}/admin`;
+Dispatch: ${Deno.env.get('SITE_URL') || 'https://junkhaul.ca'}/admin`;
 
   await sendSMS(Deno.env.get('HAMMAD_PHONE')!, body, null, 'day_summary');
 

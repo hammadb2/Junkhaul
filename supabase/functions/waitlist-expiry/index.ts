@@ -36,7 +36,7 @@ Deno.serve(async () => {
     try {
       await sendSMS(
         entry.phone,
-        `The slot at Junk Haul Calgary has been released.\nCheck junkhaul.ca for available times.`,
+        `The open slot has been released since we didn't hear back. Check junkhaul.ca for current availability or call (587) 325-0751.`,
         null,
         'waitlist_expired',
       );

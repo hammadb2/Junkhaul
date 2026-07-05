@@ -22,6 +22,7 @@ export async function POST(req) {
       same_day = false,
       stairs = 0,
       has_freon = false,
+      freon_count = 0,
       job_date,
       job_time,
       photos = [],
@@ -61,7 +62,7 @@ export async function POST(req) {
     }
 
     // Price is ALWAYS computed server-side.
-    const priced = calculatePrice({ load_size, same_day, stairs, has_freon, job_date, job_time });
+    const priced = calculatePrice({ load_size, same_day, stairs, has_freon, freon_count, job_date, job_time });
 
     // Geocode for dispatch/quadrant.
     const geo = await geocodeAddress(unit ? `${unit} ${address}` : address);
