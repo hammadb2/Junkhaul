@@ -1,0 +1,101 @@
+{
+  "_comment": "Vapi tool definitions for Junk Haul Calgary. Create each as a 'Function' tool in the Vapi dashboard. Set the Server URL of every tool (or the assistant-level server URL) to https://junkhaul.ca/api/vapi and add header 'x-vapi-secret' = VAPI_SERVER_SECRET. Names must match lib/vapiTools.js exactly.",
+  "server": {
+    "url": "https://junkhaul.ca/api/vapi",
+    "headers": { "x-vapi-secret": "<VAPI_SERVER_SECRET>" }
+  },
+  "tools": [
+    {
+      "name": "check_availability",
+      "description": "Get open pickup slots. Optionally filter by a specific date (YYYY-MM-DD) or day_type ('thursday' or 'sunday').",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "description": "Specific date YYYY-MM-DD" },
+          "day_type": { "type": "string", "enum": ["thursday", "sunday"] }
+        }
+      }
+    },
+    {
+      "name": "get_quote",
+      "description": "Get a price quote for a load size plus optional add-ons.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "load_size": { "type": "string", "enum": ["single_item", "quarter", "half", "full"] },
+          "same_day": { "type": "boolean" },
+          "stairs": { "type": "number", "description": "Number of flights of stairs" },
+          "has_freon": { "type": "boolean", "description": "Fridge/freezer/AC" }
+        },
+        "required": ["load_size"]
+      }
+    },
+    {
+      "name": "create_booking",
+      "description": "Create a booking. Texts the customer a link to pay the $50 deposit. Only Thursdays and Sundays are valid job dates.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string", "description": "E.164 mobile, e.g. +14035550123" },
+          "address": { "type": "string", "description": "Full Calgary pickup address" },
+          "load_size": { "type": "string", "enum": ["single_item", "quarter", "half", "full"] },
+          "job_date": { "type": "string", "description": "YYYY-MM-DD (Thu or Sun)" },
+          "job_time": { "type": "string", "description": "HH:MM 24h, e.g. 09:00" },
+          "same_day": { "type": "boolean" },
+          "stairs": { "type": "number" },
+          "has_freon": { "type": "boolean" }
+        },
+        "required": ["name", "phone", "address", "load_size", "job_date", "job_time"]
+      }
+    },
+    {
+      "name": "lookup_booking",
+      "description": "Look up an existing booking by reference code or phone number.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "booking_ref": { "type": "string" },
+          "phone": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "cancel_booking",
+      "description": "Cancel a booking by its reference code. Applies the cancellation/refund policy automatically.",
+      "parameters": {
+        "type": "object",
+        "properties": { "booking_ref": { "type": "string" } },
+        "required": ["booking_ref"]
+      }
+    },
+    {
+      "name": "reschedule_booking",
+      "description": "Reschedule a booking to a new date and time. Max 2 reschedules per booking. Only Thursdays and Sundays.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "booking_ref": { "type": "string" },
+          "new_date": { "type": "string", "description": "YYYY-MM-DD" },
+          "new_time": { "type": "string", "description": "HH:MM 24h" }
+        },
+        "required": ["booking_ref", "new_date", "new_time"]
+      }
+    },
+    {
+      "name": "add_to_waitlist",
+      "description": "Add a caller to the waitlist when no slots are available.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "preferred_day_type": { "type": "string", "enum": ["thursday", "sunday", "either"] },
+          "load_size": { "type": "string", "enum": ["single_item", "quarter", "half", "full"] },
+          "address": { "type": "string" }
+        },
+        "required": ["name", "phone"]
+      }
+    }
+  ]
+}
