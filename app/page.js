@@ -63,18 +63,29 @@ export default function Home() {
             <span className="text-gray-300">|</span>
             <span>Calgary Run.</span>
           </div>
-          <p>⚡ Same day available</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-600 text-sm font-medium">
+            <span>✅ Fully Licensed & Insured</span>
+            <span>⚡ Same Day Available</span>
+          </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-500">
             <span>📷 Photo quote</span>
-            <span>⚡ Same day</span>
             <span>🔒 No hidden fees</span>
+            <span>🧹 We sweep up after</span>
           </div>
         </motion.div>
       </div>
 
-      <p className="text-center text-xs text-gray-400 mt-6">
-        <Link href="/faq" className="underline">What do we haul?</Link> · Same Day. Calgary.
-      </p>
+      <div className="text-center mt-6 space-y-1">
+        <a
+          href="tel:+15873250751"
+          className="block text-sm font-semibold text-orange-500"
+        >
+          📞 (587) 325-0751 — Call or text anytime
+        </a>
+        <p className="text-xs text-gray-400">
+          <Link href="/faq" className="underline">What do we haul?</Link> · Same Day. Calgary.
+        </p>
+      </div>
     </main>
   );
 }
