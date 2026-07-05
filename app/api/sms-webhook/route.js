@@ -1,0 +1,137 @@
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
+import { sendSMS } from '@/lib/sms';
+import { calculatePrice } from '@/lib/pricing';
+
+export const runtime = 'nodejs';
+
+// Normalise both the Quo beta envelope and legacy shapes into {from, text}.
+function parseInbound(payload) {
+  // Beta: { type, data: { resource: { text, direction }, context: { senderIdentifier } } }
+  if (payload?.data?.resource) {
+    return {
+      type: payload.type,
+      from: payload.data.context?.senderIdentifier || null,
+      text: payload.data.resource?.text || '',
+    };
+  }
+  // Legacy: { type, data: { object: { from, to, body/text } } }
+  const obj = payload?.data?.object || payload?.object || {};
+  return {
+    type: payload?.type,
+    from: obj.from || null,
+    text: obj.body || obj.text || '',
+  };
+}
+
+export async function POST(req) {
+  let payload;
+  try {
+    payload = await req.json();
+  } catch {
+    return NextResponse.json({ ok: true });
+  }
+
+  const { type, from, text } = parseInbound(payload);
+
+  // Only act on inbound messages.
+  if (type && type !== 'message.received') return NextResponse.json({ ok: true });
+  if (!from) return NextResponse.json({ ok: true });
+
+  const upper = (text || '').trim().toUpperCase();
+
+  // Log the inbound message.
+  const { data: recentBooking } = await supabaseAdmin
+    .from('bookings')
+    .select('*')
+    .eq('phone', from)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  await supabaseAdmin.from('messages').insert({
+    booking_id: recentBooking?.id || null,
+    direction: 'inbound',
+    from_number: from,
+    to_number: process.env.QUO_PHONE_NUMBER,
+    message_type: 'inbound',
+    body: text,
+  });
+
+  // ── STOP / HELP ──
+  if (upper === 'STOP' || upper === 'UNSUBSCRIBE') {
+    await sendSMS(from, 'You have been unsubscribed from Junk Haul Calgary texts. Reply START to opt back in.', recentBooking?.id, 'optout');
+    return NextResponse.json({ ok: true });
+  }
+  if (upper === 'HELP') {
+    await sendSMS(from, 'Junk Haul Calgary — same-day junk removal. Book at junkhaul.ca or call us. Reply STOP to opt out.', recentBooking?.id, 'help');
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── YES — confirm a pending load upgrade ──
+  if (upper === 'YES' && recentBooking?.upgrade_pending && recentBooking?.suggested_load_size) {
+    const priced = calculatePrice({
+      load_size: recentBooking.suggested_load_size,
+      same_day: recentBooking.same_day,
+      stairs: recentBooking.stairs,
+      has_freon: recentBooking.has_freon,
+      job_date: recentBooking.job_date,
+      job_time: recentBooking.job_time,
+    });
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        load_size: recentBooking.suggested_load_size,
+        base_price: priced.base_price,
+        total_price: priced.total,
+        balance_due: priced.balance_due,
+        upgrade_pending: false,
+      })
+      .eq('id', recentBooking.id);
+    await sendSMS(
+      from,
+      `Upgraded! Your booking ${recentBooking.booking_ref} is now $${priced.total} total ($50 deposit already paid, $${priced.balance_due} due on the day). See you then!`,
+      recentBooking.id,
+      'upgrade_confirm'
+    );
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── YES — claim a waitlist spot ──
+  const { data: waitlistEntry } = await supabaseAdmin
+    .from('waitlist')
+    .select('*')
+    .eq('phone', from)
+    .eq('notified', true)
+    .is('converted_to_booking_id', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('notified_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (upper === 'YES' && waitlistEntry) {
+    await sendSMS(
+      from,
+      `Great! Grab your spot here (deposit required to lock it in): ${process.env.NEXT_PUBLIC_SITE_URL || 'https://junkhaul.ca'}/book`,
+      null,
+      'waitlist_claim'
+    );
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── Fallback: forward to operator + acknowledge customer ──
+  await sendSMS(
+    process.env.HAMMAD_PHONE,
+    `💬 SMS from ${from}${recentBooking ? ` (${recentBooking.booking_ref}, ${recentBooking.name})` : ''}:\n\n"${text}"`,
+    recentBooking?.id,
+    'inbound_forward'
+  );
+  await sendSMS(
+    from,
+    'Thanks for your message! A team member will get back to you shortly. For urgent help, call us. — Junk Haul Calgary',
+    recentBooking?.id,
+    'auto_ack'
+  );
+
+  return NextResponse.json({ ok: true });
+}
