@@ -1,0 +1,123 @@
+'use client';
+import { useState } from 'react';
+import Link from 'next/link';
+import Logo from '@/components/Logo';
+
+export default function ServiceRequestPage() {
+  const [form, setForm] = useState({ name: '', phone: '', email: '', booking_ref: '', request_type: 'reschedule', details: '' });
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!form.name || !form.phone || !form.details) return;
+    setLoading(true);
+    await fetch('/api/service-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    setLoading(false);
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <main className="min-h-dvh flex flex-col items-center justify-center px-6 max-w-md mx-auto">
+        <Logo className="h-12 mb-6" />
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-gray-900">Request Received</h1>
+          <p className="text-gray-600">
+            We&apos;ve received your request and our Customer Service team will follow up shortly.
+            You&apos;ll get a text confirmation within a few minutes.
+          </p>
+          <Link href="/" className="inline-block mt-4 text-orange-600 font-medium">
+            Back to home →
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  const requestTypes = [
+    { value: 'reschedule', label: 'Reschedule pickup' },
+    { value: 'cancel', label: 'Cancel booking' },
+    { value: 'address_change', label: 'Change address' },
+    { value: 'question', label: 'Question about my booking' },
+    { value: 'complaint', label: 'Complaint' },
+    { value: 'other', label: 'Other' },
+  ];
+
+  return (
+    <main className="min-h-dvh flex flex-col px-6 py-5 max-w-md mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <Link href="/"><Logo className="h-7" showWordmark={false} /></Link>
+        <Link href="/" className="text-sm text-gray-400">← Home</Link>
+      </div>
+
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Customer Service Request</h1>
+      <p className="text-sm text-gray-500 mb-6">
+        Need to reschedule, cancel, or have a question? Fill out the form below and our team will follow up.
+      </p>
+
+      <div className="space-y-4">
+        <input
+          className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
+          placeholder="Full name *"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+        />
+        <input
+          className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
+          placeholder="Phone number *"
+          value={form.phone}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+        />
+        <input
+          className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
+          placeholder="Email (optional)"
+          type="email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+        <input
+          className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
+          placeholder="Booking reference (e.g. JH-ABCD12)"
+          value={form.booking_ref}
+          onChange={(e) => setForm({ ...form, booking_ref: e.target.value })}
+        />
+        <div>
+          <span className="text-sm font-medium text-gray-700">What do you need? *</span>
+          <div className="mt-2 space-y-2">
+            {requestTypes.map((t) => (
+              <label key={t.value} className="flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="radio"
+                  name="request_type"
+                  checked={form.request_type === t.value}
+                  onChange={() => setForm({ ...form, request_type: t.value })}
+                  className="w-4 h-4 text-orange-500"
+                />
+                {t.label}
+              </label>
+            ))}
+          </div>
+        </div>
+        <textarea
+          className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none resize-none"
+          placeholder="Tell us the details *"
+          rows={5}
+          value={form.details}
+          onChange={(e) => setForm({ ...form, details: e.target.value })}
+        />
+
+        <button
+          onClick={submit}
+          disabled={loading || !form.name || !form.phone || !form.details}
+          className="w-full bg-orange-500 text-white font-semibold py-3.5 rounded-xl disabled:opacity-50 hover:bg-orange-600 transition-colors"
+        >
+          {loading ? 'Submitting...' : 'Submit Request'}
+        </button>
+      </div>
+    </main>
+  );
+}
