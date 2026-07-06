@@ -289,3 +289,6 @@ create policy "Service role full access" on daily_stats
 drop policy if exists "Public can read schedule" on schedule;
 create policy "Public can read schedule" on schedule
   for select using (true);
+
+-- Add is_apartment column for apartment/condo detection
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_apartment boolean default false;
