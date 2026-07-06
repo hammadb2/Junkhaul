@@ -89,6 +89,32 @@ export async function POST(req) {
       console.error('phone_calls log failed:', e);
     }
 
+    // ── Record call history for agent context on future calls ──
+    try {
+      const summary = generateCallSummary(transcript, agentType, durationSeconds);
+      const outcome = determineCallOutcome(transcript, agentType, endedReason);
+      const sentiment = detectSentiment(transcript);
+      const customerName = extractCustomerName(transcript);
+
+      await supabaseAdmin.from('call_history').insert({
+        caller_number: callerNumber,
+        caller_name: customerName,
+        vapi_call_id: message.call?.id,
+        agent_name: assistantName,
+        agent_type: agentType,
+        duration_seconds: durationSeconds,
+        call_outcome: outcome,
+        call_summary: summary,
+        transcript: transcript.slice(0, 10000),
+        sentiment: sentiment,
+        ended_reason: endedReason,
+        booking_ref: extractBookingRef(transcript),
+        follow_up_sent: false,
+      });
+    } catch (e) {
+      console.error('call_history insert failed:', e);
+    }
+
     // ── Send SMS on every customer-initiated hangup ──
     // If the customer hung up (not the agent, not an error), send a
     // follow-up text. The message depends on what happened on the call.
@@ -301,4 +327,233 @@ async function determineHandoffDestination(callerNumber) {
       },
     },
   };
+}
+
+// ============================================================
+// Call history helpers — summarise and classify each call
+// ============================================================
+
+// Extract the customer's name from the transcript if possible.
+// Vapi transcripts typically alternate speaker/role lines.
+function extractCustomerName(transcript) {
+  if (!transcript) return null;
+  const lower = transcript.toLowerCase();
+
+  // Look for "my name is X" patterns
+  const nameMatch = transcript.match(/my name is ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+  if (nameMatch) return nameMatch[1];
+
+  // Look for "this is X" patterns
+  const thisIsMatch = transcript.match(/(?:^|\.\s|,\s)this is ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+  if (thisIsMatch) return thisIsMatch[1];
+
+  // Look for "it's X" / "it is X" patterns
+  const itsMatch = transcript.match(/(?:^|\.\s|,\s)it'?s ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+  if (itsMatch) return itsMatch[1];
+
+  return null;
+}
+
+// Generate a 1-2 sentence summary of what the call was about.
+function generateCallSummary(transcript, agentType, duration) {
+  if (!transcript || transcript.trim().length === 0) {
+    return `Short ${agentType} call (${duration}s) with no transcript available.`;
+  }
+
+  const lower = transcript.toLowerCase();
+  const parts = [];
+
+  // Identify what items were discussed
+  const items = [];
+  const itemKeywords = [
+    'sofa', 'couch', 'fridge', 'stove', 'washer', 'dryer', 'mattress',
+    'bed', 'table', 'chair', 'desk', 'tv', 'furniture', 'appliance',
+    'box', 'bag', 'garbage', 'fridge', 'freezer', 'dishwasher',
+    'piano', 'hot tub', 'shed', 'deck', 'fence', 'drywall',
+  ];
+  for (const item of itemKeywords) {
+    if (lower.includes(item)) items.push(item);
+  }
+  const uniqueItems = [...new Set(items)].slice(0, 4);
+
+  // Identify neighbourhood if mentioned
+  const neighbourhoods = [
+    'coventry hills', 'country hills', 'panorama hills', 'beddington',
+    'thorncliffe', 'greenwood', 'sage hill', 'nolan hill', 'evanston',
+    'kincora', 'sherwood', 'royal oak', 'tuscany', 'bowness',
+    'crestmont', 'springbank hill', 'cougar ridge', 'west springs',
+    'beltline', 'downtown', 'mission', 'inglewood', 'forest lawn',
+    'marlborough', 'acadia', 'macleod trail', 'douglasdale', 'mckenzie',
+    'mahogany', 'auburn bay', 'seton', 'cranston', 'riverbend',
+    'quarry park', 'ogden', 'mill woods', 'forest heights',
+  ];
+  let neighbourhood = null;
+  for (const n of neighbourhoods) {
+    if (lower.includes(n)) { neighbourhood = n; break; }
+  }
+
+  // Build the summary based on agent type and what happened
+  if (agentType === 'sales') {
+    if (uniqueItems.length > 0) {
+      parts.push(`Customer called about a ${uniqueItems.join(' and ')} pickup`);
+    } else {
+      parts.push('Customer called about a junk pickup');
+    }
+    if (neighbourhood) parts[0] += ` in ${neighbourhood}`;
+
+    // Check for quote
+    const quoteMatch = transcript.match(/\$(\d{2,5})/);
+    if (quoteMatch) {
+      parts.push(`Quoted $${quoteMatch[1]}`);
+      if (lower.includes('shop around') || lower.includes('think about') || lower.includes('call back')) {
+        parts.push('but customer wanted to shop around');
+      }
+      if (lower.includes('deposit') || lower.includes('booked') || lower.includes('booking')) {
+        parts.push('and booking was completed');
+      } else {
+        parts.push('but no booking was made');
+      }
+    } else {
+      parts.push('No quote was given');
+    }
+  } else if (agentType === 'service') {
+    if (lower.includes('reschedule')) {
+      parts.push('Customer called to reschedule their booking');
+    } else if (lower.includes('cancel')) {
+      parts.push('Customer called to cancel their booking');
+    } else if (lower.includes('address') || lower.includes('move')) {
+      parts.push('Customer called to change their pickup address');
+    } else if (lower.includes('question') || lower.includes('confirm')) {
+      parts.push('Customer called with questions about their booking');
+    } else {
+      parts.push('Customer called about an existing booking');
+    }
+    const refMatch = transcript.match(/JH-[A-Z0-9]{4,6}/);
+    if (refMatch) parts.push(`(ref ${refMatch[0]})`);
+  } else if (agentType === 'refunds') {
+    if (lower.includes('refund')) {
+      parts.push('Customer called about a refund request');
+    } else if (lower.includes('complaint') || lower.includes('complain')) {
+      parts.push('Customer called to log a complaint');
+    } else {
+      parts.push('Customer called about a refund or complaint');
+    }
+    const refMatch = transcript.match(/JH-[A-Z0-9]{4,6}/);
+    if (refMatch) parts.push(`for booking ${refMatch[0]}`);
+  } else {
+    // Unknown / greeter
+    if (duration < 15) {
+      parts.push('Short call, likely a transfer from the greeter');
+    } else {
+      parts.push('Customer called in');
+    }
+  }
+
+  return parts.join('. ') + '.';
+}
+
+// Determine the outcome of the call from the transcript.
+function determineCallOutcome(transcript, agentType, endedReason) {
+  if (!transcript) {
+    if (endedReason === 'customer-did-not-answer') return 'no_resolution';
+    return 'no_resolution';
+  }
+
+  const lower = transcript.toLowerCase();
+
+  // Booking completed — deposit link was sent and customer agreed
+  if (lower.includes('deposit link') || lower.includes("i've texted you") ||
+      lower.includes("i have texted you") || lower.includes('booking is confirmed') ||
+      lower.includes('booking confirmation')) {
+    return 'booking_completed';
+  }
+
+  // Refund issued
+  if (lower.includes('refund') && (lower.includes('processed') || lower.includes('issued') ||
+      lower.includes('approved') || lower.includes('sent') || lower.includes('i can refund'))) {
+    return 'refund_issued';
+  }
+
+  // Complaint logged
+  if (lower.includes('complaint') || lower.includes('complain') || lower.includes('unhappy') ||
+      lower.includes('not satisfied') || lower.includes('terrible') || lower.includes('awful')) {
+    if (!lower.includes('refund')) return 'complaint_logged';
+  }
+
+  // Rescheduled
+  if (lower.includes('reschedule') && (lower.includes('thursday') || lower.includes('sunday') ||
+      lower.includes('moved') || lower.includes('changed') || lower.includes('new date'))) {
+    return 'rescheduled';
+  }
+
+  // Cancelled
+  if (lower.includes('cancel') && (lower.includes('booking') || lower.includes('pickup'))) {
+    return 'cancelled';
+  }
+
+  // Transferred
+  if (lower.includes('transfer') || lower.includes('let me transfer') ||
+      lower.includes('hand you over') || lower.includes('connect you')) {
+    return 'transferred';
+  }
+
+  // Frustrated hangup — short call with frustration keywords
+  const frustrationWords = [
+    'forget it', 'never mind', 'waste of time', 'this is ridiculous',
+    'whatever', 'goodbye', 'useless', 'forget this',
+  ];
+  if (endedReason && (endedReason.includes('customer') || endedReason === 'hangup')) {
+    if (frustrationWords.some((w) => lower.includes(w))) {
+      return 'frustrated_hangup';
+    }
+  }
+
+  // Quote given but no booking
+  if (lower.match(/\$\d{2,}/) && !lower.includes('deposit') && !lower.includes('booked')) {
+    return 'quote_given_no_booking';
+  }
+
+  return 'no_resolution';
+}
+
+// Detect sentiment from the transcript based on keywords.
+function detectSentiment(transcript) {
+  if (!transcript || transcript.trim().length === 0) return 'neutral';
+  const lower = transcript.toLowerCase();
+
+  const angryWords = [
+    'angry', 'furious', 'outrageous', 'disgusting', 'scam', 'rip off',
+    'ripped off', 'ripoff', 'lawyer', 'sue', 'better business bureau',
+    'bbb', 'report you', 'this is unacceptable', 'absolutely ridiculous',
+  ];
+  if (angryWords.some((w) => lower.includes(w))) return 'angry';
+
+  const frustratedWords = [
+    'frustrated', 'frustrating', 'annoying', 'ridiculous', 'useless',
+    'waste of time', 'forget it', 'never mind', 'this is ridiculous',
+    'are you deaf', 'speak up', "can't hear", 'cant hear', 'whatever',
+    'not listening', "you're not listening", 'forget this', 'im done',
+    'i cant understand', "i can't understand", 'transfer me',
+    'let me talk to a human', 'real person',
+  ];
+  if (frustratedWords.some((w) => lower.includes(w))) return 'frustrated';
+
+  const positiveWords = [
+    'great', 'awesome', 'perfect', 'thank you so much', 'thanks',
+    'appreciate', 'wonderful', 'amazing', 'love it', 'sounds good',
+    'book it', "let's do it", 'perfect', 'excellent', 'fantastic',
+    'happy', 'pleased', 'glad',
+  ];
+  // Count positive word hits — need at least 2 to be confident
+  const positiveHits = positiveWords.filter((w) => lower.includes(w)).length;
+  if (positiveHits >= 2) return 'positive';
+
+  return 'neutral';
+}
+
+// Extract a booking reference (JH-XXXXX) from the transcript if mentioned.
+function extractBookingRef(transcript) {
+  if (!transcript) return null;
+  const match = transcript.match(/JH-[A-Z0-9]{4,6}/);
+  return match ? match[0] : null;
 }
