@@ -74,20 +74,17 @@ export async function POST(req) {
     // Build customer context variables
     const variableValues = buildVariables(customerInfo, callerNumber);
 
-    // MODE 1: Greeter number — return the squad with transfer_destination variable
-    // The squad starts with the greeter, which says the greeting and
-    // hands off to the right agent based on the transfer_destination variable
+    // MODE 1: Greeter number — return the right agent directly
+    // No greeter, no squad. The agent picks up immediately with a personalized greeting.
+    // Hold music is handled on the Quo side before the call connects to Vapi.
     if (calledNumber === GREETER_NUMBER || !calledNumber) {
       const variableValues = buildVariables(customerInfo, callerNumber);
-      variableValues.transfer_destination = routing.department;
       variableValues.caller_context = customerInfo.contextSummary;
 
       return NextResponse.json({
-        squadId: SQUAD_ID,
-        squadOverrides: {
-          memberOverrides: {
-            variableValues,
-          },
+        assistantId: routing.assistantId,
+        assistantOverrides: {
+          variableValues,
         },
       });
     }
