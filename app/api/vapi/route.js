@@ -42,16 +42,24 @@ export async function POST(req) {
     return NextResponse.json({ result });
   }
 
-  // ── End-of-call report: log the call + detect frustrated hangups ──
+  // ── End-of-call report: log the call + send follow-up SMS ──
   if (message.type === 'end-of-call-report') {
-    const callerNumber = message.customer?.number || message.call?.customer?.number || null;
+    const callerNumber = message.customer?.number ||
+                         message.call?.customer?.number ||
+                         message.customer?.num ||
+                         null;
     const durationSeconds = message.durationSeconds ? Math.round(message.durationSeconds) : 0;
     const endedReason = message.endedReason || null;
-    const transcript = message.transcript || '';
+    const transcript = message.transcript || message.artifact?.transcript || '';
+    const assistantId = message.assistant?.id || message.assistantId || '';
+    const assistantName = message.assistant?.name || '';
     const agentType =
-      message.assistant?.id === process.env.VAPI_BOOKING_AGENT_ID ? 'sales'
-      : message.assistant?.id === process.env.VAPI_CS_AGENT_ID ? 'service'
-      : message.assistant?.name === 'Riley' ? 'refunds'
+      assistantId === '8a7d8d53-3749-4814-bd36-39239e8a9c86' ? 'sales'
+      : assistantId === '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b' ? 'service'
+      : assistantId === '204b8b2f-325b-4d2b-95da-613ed0c51c68' ? 'refunds'
+      : assistantName === 'Casey' ? 'sales'
+      : assistantName === 'Jordan' ? 'service'
+      : assistantName === 'Riley' ? 'refunds'
       : 'unknown';
 
     try {
@@ -69,17 +77,31 @@ export async function POST(req) {
       console.error('phone_calls log failed:', e);
     }
 
-    // Detect frustrated hangup: short call + customer-initiated hangup
-    // Signs of frustration: call < 60 seconds, ended by customer, transcript shows frustration
-    const isFrustratedHangup = detectFrustration(durationSeconds, endedReason, transcript, agentType);
+    // ── Send SMS on every customer-initiated hangup ──
+    // If the customer hung up (not the agent, not an error), send a
+    // follow-up text. The message depends on what happened on the call.
+    const customerHungUp = endedReason === 'customer-ended-call' ||
+                           endedReason === 'customer-hung-up' ||
+                           endedReason === 'hangup' ||
+                           endedReason === 'customer-did-not-answer';
 
-    if (isFrustratedHangup && callerNumber) {
+    // Check if a booking was actually completed on this call
+    const bookingCompleted = transcript.toLowerCase().includes('deposit link') &&
+                             transcript.toLowerCase().includes('texted you');
+
+    // Check if this was a transfer from the greeter (short, no real conversation)
+    const wasGreeterTransfer = durationSeconds < 15 && agentType === 'unknown';
+
+    if (callerNumber && customerHungUp && !bookingCompleted && !wasGreeterTransfer) {
       try {
-        const apologyMsg = buildApologyMessage(agentType, transcript);
-        await sendSMS(callerNumber, apologyMsg, null, 'frustrated_hangup');
-        console.log('Sent frustration apology SMS to', callerNumber);
+        const isFrustrated = detectFrustration(durationSeconds, endedReason, transcript, agentType);
+        const smsMsg = isFrustrated
+          ? buildApologyMessage(agentType, transcript)
+          : buildFollowUpMessage(agentType, transcript, durationSeconds);
+        await sendSMS(callerNumber, smsMsg, null, isFrustrated ? 'frustrated_hangup' : 'follow_up');
+        console.log(`Sent ${isFrustrated ? 'frustration apology' : 'follow-up'} SMS to`, callerNumber);
       } catch (e) {
-        console.error('Failed to send apology SMS:', e);
+        console.error('Failed to send hangup SMS:', e);
       }
     }
 
@@ -94,7 +116,9 @@ export async function POST(req) {
 // ============================================================
 function detectFrustration(duration, endedReason, transcript, agentType) {
   // Customer hung up
-  const customerHungUp = endedReason === 'customer-hung-up' || endedReason === 'customer-ended-call';
+  const customerHungUp = endedReason === 'customer-hung-up' ||
+                         endedReason === 'customer-ended-call' ||
+                         endedReason === 'hangup';
   if (!customerHungUp) return false;
 
   // Very short calls (< 30s) that the customer ended = likely frustrated
@@ -120,7 +144,37 @@ function detectFrustration(duration, endedReason, transcript, agentType) {
 }
 
 // ============================================================
-// Build a personalized apology SMS based on what happened
+// Build a follow-up SMS for normal hangups (not frustrated)
+// ============================================================
+function buildFollowUpMessage(agentType, transcript, duration) {
+  const base = 'Hi, this is Junk Haul Calgary. ';
+
+  // Sales calls — they were interested but didn't finish booking
+  if (agentType === 'sales') {
+    // If they got a quote but didn't book
+    if (transcript.match(/\$\d{2,}/)) {
+      return base + "Thanks for calling! If you're ready to book your pickup, you can do it online at junkhaul.ca/book or just call us back. We've got slots open this Thursday and Sunday. Talk soon!";
+    }
+    // If they were just asking questions
+    return base + "Thanks for calling! If you'd like to book a pickup, you can do it online at junkhaul.ca/book anytime - takes about 2 minutes. Or call us back and we'll get you sorted. Have a good one!";
+  }
+
+  // Service calls — they have an existing booking
+  if (agentType === 'service') {
+    return base + "Thanks for calling! If you need to reschedule, change your address, or have any questions about your booking, you can do it online at junkhaul.ca/service or call us back. We're here to help!";
+  }
+
+  // Refund calls
+  if (agentType === 'refunds') {
+    return base + "Thanks for calling! If you need to submit or check on a refund request, you can do it online at junkhaul.ca/refund. Our team processes requests within 24 hours. Sorry for any inconvenience!";
+  }
+
+  // Unknown agent type
+  return base + "Thanks for calling! If you'd like to book a junk pickup, visit junkhaul.ca/book or call us back. Have a great day!";
+}
+
+// ============================================================
+// Build a personalized apology SMS for frustrated hangups
 // ============================================================
 function buildApologyMessage(agentType, transcript) {
   const base = 'Hi, this is Junk Haul Calgary. ';
