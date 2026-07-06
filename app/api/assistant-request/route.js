@@ -74,12 +74,21 @@ export async function POST(req) {
     // Build customer context variables
     const variableValues = buildVariables(customerInfo, callerNumber);
 
-    // MODE 1: Greeter number — return the squad
+    // MODE 1: Greeter number — return the squad with transfer_destination variable
     // The squad starts with the greeter, which says the greeting and
-    // hands off to the right agent via the dynamic handoff tool
+    // hands off to the right agent based on the transfer_destination variable
     if (calledNumber === GREETER_NUMBER || !calledNumber) {
+      const variableValues = buildVariables(customerInfo, callerNumber);
+      variableValues.transfer_destination = routing.department;
+      variableValues.caller_context = customerInfo.contextSummary;
+
       return NextResponse.json({
         squadId: SQUAD_ID,
+        squadOverrides: {
+          memberOverrides: {
+            variableValues,
+          },
+        },
       });
     }
 
@@ -223,16 +232,16 @@ function determineRouting(customerInfo) {
   const { customer } = customerInfo;
 
   if (customer?.has_refund_request) {
-    return { assistantId: ASSISTANT_RILEY, destination: DEPT_REFUNDS };
+    return { assistantId: ASSISTANT_RILEY, destination: DEPT_REFUNDS, department: 'refunds' };
   }
   if (customer?.has_service_request) {
-    return { assistantId: ASSISTANT_JORDAN, destination: DEPT_SERVICE };
+    return { assistantId: ASSISTANT_JORDAN, destination: DEPT_SERVICE, department: 'service' };
   }
   if (customer?.booking_status === 'pending_payment' || customer?.booking_status === 'confirmed') {
-    return { assistantId: ASSISTANT_JORDAN, destination: DEPT_SERVICE };
+    return { assistantId: ASSISTANT_JORDAN, destination: DEPT_SERVICE, department: 'service' };
   }
   // New caller or anything else → sales
-  return { assistantId: ASSISTANT_CASEY, destination: DEPT_SALES };
+  return { assistantId: ASSISTANT_CASEY, destination: DEPT_SALES, department: 'sales' };
 }
 
 // ============================================================
