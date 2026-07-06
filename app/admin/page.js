@@ -287,6 +287,13 @@ function JobCard({ b, act }) {
         </p>
       )}
 
+      {/* Customer notes (new field) */}
+      {b.customer_notes && (
+        <p className="mt-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded p-2">
+          📝 Customer notes: {b.customer_notes}
+        </p>
+      )}
+
       {/* Photos with lightbox */}
       {b.photos?.length > 0 && (
         <>
