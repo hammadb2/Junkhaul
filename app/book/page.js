@@ -867,28 +867,32 @@ function Field({ label, value, onChange, placeholder, type = 'text' }) {
   );
 }
 
-// Address field with free autocomplete using OpenStreetMap Nominatim API
+// Address field with Mapbox geocoding autocomplete — very accurate for Calgary
 function AddressField({ label, value, onChange, placeholder }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
   const debounceRef = useRef(null);
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   const fetchSuggestions = async (query) => {
-    if (query.length < 4) {
+    if (query.length < 2 || !token) {
       setSuggestions([]);
       return;
     }
     setLoading(true);
     try {
+      // Mapbox geocoding API — biased to Calgary, Alberta, Canada
+      const proximity = '-114.0719,51.0447'; // Calgary center
+      const bbox = '-114.3,50.9,-113.9,51.2'; // Calgary bounding box
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query + ', Calgary, Alberta, Canada'
-        )}&addressdetails=1&limit=5&countrycodes=ca`,
-        { headers: { 'Accept-Language': 'en' } }
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+          query
+        )}.json?access_token=${token}&country=ca&proximity=${proximity}&bbox=${bbox}&types=address,poi&limit=6&autocomplete=true`
       );
       const data = await res.json();
-      setSuggestions(data || []);
+      setSuggestions(data.features || []);
     } catch {
       setSuggestions([]);
     } finally {
@@ -899,19 +903,32 @@ function AddressField({ label, value, onChange, placeholder }) {
   const handleChange = (val) => {
     onChange(val);
     setShowDropdown(true);
+    setHighlighted(-1);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchSuggestions(val), 300);
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 200);
   };
 
   const selectSuggestion = (s) => {
-    const parts = [];
-    if (s.address?.house_number) parts.push(s.address.house_number);
-    if (s.address?.road) parts.push(s.address.road);
-    if (s.address?.suburb) parts.push(s.address.suburb);
-    const addr = parts.join(' ');
-    onChange(addr);
+    onChange(s.place_name);
     setSuggestions([]);
     setShowDropdown(false);
+    setHighlighted(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!showDropdown || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlighted((h) => Math.min(h + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlighted((h) => Math.max(h - 1, 0));
+    } else if (e.key === 'Enter' && highlighted >= 0) {
+      e.preventDefault();
+      selectSuggestion(suggestions[highlighted]);
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
   };
 
   return (
@@ -921,8 +938,9 @@ function AddressField({ label, value, onChange, placeholder }) {
         type="text"
         value={value}
         onChange={(e) => handleChange(e.target.value)}
-        onFocus={() => value.length >= 4 && setShowDropdown(true)}
+        onFocus={() => value.length >= 2 && setShowDropdown(true)}
         onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoComplete="off"
         className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
@@ -936,29 +954,26 @@ function AddressField({ label, value, onChange, placeholder }) {
             </div>
           )}
           {suggestions.map((s, i) => {
-            const parts = [];
-            if (s.address?.house_number) parts.push(s.address.house_number);
-            if (s.address?.road) parts.push(s.address.road);
-            if (s.address?.suburb) parts.push(s.address.suburb);
-            const mainAddr = parts.join(' ');
-            const area = [s.address?.city || s.address?.town || 'Calgary', s.address?.state || 'Alberta'].filter(Boolean).join(', ');
+            // Mapbox returns place_name as "123 5 Ave NE, Calgary, Alberta T2E 8N6, Canada"
+            // Split into main address + area for display
+            const parts = (s.place_name || '').split(',');
+            const mainAddr = parts[0] || s.place_name;
+            const area = parts.slice(1).join(',').trim();
             return (
               <button
-                key={s.place_id}
+                key={s.id}
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
-                className={`w-full text-left px-4 py-3 hover:bg-orange-50 border-b border-gray-100 last:border-0 transition-all ${
-                  i === 0 ? 'rounded-t-2xl' : ''
-                }`}
+                onMouseEnter={() => setHighlighted(i)}
+                className={`w-full text-left px-4 py-3 border-b border-gray-100 last:border-0 transition-all ${
+                  highlighted === i ? 'bg-orange-50' : 'hover:bg-orange-50'
+                } ${i === 0 ? 'rounded-t-2xl' : ''} ${i === suggestions.length - 1 ? 'rounded-b-2xl' : ''}`}
               >
                 <div className="text-sm font-semibold text-gray-900">{mainAddr}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{area}</div>
+                {area && <div className="text-xs text-gray-500 mt-0.5">{area}</div>}
               </button>
             );
           })}
-          {suggestions.length === 0 && !loading && (
-            <div className="px-4 py-3 text-sm text-gray-400">No addresses found. Try typing more details.</div>
-          )}
         </div>
       )}
     </label>
