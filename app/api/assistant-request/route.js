@@ -40,6 +40,8 @@ const DEPT_REFUNDS = '+14127149181';    // Riley
 const ASSISTANT_CASEY = '8a7d8d53-3749-4814-bd36-39239e8a9c86';
 const ASSISTANT_JORDAN = '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
 const ASSISTANT_RILEY = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
+const ASSISTANT_MORGAN = '88891da2-0cff-4486-8110-8195fd676c1c';
+const MANAGER_NUMBER = '+14127149656';
 
 export async function POST(req) {
   try {
@@ -81,11 +83,31 @@ export async function POST(req) {
       const variableValues = buildVariables(customerInfo, callerNumber);
       variableValues.caller_context = customerInfo.contextSummary;
 
+      // Check if customer's last call was an escalation to manager
+      const lastCall = customerInfo.callHistory?.[0];
+      if (lastCall && lastCall.call_outcome === 'complaint_logged' && lastCall.sentiment === 'angry') {
+        // Auto-route to Morgan if last call was an angry complaint
+        return NextResponse.json({
+          assistantId: ASSISTANT_MORGAN,
+          assistantOverrides: { variableValues },
+        });
+      }
+
       return NextResponse.json({
         assistantId: routing.assistantId,
         assistantOverrides: {
           variableValues,
         },
+      });
+    }
+
+    // MODE 1b: Manager number — route to Morgan directly
+    if (calledNumber === MANAGER_NUMBER) {
+      const variableValues = buildVariables(customerInfo, callerNumber);
+      variableValues.caller_context = customerInfo.contextSummary;
+      return NextResponse.json({
+        assistantId: ASSISTANT_MORGAN,
+        assistantOverrides: { variableValues },
       });
     }
 
@@ -199,6 +221,14 @@ async function lookupCustomer(callerNumber) {
     customer.service_request_type = serviceRequests[0].request_type;
   }
 
+  // Get last 3 calls from this customer
+  const { data: callHistory } = await supabaseAdmin
+    .from('call_history')
+    .select('*')
+    .or(phonePatterns.map(p => `caller_number.eq.${p}`).join(','))
+    .order('call_date', { ascending: false })
+    .limit(3);
+
   // Build context summary
   let contextSummary = '';
   if (customer) {
@@ -217,6 +247,25 @@ async function lookupCustomer(callerNumber) {
     }
   } else {
     contextSummary = `INCOMING CALLER INFO: New caller, phone ${callerNumber}. No previous bookings found. This is a potential new customer.`;
+  }
+
+  // Add call history so the agent knows what the customer called about before
+  if (callHistory && callHistory.length > 0) {
+    contextSummary += '\nPREVIOUS CALLS:\n';
+    for (const call of callHistory) {
+      const dateStr = new Date(call.call_date).toLocaleString('en-CA', {
+        timeZone: 'America/Edmonton',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      const summary = call.call_summary || 'No summary available';
+      const outcome = call.call_outcome || 'unknown';
+      const sentiment = call.sentiment || 'neutral';
+      contextSummary += `- ${dateStr}: ${summary} Outcome: ${outcome}. Sentiment: ${sentiment}.\n`;
+    }
   }
 
   return { customer, bookings, contextSummary };

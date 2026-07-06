@@ -82,7 +82,7 @@ export default function AdminDashboard() {
         <Logo className="h-7" />
         <div className="flex items-center gap-3">
           <div className="flex gap-1 text-xs">
-            {['dispatch', 'schedule', 'earnings', 'waitlist', 'leads'].map((v) => (
+            {['dispatch', 'schedule', 'earnings', 'waitlist', 'leads', 'calls'].map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -197,6 +197,7 @@ export default function AdminDashboard() {
         {view === 'earnings' && <EarningsDashboard />}
         {view === 'waitlist' && <WaitlistView />}
         {view === 'leads' && <LeadsView />}
+        {view === 'calls' && <CallHistoryView />}
       </div>
     </main>
   );
@@ -217,6 +218,211 @@ function Stat({ label, value, accent }) {
 }
 
 // ============================================================
+// CREW PHOTO CAPTURE — before/after documentation flow
+// ============================================================
+function CrewPhotoCapture({ booking, onCompleteStateChange }) {
+  const [arrived, setArrived] = useState(!!booking.crew_arrived_at);
+  const [jobStarted, setJobStarted] = useState(false);
+  const [arrivalPhotos, setArrivalPhotos] = useState([]);
+  const [completionPhotos, setCompletionPhotos] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [markingArrived, setMarkingArrived] = useState(false);
+  const [photoLightbox, setPhotoLightbox] = useState(null);
+
+  // Hydrate from any crew_photos already on the booking
+  useEffect(() => {
+    const photos = Array.isArray(booking.crew_photos) ? booking.crew_photos : [];
+    const arrival = photos.filter((p) => p.type === 'crew_arrival').map((p) => p.url);
+    const completion = photos.filter((p) => p.type === 'crew_completion').map((p) => p.url);
+    setArrivalPhotos(arrival);
+    setCompletionPhotos(completion);
+    // If we already have 3+ arrival photos, treat the job as started
+    if (arrival.length >= 3) setJobStarted(true);
+  }, [booking.crew_photos]);
+
+  const arrivalComplete = arrivalPhotos.length >= 3;
+  const completionComplete = completionPhotos.length >= 3;
+  const canCompleteJob = arrivalComplete && completionComplete;
+
+  // Notify parent whenever completion readiness changes
+  useEffect(() => {
+    if (onCompleteStateChange) onCompleteStateChange(canCompleteJob);
+  }, [canCompleteJob, onCompleteStateChange]);
+
+  const markArrived = async () => {
+    setMarkingArrived(true);
+    const res = await fetch('/api/admin/mark-arrived', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: booking.id }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setArrived(true);
+    } else {
+      alert(data.error || 'Failed to mark arrived');
+    }
+    setMarkingArrived(false);
+  };
+
+  const uploadPhoto = async (e, type) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('booking_id', booking.id);
+    formData.append('type', type);
+    try {
+      const res = await fetch('/api/admin/upload-crew-photo', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        if (type === 'crew_arrival') {
+          setArrivalPhotos((prev) => [...prev, data.url]);
+        } else {
+          setCompletionPhotos((prev) => [...prev, data.url]);
+        }
+      } else {
+        alert(data.error || 'Upload failed');
+      }
+    } catch (err) {
+      alert('Upload failed: ' + err.message);
+    }
+    setUploading(false);
+    // Reset the input so the same file can be re-selected
+    e.target.value = '';
+  };
+
+  const PhotoThumbs = ({ photos, label }) => (
+    <>
+      {photos.length > 0 && (
+        <div className="mt-2">
+          <p className="text-xs text-gray-500 mb-1">{label} ({photos.length})</p>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            {photos.map((url, i) => (
+              <button key={i} onClick={() => setPhotoLightbox(url)} className="flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt={label} className="h-16 w-16 rounded-lg object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold text-blue-900">📸 Crew Photo Documentation</span>
+        {arrived && (
+          <span className="text-xs bg-green-100 text-green-700 rounded px-1.5 py-0.5">
+            On site
+          </span>
+        )}
+      </div>
+
+      {/* Step 1: Mark arrived */}
+      {!arrived ? (
+        <button
+          onClick={markArrived}
+          disabled={markingArrived}
+          className="w-full bg-blue-600 text-white text-sm font-semibold py-2.5 rounded-lg disabled:bg-blue-300"
+        >
+          {markingArrived ? 'Marking…' : '📍 Mark arrived on site'}
+        </button>
+      ) : (
+        <>
+          {/* Step 2: Arrival photos */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-medium text-gray-700">
+                Arrival photos {arrivalPhotos.length}/3
+              </p>
+              {arrivalComplete && (
+                <span className="text-xs text-green-600 font-medium">✓ Minimum met</span>
+              )}
+            </div>
+            <PhotoThumbs photos={arrivalPhotos} label="Arrival photos" />
+            <label className="mt-2 flex items-center justify-center w-full border-2 border-dashed border-blue-300 rounded-lg py-3 text-sm text-blue-600 font-medium cursor-pointer hover:bg-blue-100 transition-colors">
+              {uploading ? 'Uploading…' : '📷 Take / upload arrival photo'}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => uploadPhoto(e, 'crew_arrival')}
+                className="hidden"
+                disabled={uploading}
+              />
+            </label>
+          </div>
+
+          {/* Step 3: Start the job (requires 3 arrival photos) */}
+          {arrivalComplete && !jobStarted && (
+            <button
+              onClick={() => setJobStarted(true)}
+              className="w-full bg-orange-500 text-white text-sm font-semibold py-2.5 rounded-lg"
+            >
+              ▶ Start the job
+            </button>
+          )}
+          {!arrivalComplete && (
+            <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded p-2">
+              ⚠️ Take at least {3 - arrivalPhotos.length} more arrival photo{3 - arrivalPhotos.length > 1 ? 's' : ''} before starting the job.
+            </p>
+          )}
+
+          {/* Step 4: Completion photos (after job started) */}
+          {jobStarted && (
+            <div className="border-t border-blue-200 pt-3">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-medium text-gray-700">
+                  Completion photos {completionPhotos.length}/3
+                </p>
+                {completionComplete && (
+                  <span className="text-xs text-green-600 font-medium">✓ Minimum met</span>
+                )}
+              </div>
+              <PhotoThumbs photos={completionPhotos} label="Completion photos" />
+              <label className="mt-2 flex items-center justify-center w-full border-2 border-dashed border-blue-300 rounded-lg py-3 text-sm text-blue-600 font-medium cursor-pointer hover:bg-blue-100 transition-colors">
+                {uploading ? 'Uploading…' : '📷 Take / upload completion photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => uploadPhoto(e, 'crew_completion')}
+                  className="hidden"
+                  disabled={uploading}
+                />
+              </label>
+              {!completionComplete && (
+                <p className="mt-2 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded p-2">
+                  ⚠️ Take at least {3 - completionPhotos.length} more completion photo{3 - completionPhotos.length > 1 ? 's' : ''} before marking the job complete.
+                </p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Lightbox for crew photos */}
+      {photoLightbox && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setPhotoLightbox(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoLightbox} alt="crew photo" className="max-w-full max-h-full rounded-xl object-contain" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // JOB CARD — upgraded with all improvements
 // ============================================================
 function JobCard({ b, act }) {
@@ -226,8 +432,10 @@ function JobCard({ b, act }) {
   const [rescheduleTime, setRescheduleTime] = useState(b.job_time);
   const [rescheduleSlots, setRescheduleSlots] = useState([]);
   const [lightbox, setLightbox] = useState(null);
+  const [canComplete, setCanComplete] = useState(false);
   const done = b.status === 'completed';
   const isNoShow = b.status === 'no_show';
+  const isConfirmed = b.status === 'confirmed';
 
   const loadRescheduleSlots = async (date) => {
     setRescheduleDate(date);
@@ -317,6 +525,9 @@ function JobCard({ b, act }) {
         </>
       )}
 
+      {/* Crew photo documentation (confirmed bookings only) */}
+      {isConfirmed && <CrewPhotoCapture booking={b} onCompleteStateChange={setCanComplete} />}
+
       {/* Operator notes */}
       <OperatorNotes bookingId={b.id} initial={b.operator_notes} />
 
@@ -324,12 +535,19 @@ function JobCard({ b, act }) {
       {!done && !isNoShow && (
         <div className="mt-3 flex gap-2">
           <button
-            onClick={() =>
-              act('complete', { booking_id: b.id }, `Mark ${b.name}'s job as complete and collect $${b.balance_due} balance?`)
-            }
-            className="flex-1 bg-green-600 text-white text-sm font-semibold py-2 rounded-lg"
+            onClick={() => {
+              if (isConfirmed && !canComplete) {
+                alert('Cannot mark complete — need at least 3 arrival photos and 3 completion photos.');
+                return;
+              }
+              act('complete', { booking_id: b.id }, `Mark ${b.name}'s job as complete and collect $${b.balance_due} balance?`);
+            }}
+            disabled={isConfirmed && !canComplete}
+            className={`flex-1 text-white text-sm font-semibold py-2 rounded-lg ${
+              isConfirmed && !canComplete ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-600'
+            }`}
           >
-            ✓ Complete
+            {isConfirmed && !canComplete ? '🔒 Photos required' : '✓ Complete'}
           </button>
           <button
             onClick={() => setOpen((o) => !o)}
@@ -1326,6 +1544,183 @@ function LeadsView() {
                 </div>
                 <a href={`tel:${lead.phone}`} className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// CALL HISTORY VIEW — recent calls with transcript expand
+// ============================================================
+const SENTIMENT_STYLES = {
+  positive: 'bg-green-50 text-green-700',
+  neutral: 'bg-gray-100 text-gray-600',
+  frustrated: 'bg-orange-50 text-orange-700',
+  angry: 'bg-red-50 text-red-700',
+};
+
+const OUTCOME_LABELS = {
+  booking_completed: 'Booking completed',
+  quote_given_no_booking: 'Quote — no booking',
+  rescheduled: 'Rescheduled',
+  cancelled: 'Cancelled',
+  refund_issued: 'Refund issued',
+  complaint_logged: 'Complaint logged',
+  frustrated_hangup: 'Frustrated hangup',
+  no_resolution: 'No resolution',
+  transferred: 'Transferred',
+};
+
+function CallHistoryView() {
+  const [calls, setCalls] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [phoneFilter, setPhoneFilter] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+
+  const load = useCallback((phone) => {
+    setLoading(true);
+    const url = phone
+      ? `/api/admin/call-history?phone=${encodeURIComponent(phone)}`
+      : '/api/admin/call-history';
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => { setCalls(d.calls || []); setLoading(false); });
+  }, []);
+
+  useEffect(() => { load(''); }, [load]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    load(phoneFilter);
+  };
+
+  const formatCallDate = (dateStr) => {
+    return new Date(dateStr).toLocaleString('en-CA', {
+      timeZone: 'America/Edmonton',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0s';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filter bar */}
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <input
+          type="tel"
+          value={phoneFilter}
+          onChange={(e) => setPhoneFilter(e.target.value)}
+          placeholder="Filter by phone number…"
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          className="bg-gray-900 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+        >
+          Filter
+        </button>
+        {phoneFilter && (
+          <button
+            type="button"
+            onClick={() => { setPhoneFilter(''); load(''); }}
+            className="border border-gray-300 text-sm px-3 py-2 rounded-lg"
+          >
+            Clear
+          </button>
+        )}
+      </form>
+
+      <p className="text-sm text-gray-500">{calls.length} call{calls.length !== 1 ? 's' : ''}</p>
+
+      {loading ? (
+        <p className="text-center text-gray-400 py-10">Loading call history…</p>
+      ) : calls.length === 0 ? (
+        <p className="text-center text-gray-400 py-10">No calls found.</p>
+      ) : (
+        <div className="space-y-3">
+          {calls.map((call) => (
+            <div key={call.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+              {/* Header row */}
+              <button
+                onClick={() => setExpandedId(expandedId === call.id ? null : call.id)}
+                className="w-full text-left"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <a
+                        href={`tel:${call.caller_number}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-orange-600 font-semibold text-sm"
+                      >
+                        {call.caller_name || call.caller_number}
+                      </a>
+                      {call.caller_name && (
+                        <span className="text-xs text-gray-400">{call.caller_number}</span>
+                      )}
+                      {call.agent_name && (
+                        <span className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">
+                          {call.agent_name}
+                        </span>
+                      )}
+                    </div>
+                    {call.call_summary && (
+                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{call.call_summary}</p>
+                    )}
+                    <div className="flex gap-2 mt-1.5 flex-wrap items-center">
+                      <span className="text-xs text-gray-400">{formatCallDate(call.call_date)}</span>
+                      <span className="text-xs text-gray-400">· {formatDuration(call.duration_seconds)}</span>
+                      {call.call_outcome && (
+                        <span className="text-xs bg-blue-50 text-blue-700 rounded px-1.5 py-0.5 font-medium">
+                          {OUTCOME_LABELS[call.call_outcome] || call.call_outcome}
+                        </span>
+                      )}
+                      {call.sentiment && (
+                        <span className={`text-xs rounded px-1.5 py-0.5 font-medium ${SENTIMENT_STYLES[call.sentiment] || SENTIMENT_STYLES.neutral}`}>
+                          {call.sentiment}
+                        </span>
+                      )}
+                      {call.booking_ref && (
+                        <span className="text-xs bg-purple-50 text-purple-700 rounded px-1.5 py-0.5 font-medium">
+                          {call.booking_ref}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-gray-400 text-xs flex-shrink-0">
+                    {expandedId === call.id ? '▲' : '▼'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Expanded transcript */}
+              {expandedId === call.id && (
+                <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+                  {call.ended_reason && (
+                    <p className="text-xs text-gray-400">Ended: {call.ended_reason}</p>
+                  )}
+                  {call.transcript ? (
+                    <pre className="text-xs text-gray-600 whitespace-pre-wrap font-sans bg-gray-50 rounded-lg p-3 max-h-96 overflow-y-auto">
+                      {call.transcript}
+                    </pre>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">No transcript available</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
