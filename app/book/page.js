@@ -826,7 +826,7 @@ function DetailsStep({ state, update, price, onCreated }) {
         placeholder="you@email.com"
         type="email"
       />
-      <Field
+      <AddressField
         label="Pickup address"
         value={state.address}
         onChange={(v) => update({ address: v })}
@@ -863,6 +863,94 @@ function Field({ label, value, onChange, placeholder, type = 'text' }) {
         placeholder={placeholder}
         className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
       />
+    </label>
+  );
+}
+
+// Address field with free autocomplete using OpenStreetMap Nominatim API
+function AddressField({ label, value, onChange, placeholder }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef(null);
+
+  const fetchSuggestions = async (query) => {
+    if (query.length < 4) {
+      setSuggestions([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query + ', Calgary, Alberta, Canada'
+        )}&addressdetails=1&limit=5&countrycodes=ca`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      const data = await res.json();
+      setSuggestions(data || []);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (val) => {
+    onChange(val);
+    setShowDropdown(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 300);
+  };
+
+  const selectSuggestion = (s) => {
+    const parts = [];
+    if (s.address?.house_number) parts.push(s.address.house_number);
+    if (s.address?.road) parts.push(s.address.road);
+    if (s.address?.suburb) parts.push(s.address.suburb);
+    const addr = parts.join(' ');
+    onChange(addr);
+    setSuggestions([]);
+    setShowDropdown(false);
+  };
+
+  return (
+    <label className="block relative">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={() => value.length >= 4 && setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        placeholder={placeholder}
+        autoComplete="off"
+        className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
+      />
+      {showDropdown && (suggestions.length > 0 || loading) && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+          {loading && <div className="px-3 py-2 text-sm text-gray-400">Searching...</div>}
+          {suggestions.map((s) => {
+            const parts = [];
+            if (s.address?.house_number) parts.push(s.address.house_number);
+            if (s.address?.road) parts.push(s.address.road);
+            if (s.address?.suburb) parts.push(s.address.suburb);
+            const mainAddr = parts.join(' ');
+            const area = [s.address?.city || s.address?.town || 'Calgary', s.address?.state || 'Alberta'].filter(Boolean).join(', ');
+            return (
+              <button
+                key={s.place_id}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
+                className="w-full text-left px-3 py-2.5 hover:bg-orange-50 border-b border-gray-100 last:border-0 transition-colors"
+              >
+                <div className="text-sm font-medium text-gray-900">{mainAddr}</div>
+                <div className="text-xs text-gray-400">{area}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </label>
   );
 }
