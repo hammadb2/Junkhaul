@@ -17,6 +17,18 @@ export async function POST(req) {
   const body = await req.json();
   const message = body?.message || {};
 
+  // ── Handoff destination request (from squad handoff tool) ──
+  // When the greeter calls handoffToAgent, Vapi asks our server which
+  // assistant to hand off to. We look up the customer and route accordingly.
+  if (message.type === 'handoff-destination-request') {
+    const callerNumber = message.call?.customer?.number ||
+                         message.customer?.number ||
+                         message.call?.from?.phoneNumber ||
+                         '';
+    const routing = await determineHandoffDestination(callerNumber);
+    return NextResponse.json(routing);
+  }
+
   // ── Tool calls (current Vapi format) ──
   if (message.type === 'tool-calls' && Array.isArray(message.toolCallList)) {
     const results = [];
@@ -147,53 +159,146 @@ function detectFrustration(duration, endedReason, transcript, agentType) {
 // Build a follow-up SMS for normal hangups (not frustrated)
 // ============================================================
 function buildFollowUpMessage(agentType, transcript, duration) {
-  const base = 'Hi, this is Junk Haul Calgary. ';
-
   // Sales calls — they were interested but didn't finish booking
   if (agentType === 'sales') {
     // If they got a quote but didn't book
     if (transcript.match(/\$\d{2,}/)) {
-      return base + "Thanks for calling! If you're ready to book your pickup, you can do it online at junkhaul.ca/book or just call us back. We've got slots open this Thursday and Sunday. Talk soon!";
+      return "Hey, thanks for calling Junk Haul Calgary! If you're ready to book your pickup you can do it online at junkhaul.ca/book or just call us back. We've got slots open this Thursday and Sunday. Talk soon!";
     }
     // If they were just asking questions
-    return base + "Thanks for calling! If you'd like to book a pickup, you can do it online at junkhaul.ca/book anytime - takes about 2 minutes. Or call us back and we'll get you sorted. Have a good one!";
+    return "Hey, thanks for calling Junk Haul Calgary! If you'd like to book a pickup you can do it online at junkhaul.ca/book anytime, takes about 2 minutes. Or call us back and we'll get you sorted. Have a good one!";
   }
 
   // Service calls — they have an existing booking
   if (agentType === 'service') {
-    return base + "Thanks for calling! If you need to reschedule, change your address, or have any questions about your booking, you can do it online at junkhaul.ca/service or call us back. We're here to help!";
+    return "Hey, thanks for calling Junk Haul Calgary! If you need to reschedule, change your address, or have any questions about your booking, you can do it online at junkhaul.ca/service or call us back. We're here to help!";
   }
 
   // Refund calls
   if (agentType === 'refunds') {
-    return base + "Thanks for calling! If you need to submit or check on a refund request, you can do it online at junkhaul.ca/refund. Our team processes requests within 24 hours. Sorry for any inconvenience!";
+    return "Hey, thanks for calling Junk Haul Calgary! If you need to submit or check on a refund request, you can do it online at junkhaul.ca/refund. Our team processes requests within 24 hours. Sorry for any inconvenience!";
   }
 
   // Unknown agent type
-  return base + "Thanks for calling! If you'd like to book a junk pickup, visit junkhaul.ca/book or call us back. Have a great day!";
+  return "Hey, thanks for calling Junk Haul Calgary! If you'd like to book a junk pickup, visit junkhaul.ca/book or call us back. Have a great day!";
 }
 
 // ============================================================
 // Build a personalized apology SMS for frustrated hangups
 // ============================================================
 function buildApologyMessage(agentType, transcript) {
-  const base = 'Hi, this is Junk Haul Calgary. ';
-
   if (agentType === 'sales') {
     // Check if they were trying to book
     if (transcript.toLowerCase().includes('book') || transcript.toLowerCase().includes('pickup') || transcript.toLowerCase().includes('junk')) {
-      return base + "I'm sorry our call got cut short - it sounded like you were trying to book a pickup. You can book online anytime at junkhaul.ca/book - it takes 2 minutes. Or call us back and we'll make sure to get you sorted. Sorry for the hassle!";
+      return "Hey, this is Junk Haul Calgary. Really sorry about the call just now, it sounded like you were trying to book a pickup. You can book online anytime at junkhaul.ca/book, takes 2 minutes. Or call us back and we'll make sure to get you sorted. Sorry for the hassle!";
     }
-    return base + "I'm sorry about the call just now - I know that was frustrating. If you're looking to book a junk pickup, you can do it online at junkhaul.ca/book anytime. Sorry again for the trouble!";
+    return "Hey, this is Junk Haul Calgary. Really sorry about the call just now, I know that was frustrating. If you're looking to book a junk pickup you can do it online at junkhaul.ca/book anytime. Sorry again for the trouble!";
   }
 
   if (agentType === 'service') {
-    return base + "I'm sorry about the call just now. If you need to reschedule, cancel, or have questions about your booking, you can do it online at junkhaul.ca/service or call us back. We'll make it right. Sorry for the frustration!";
+    return "Hey, this is Junk Haul Calgary. Really sorry about the call just now. If you need to reschedule, cancel, or have questions about your booking, you can do it online at junkhaul.ca/service or call us back. We'll make it right. Sorry for the frustration!";
   }
 
   if (agentType === 'refunds') {
-    return base + "I'm sorry about the call just now. If you're looking for a refund, you can submit a request online at junkhaul.ca/refund and our team will process it within 24 hours. Sorry for the hassle - we take every complaint seriously.";
+    return "Hey, this is Junk Haul Calgary. Really sorry about the call just now. If you're looking for a refund, you can submit a request online at junkhaul.ca/refund and our team will process it within 24 hours. Sorry for the hassle, we take every complaint seriously.";
   }
 
-  return base + "I'm sorry about the call just now. You can reach us online at junkhaul.ca or call us back. Sorry for the trouble!";
+  return "Hey, this is Junk Haul Calgary. Really sorry about the call just now. You can reach us online at junkhaul.ca or call us back. Sorry for the trouble!";
+}
+
+// ============================================================
+// Determine which assistant to hand off to (squad handoff)
+// ============================================================
+async function determineHandoffDestination(callerNumber) {
+  const ASSISTANT_CASEY = '8a7d8d53-3749-4814-bd36-39239e8a9c86';
+  const ASSISTANT_JORDAN = '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
+  const ASSISTANT_RILEY = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
+
+  if (!callerNumber) {
+    return {
+      destination: {
+        type: 'assistant',
+        assistantId: ASSISTANT_CASEY,
+        contextEngineeringPlan: { type: 'all' },
+      },
+    };
+  }
+
+  const normalizedPhone = callerNumber.replace(/^\+1/, '').replace(/\D/g, '');
+  const phonePatterns = [
+    callerNumber,
+    `+1${normalizedPhone}`,
+    `1${normalizedPhone}`,
+    normalizedPhone,
+  ];
+
+  // Check bookings
+  const { data: bookings } = await supabaseAdmin
+    .from('bookings')
+    .select('*')
+    .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  // Check refund requests
+  const { data: refunds } = await supabaseAdmin
+    .from('refund_requests')
+    .select('*')
+    .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  // Check service requests
+  const { data: services } = await supabaseAdmin
+    .from('service_requests')
+    .select('*')
+    .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  let assistantId = ASSISTANT_CASEY; // default: sales
+
+  if (refunds && refunds.length > 0) {
+    assistantId = ASSISTANT_RILEY;
+  } else if (services && services.length > 0) {
+    assistantId = ASSISTANT_JORDAN;
+  } else if (bookings && bookings.length > 0) {
+    const status = bookings[0].status;
+    if (status === 'pending_payment' || status === 'confirmed') {
+      assistantId = ASSISTANT_JORDAN;
+    }
+  }
+
+  // Build variable values for the destination assistant
+  const variableValues = {};
+  if (bookings && bookings.length > 0) {
+    const b = bookings[0];
+    variableValues.customer_first_name = b.name?.split(' ')[0] || 'there';
+    variableValues.customer_name = b.name || '';
+    variableValues.has_booking = 'true';
+    variableValues.booking_ref = b.booking_ref || '';
+    variableValues.booking_status = b.status || '';
+    variableValues.booking_load_size = b.load_size || '';
+    variableValues.booking_date = b.job_date || '';
+    variableValues.booking_time = b.job_time || '';
+    variableValues.booking_address = b.address || '';
+    variableValues.booking_total = b.total_price ? String(b.total_price) : '';
+    variableValues.booking_balance = b.balance_due ? String(b.balance_due) : '';
+    variableValues.is_returning_customer = 'true';
+  } else {
+    variableValues.customer_first_name = 'there';
+    variableValues.has_booking = 'false';
+    variableValues.is_returning_customer = 'false';
+  }
+
+  return {
+    destination: {
+      type: 'assistant',
+      assistantId,
+      contextEngineeringPlan: { type: 'all' },
+      assistantOverrides: {
+        variableValues,
+      },
+    },
+  };
 }
