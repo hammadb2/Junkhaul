@@ -69,6 +69,8 @@ export default function BookPage() {
     email: '',
     address: '',
     unit: '',
+    address_data: null, // full Mapbox feature with coords, postal code, etc.
+    is_apartment: false, // detected from address type
   });
   const [booking, setBooking] = useState(null);
 
@@ -778,6 +780,8 @@ function DetailsStep({ state, update, price, onCreated }) {
           email: state.email || null,
           address: state.address,
           unit: state.unit || null,
+          address_data: state.address_data || null,
+          is_apartment: state.is_apartment || false,
           load_size: state.load_size,
           same_day: state.same_day,
           stairs: state.stairs,
@@ -829,15 +833,73 @@ function DetailsStep({ state, update, price, onCreated }) {
       <AddressField
         label="Pickup address"
         value={state.address}
-        onChange={(v) => update({ address: v })}
+        onChange={(v, data) => {
+          if (data) {
+            // Full address selected from Mapbox — extract all details
+            const ctx = (data.context || []).reduce((acc, c) => {
+              const key = c.id.split('.')[0];
+              acc[key] = c.text;
+              return acc;
+            }, {});
+            const isApt = ['apartments', 'residential', 'condominium', 'building'].some(
+              (t) => (data.place_type || []).includes(t)
+            ) || /apt|apartment|condo|unit|suite|tower|building|complex/i.test(data.text || '');
+            update({
+              address: data.place_name,
+              address_data: {
+                full_address: data.place_name,
+                street: data.text,
+                postal_code: ctx.postcode || '',
+                city: ctx.place || 'Calgary',
+                province: ctx.region || 'Alberta',
+                country: ctx.country || 'Canada',
+                lat: data.center?.[1] || null,
+                lng: data.center?.[0] || null,
+                place_id: data.id,
+              },
+              is_apartment: isApt,
+              // Auto-apply 1 flight of stairs for apartments unless user already confirmed no stairs
+              stairs: isApt && !state.stairs_confirmed ? Math.max(state.stairs, 1) : state.stairs,
+            });
+          } else {
+            // User is typing manually
+            update({ address: v, address_data: null, is_apartment: false });
+          }
+        }}
         placeholder="123 5 Ave NE, Calgary"
       />
-      <Field
-        label="Unit / buzzer (optional)"
-        value={state.unit}
-        onChange={(v) => update({ unit: v })}
-        placeholder="Apt 204"
-      />
+      {state.is_apartment && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
+          <p className="text-sm font-medium text-orange-700">
+            This looks like an apartment or condo. We need your unit number.
+          </p>
+          <input
+            type="text"
+            value={state.unit}
+            onChange={(e) => update({ unit: e.target.value })}
+            placeholder="Apt 204, Unit 15, Suite 301..."
+            className="w-full border border-orange-300 rounded-lg px-3 py-2.5 text-sm focus:border-orange-500 focus:outline-none"
+          />
+          <p className="text-xs text-orange-600">
+            A stair charge of $25 (1 flight) has been added. If there are no stairs or an elevator, tap &quot;No stairs&quot; below.
+          </p>
+          <button
+            type="button"
+            onClick={() => update({ stairs: 0, stairs_confirmed: true })}
+            className="text-xs font-medium text-orange-700 underline"
+          >
+            No stairs / has elevator
+          </button>
+        </div>
+      )}
+      {!state.is_apartment && (
+        <Field
+          label="Unit / buzzer (optional)"
+          value={state.unit}
+          onChange={(v) => update({ unit: v })}
+          placeholder="Apt 204"
+        />
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -884,12 +946,13 @@ function AddressField({ label, value, onChange, placeholder }) {
     setLoading(true);
     try {
       // Mapbox geocoding API — biased to Calgary, Alberta, Canada
+      // Include address + poi (points of interest like apartment buildings) for max accuracy
       const proximity = '-114.0719,51.0447'; // Calgary center
       const bbox = '-114.3,50.9,-113.9,51.2'; // Calgary bounding box
       const res = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           query
-        )}.json?access_token=${token}&country=ca&proximity=${proximity}&bbox=${bbox}&types=address,poi&limit=6&autocomplete=true`
+        )}.json?access_token=${token}&country=ca&proximity=${proximity}&bbox=${bbox}&types=address,poi,neighborhood&limit=6&autocomplete=true`
       );
       const data = await res.json();
       setSuggestions(data.features || []);
@@ -901,7 +964,7 @@ function AddressField({ label, value, onChange, placeholder }) {
   };
 
   const handleChange = (val) => {
-    onChange(val);
+    onChange(val); // pass just the string while typing
     setShowDropdown(true);
     setHighlighted(-1);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -909,7 +972,8 @@ function AddressField({ label, value, onChange, placeholder }) {
   };
 
   const selectSuggestion = (s) => {
-    onChange(s.place_name);
+    // Pass the full feature back so parent can extract postal code, coords, etc.
+    onChange(s.place_name, s);
     setSuggestions([]);
     setShowDropdown(false);
     setHighlighted(-1);

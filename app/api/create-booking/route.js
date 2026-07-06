@@ -18,6 +18,8 @@ export async function POST(req) {
       email = null,
       address,
       unit = null,
+      address_data = null,
+      is_apartment = false,
       load_size,
       same_day = false,
       stairs = 0,
@@ -64,8 +66,20 @@ export async function POST(req) {
     // Price is ALWAYS computed server-side.
     const priced = calculatePrice({ load_size, same_day, stairs, has_freon, freon_count, job_date, job_time });
 
-    // Geocode for dispatch/quadrant.
-    const geo = await geocodeAddress(unit ? `${unit} ${address}` : address);
+    // Geocode for dispatch/quadrant — use Mapbox data from frontend if available, else geocode
+    let geo;
+    if (address_data?.lat && address_data?.lng) {
+      // Determine quadrant from lat/lng
+      const isNorth = address_data.lat >= 51.0447;
+      const isEast = address_data.lng >= -114.0719;
+      const quadrant = `${isNorth ? 'NW' : 'SW'}${isEast ? 'E' : 'W'}`.replace(/(?<=[NS])W(?=E)/, '');
+      // Simpler: just compute it
+      const ns = address_data.lat >= 51.0447 ? 'N' : 'S';
+      const ew = address_data.lng >= -114.0719 ? 'E' : 'W';
+      geo = { lat: address_data.lat, lng: address_data.lng, quadrant: `${ns}${ew}`, postal_code: address_data.postal_code || null };
+    } else {
+      geo = await geocodeAddress(unit ? `${unit} ${address}` : address);
+    }
 
     // Weight safety flag.
     const weight = checkWeightFlag(load_size, ai_weight_estimate_kg);
@@ -94,9 +108,11 @@ export async function POST(req) {
       email,
       address: unit ? `${unit}-${address}` : address,
       unit,
+      postal_code: geo.postal_code || null,
       quadrant: geo.quadrant,
       lat: geo.lat,
       lng: geo.lng,
+      is_apartment,
       load_size,
       base_price: priced.base_price,
       same_day,
