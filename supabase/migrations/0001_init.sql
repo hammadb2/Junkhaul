@@ -292,3 +292,6 @@ create policy "Public can read schedule" on schedule
 
 -- Add is_apartment column for apartment/condo detection
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_apartment boolean default false;
+
+-- Add customer_notes column for customer-provided pickup notes
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_notes text;

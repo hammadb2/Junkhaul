@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { calculatePrice, PRICING, checkWeightFlag } from '@/lib/pricing';
+import { calculatePrice, PRICING, checkWeightFlag, LOAD_LABELS } from '@/lib/pricing';
 import { geocodeAddress } from '@/lib/geocode';
 import { createDepositPayment } from '@/lib/stripe';
-import { jobDateTimeUTC, dayType } from '@/lib/dates';
+import { jobDateTimeUTC, dayType, formatDateLong, formatTime } from '@/lib/dates';
+import { sendSMS } from '@/lib/sms';
+import { sendDepositLink } from '@/lib/messages';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +22,7 @@ export async function POST(req) {
       unit = null,
       address_data = null,
       is_apartment = false,
+      customer_notes = null,
       load_size,
       same_day = false,
       stairs = 0,
@@ -113,6 +116,7 @@ export async function POST(req) {
       lat: geo.lat,
       lng: geo.lng,
       is_apartment,
+      customer_notes,
       load_size,
       base_price: priced.base_price,
       same_day,
@@ -156,8 +160,8 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Could not create booking.' }, { status: 500 });
     }
 
-    // Create the $50 deposit PaymentIntent.
-    const intent = await createDepositPayment(booking.id, name);
+    // Create the $50 deposit PaymentIntent (with receipt email if provided).
+    const intent = await createDepositPayment(booking.id, name, email);
     await supabaseAdmin
       .from('bookings')
       .update({ stripe_payment_intent_id: intent.id })

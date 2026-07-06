@@ -71,6 +71,7 @@ export default function BookPage() {
     unit: '',
     address_data: null, // full Mapbox feature with coords, postal code, etc.
     is_apartment: false, // detected from address type
+    customer_notes: '', // notes from customer about pickup
   });
   const [booking, setBooking] = useState(null);
 
@@ -782,6 +783,7 @@ function DetailsStep({ state, update, price, onCreated }) {
           unit: state.unit || null,
           address_data: state.address_data || null,
           is_apartment: state.is_apartment || false,
+          customer_notes: state.customer_notes || null,
           load_size: state.load_size,
           same_day: state.same_day,
           stairs: state.stairs,
@@ -900,6 +902,17 @@ function DetailsStep({ state, update, price, onCreated }) {
           placeholder="Apt 204"
         />
       )}
+
+      <label className="block">
+        <span className="text-sm font-medium text-gray-700">Notes for our team (optional)</span>
+        <textarea
+          value={state.customer_notes}
+          onChange={(e) => update({ customer_notes: e.target.value })}
+          placeholder="Any details about the junk, access, parking, gate codes, heavy items, etc."
+          rows={3}
+          className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none resize-none"
+        />
+      </label>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
