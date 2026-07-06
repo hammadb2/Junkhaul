@@ -29,6 +29,7 @@ export const maxDuration = 10;
 // Phone number IDs
 const GREETER_NUMBER = '+14127149826';
 const GREETER_ASSISTANT_ID = '6a8e3193-85fe-400a-b6d2-32f024803b7e';
+const SQUAD_ID = '7ee74770-c96b-4254-995a-0d1270b419bc';
 
 // Department Vapi numbers (the greeter transfers to these)
 const DEPT_SALES = '+14127149201';      // Casey
@@ -73,16 +74,12 @@ export async function POST(req) {
     // Build customer context variables
     const variableValues = buildVariables(customerInfo, callerNumber);
 
-    // MODE 1: Greeter number — return greeter + transfer destination
+    // MODE 1: Greeter number — return the squad
+    // The squad starts with the greeter, which says the greeting and
+    // hands off to the right agent via the dynamic handoff tool
     if (calledNumber === GREETER_NUMBER || !calledNumber) {
-      variableValues.transfer_destination = routing.destination;
-      variableValues.caller_context = customerInfo.contextSummary;
-
       return NextResponse.json({
-        assistantId: GREETER_ASSISTANT_ID,
-        assistantOverrides: {
-          variableValues,
-        },
+        squadId: SQUAD_ID,
       });
     }
 
