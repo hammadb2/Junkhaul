@@ -7,190 +7,259 @@ export const maxDuration = 10;
 // ============================================================
 // Vapi Assistant Request Webhook
 //
-// When a call comes in, Vapi calls this endpoint with the caller's
-// phone number. We look up the customer in our database and respond
-// with:
-// 1. Which assistant to route to (based on call context)
-// 2. Dynamic variables (customer name, booking info, etc.)
+// TWO MODES depending on which number was called:
 //
-// The assistant then greets the customer by name with full context.
+// 1. GREETER NUMBER (+14127149826):
+//    - Quo forwards the call here
+//    - We look up the customer, determine the right department
+//    - Return the greeter assistant + transfer_destination variable
+//    - Greeter says "Hey, thanks for calling Junk Haul Calgary!"
+//    - Greeter calls transferToAgent → hold music plays → transfers
+//
+// 2. DEPARTMENT NUMBERS (sales/service/refund):
+//    - Called by the greeter transfer
+//    - We look up the customer again (caller ID passes through)
+//    - Return the department agent + customer context variables
+//    - Agent picks up with "Hey [first name], hows it going?"
+//
+// If the caller ID does NOT pass through on transfer, the department
+// agent will still work but greet generically ("Hey there").
 // ============================================================
+
+// Phone number IDs
+const GREETER_NUMBER = '+14127149826';
+const GREETER_ASSISTANT_ID = '6a8e3193-85fe-400a-b6d2-32f024803b7e';
+
+// Department Vapi numbers (the greeter transfers to these)
+const DEPT_SALES = '+14127149201';      // Casey
+const DEPT_SERVICE = '+14127149625';    // Jordan
+const DEPT_REFUNDS = '+14127149181';    // Riley
+
+// Department assistant IDs
+const ASSISTANT_CASEY = '8a7d8d53-3749-4814-bd36-39239e8a9c86';
+const ASSISTANT_JORDAN = '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
+const ASSISTANT_RILEY = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
 
 export async function POST(req) {
   try {
     const body = await req.json();
     const message = body?.message || {};
 
-    // Only handle assistant-request
     if (message.type !== 'assistant-request') {
       return NextResponse.json({ error: 'Not an assistant request' }, { status: 400 });
     }
 
-    // Get the caller's REAL phone number (not the Quo forwarding number)
-    const callerNumber = message.call?.from?.phoneNumber || 
+    // Get the caller's REAL phone number
+    const callerNumber = message.call?.from?.phoneNumber ||
                          message.call?.customer?.number ||
                          body?.call?.from?.phoneNumber ||
                          body?.call?.customer?.number ||
                          '';
 
-    console.log('Assistant request for caller:', callerNumber);
+    // Get the number that was called (to determine greeter vs department)
+    const calledNumber = message.call?.to?.phoneNumber ||
+                         message.phoneNumber?.number ||
+                         body?.call?.to?.phoneNumber ||
+                         '';
 
-    // Look up the customer in our bookings database
-    let customer = null;
-    let bookings = [];
-    let recentBooking = null;
+    console.log('Assistant request - caller:', callerNumber, 'called:', calledNumber);
 
-    if (callerNumber) {
-      // Normalize phone number (remove +1 prefix for matching)
-      const normalizedPhone = callerNumber.replace(/^\+1/, '').replace(/\D/g, '');
-      const phonePatterns = [
-        callerNumber,
-        `+1${normalizedPhone}`,
-        `1${normalizedPhone}`,
-        normalizedPhone,
-      ];
+    // Look up the customer in our database
+    const customerInfo = await lookupCustomer(callerNumber);
 
-      // Search bookings by phone number
-      const { data: bookingResults } = await supabaseAdmin
-        .from('bookings')
-        .select('*')
-        .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
-        .order('created_at', { ascending: false })
-        .limit(5);
+    // Determine which department to route to
+    const routing = determineRouting(customerInfo);
 
-      if (bookingResults && bookingResults.length > 0) {
-        bookings = bookingResults;
-        recentBooking = bookingResults[0];
-        customer = {
-          name: recentBooking.name,
-          first_name: recentBooking.name?.split(' ')[0] || 'there',
-          phone: recentBooking.phone,
-          email: recentBooking.email,
-          booking_ref: recentBooking.booking_ref,
-          booking_status: recentBooking.status,
-          load_size: recentBooking.load_size,
-          job_date: recentBooking.job_date,
-          job_time: recentBooking.job_time,
-          address: recentBooking.address,
-          total_price: recentBooking.total_price,
-          balance_due: recentBooking.balance_due,
-          has_complaint: false,
-        };
-      }
+    // Build customer context variables
+    const variableValues = buildVariables(customerInfo, callerNumber);
 
-      // Also check refund_requests
-      const { data: refundRequests } = await supabaseAdmin
-        .from('refund_requests')
-        .select('*')
-        .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
-        .order('created_at', { ascending: false })
-        .limit(1);
+    // MODE 1: Greeter number — return greeter + transfer destination
+    if (calledNumber === GREETER_NUMBER || !calledNumber) {
+      variableValues.transfer_destination = routing.destination;
+      variableValues.caller_context = customerInfo.contextSummary;
 
-      if (refundRequests && refundRequests.length > 0) {
-        customer = customer || {
-          name: refundRequests[0].name,
-          first_name: refundRequests[0].name?.split(' ')[0] || 'there',
-          phone: refundRequests[0].phone,
-        };
-        customer.has_refund_request = true;
-        customer.refund_reason = refundRequests[0].reason;
-      }
-
-      // Check service_requests
-      const { data: serviceRequests } = await supabaseAdmin
-        .from('service_requests')
-        .select('*')
-        .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (serviceRequests && serviceRequests.length > 0) {
-        customer = customer || {
-          name: serviceRequests[0].name,
-          first_name: serviceRequests[0].name?.split(' ')[0] || 'there',
-          phone: serviceRequests[0].phone,
-        };
-        customer.has_service_request = true;
-        customer.service_request_type = serviceRequests[0].request_type;
-      }
+      return NextResponse.json({
+        assistantId: GREETER_ASSISTANT_ID,
+        assistantOverrides: {
+          variableValues,
+        },
+      });
     }
 
-    // Determine which assistant to route to
-    let assistantId;
-    if (customer?.has_refund_request) {
-      // Route to Riley (refunds)
-      assistantId = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
-    } else if (customer?.has_service_request) {
-      // Route to Jordan (service)
-      assistantId = '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
-    } else if (customer?.booking_status === 'pending_payment' || customer?.booking_status === 'confirmed') {
-      // Existing booking — route to Jordan (service) for any changes
-      assistantId = '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
-    } else {
-      // New caller — route to Casey (sales)
-      assistantId = '8a7d8d53-3749-4814-bd36-39239e8a9c86';
-    }
+    // MODE 2: Department number — return the actual agent + customer context
+    variableValues.caller_context = customerInfo.contextSummary;
 
-    // Build dynamic variables for the assistant
-    const variableValues = {
-      customer_first_name: customer?.first_name || 'there',
-      customer_name: customer?.name || '',
-      customer_phone: callerNumber,
-      has_booking: customer ? 'true' : 'false',
-      booking_ref: customer?.booking_ref || '',
-      booking_status: customer?.booking_status || '',
-      booking_load_size: customer?.load_size || '',
-      booking_date: customer?.job_date || '',
-      booking_time: customer?.job_time || '',
-      booking_address: customer?.address || '',
-      booking_total: customer?.total_price ? String(customer.total_price) : '',
-      booking_balance: customer?.balance_due ? String(customer.balance_due) : '',
-      has_refund_request: customer?.has_refund_request ? 'true' : 'false',
-      has_service_request: customer?.has_service_request ? 'true' : 'false',
-      service_request_type: customer?.service_request_type || '',
-      is_returning_customer: bookings.length > 0 ? 'true' : 'false',
-      booking_count: String(bookings.length),
-    };
-
-    // Build context summary for the system prompt
-    let contextSummary = '';
-    if (customer) {
-      contextSummary = `INCOMING CALLER INFO: Name: ${customer.name}. Phone: ${callerNumber}. `;
-      if (customer.booking_ref) {
-        contextSummary += `Booking ref: ${customer.booking_ref}. Status: ${customer.booking_status}. Load: ${customer.load_size}. Date: ${customer.job_date} at ${customer.job_time}. Address: ${customer.address}. Total: $${customer.total_price}. Balance due: $${customer.balance_due}. `;
-      }
-      if (customer.has_refund_request) {
-        contextSummary += `Has a pending refund request: ${customer.refund_reason}. `;
-      }
-      if (customer.has_service_request) {
-        contextSummary += `Has a pending service request: ${customer.service_request_type}. `;
-      }
-      if (bookings.length > 1) {
-        contextSummary += `Returning customer with ${bookings.length} bookings. `;
-      }
-    } else {
-      contextSummary = `INCOMING CALLER INFO: New caller, phone ${callerNumber}. No previous bookings found. This is a potential new customer.`;
-    }
-
-    // Return the assistant ID with variable values and context
     return NextResponse.json({
-      assistantId,
+      assistantId: routing.assistantId,
       assistantOverrides: {
         variableValues,
-        context: contextSummary,
       },
     });
   } catch (e) {
     console.error('Assistant request error:', e);
-    // Fallback to Casey (sales)
+    // Fallback to greeter
     return NextResponse.json({
-      assistantId: '8a7d8d53-3749-4814-bd36-39239e8a9c86',
+      assistantId: GREETER_ASSISTANT_ID,
       assistantOverrides: {
         variableValues: {
+          transfer_destination: DEPT_SALES,
           customer_first_name: 'there',
-          is_returning_customer: 'false',
         },
       },
     });
   }
+}
+
+// ============================================================
+// Customer lookup
+// ============================================================
+async function lookupCustomer(callerNumber) {
+  let customer = null;
+  let bookings = [];
+
+  if (!callerNumber) {
+    return {
+      customer: null,
+      bookings: [],
+      contextSummary: 'INCOMING CALLER INFO: Unknown caller, no phone number available.',
+    };
+  }
+
+  const normalizedPhone = callerNumber.replace(/^\+1/, '').replace(/\D/g, '');
+  const phonePatterns = [
+    callerNumber,
+    `+1${normalizedPhone}`,
+    `1${normalizedPhone}`,
+    normalizedPhone,
+  ];
+
+  // Search bookings by phone number
+  const { data: bookingResults } = await supabaseAdmin
+    .from('bookings')
+    .select('*')
+    .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (bookingResults && bookingResults.length > 0) {
+    bookings = bookingResults;
+    const recent = bookingResults[0];
+    customer = {
+      name: recent.name,
+      first_name: recent.name?.split(' ')[0] || 'there',
+      phone: recent.phone,
+      email: recent.email,
+      booking_ref: recent.booking_ref,
+      booking_status: recent.status,
+      load_size: recent.load_size,
+      job_date: recent.job_date,
+      job_time: recent.job_time,
+      address: recent.address,
+      total_price: recent.total_price,
+      balance_due: recent.balance_due,
+    };
+  }
+
+  // Check refund_requests
+  const { data: refundRequests } = await supabaseAdmin
+    .from('refund_requests')
+    .select('*')
+    .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (refundRequests && refundRequests.length > 0) {
+    customer = customer || {
+      name: refundRequests[0].name,
+      first_name: refundRequests[0].name?.split(' ')[0] || 'there',
+      phone: refundRequests[0].phone,
+    };
+    customer.has_refund_request = true;
+    customer.refund_reason = refundRequests[0].reason;
+  }
+
+  // Check service_requests
+  const { data: serviceRequests } = await supabaseAdmin
+    .from('service_requests')
+    .select('*')
+    .or(phonePatterns.map(p => `phone.eq.${p}`).join(','))
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (serviceRequests && serviceRequests.length > 0) {
+    customer = customer || {
+      name: serviceRequests[0].name,
+      first_name: serviceRequests[0].name?.split(' ')[0] || 'there',
+      phone: serviceRequests[0].phone,
+    };
+    customer.has_service_request = true;
+    customer.service_request_type = serviceRequests[0].request_type;
+  }
+
+  // Build context summary
+  let contextSummary = '';
+  if (customer) {
+    contextSummary = `INCOMING CALLER INFO: Name: ${customer.name}. Phone: ${callerNumber}. `;
+    if (customer.booking_ref) {
+      contextSummary += `Booking ref: ${customer.booking_ref}. Status: ${customer.booking_status}. Load: ${customer.load_size}. Date: ${customer.job_date} at ${customer.job_time}. Address: ${customer.address}. Total: $${customer.total_price}. Balance due: $${customer.balance_due}. `;
+    }
+    if (customer.has_refund_request) {
+      contextSummary += `Has a pending refund request: ${customer.refund_reason}. `;
+    }
+    if (customer.has_service_request) {
+      contextSummary += `Has a pending service request: ${customer.service_request_type}. `;
+    }
+    if (bookings.length > 1) {
+      contextSummary += `Returning customer with ${bookings.length} bookings. `;
+    }
+  } else {
+    contextSummary = `INCOMING CALLER INFO: New caller, phone ${callerNumber}. No previous bookings found. This is a potential new customer.`;
+  }
+
+  return { customer, bookings, contextSummary };
+}
+
+// ============================================================
+// Routing logic — which department + which agent
+// ============================================================
+function determineRouting(customerInfo) {
+  const { customer } = customerInfo;
+
+  if (customer?.has_refund_request) {
+    return { assistantId: ASSISTANT_RILEY, destination: DEPT_REFUNDS };
+  }
+  if (customer?.has_service_request) {
+    return { assistantId: ASSISTANT_JORDAN, destination: DEPT_SERVICE };
+  }
+  if (customer?.booking_status === 'pending_payment' || customer?.booking_status === 'confirmed') {
+    return { assistantId: ASSISTANT_JORDAN, destination: DEPT_SERVICE };
+  }
+  // New caller or anything else → sales
+  return { assistantId: ASSISTANT_CASEY, destination: DEPT_SALES };
+}
+
+// ============================================================
+// Build dynamic variables for the assistant
+// ============================================================
+function buildVariables(customerInfo, callerNumber) {
+  const { customer, bookings } = customerInfo;
+  return {
+    customer_first_name: customer?.first_name || 'there',
+    customer_name: customer?.name || '',
+    customer_phone: callerNumber,
+    has_booking: customer ? 'true' : 'false',
+    booking_ref: customer?.booking_ref || '',
+    booking_status: customer?.booking_status || '',
+    booking_load_size: customer?.load_size || '',
+    booking_date: customer?.job_date || '',
+    booking_time: customer?.job_time || '',
+    booking_address: customer?.address || '',
+    booking_total: customer?.total_price ? String(customer.total_price) : '',
+    booking_balance: customer?.balance_due ? String(customer.balance_due) : '',
+    has_refund_request: customer?.has_refund_request ? 'true' : 'false',
+    has_service_request: customer?.has_service_request ? 'true' : 'false',
+    service_request_type: customer?.service_request_type || '',
+    is_returning_customer: bookings.length > 0 ? 'true' : 'false',
+    booking_count: String(bookings.length),
+  };
 }
