@@ -22,9 +22,9 @@ function getGroq() {
   return _groq;
 }
 
-// Wrapper that strips ALL dashes from outgoing SMS
+// Wrapper that strips ALL dashes and apostrophes from outgoing SMS
 async function sendSMS(to, body, booking_id = null, message_type = null) {
-  const clean = body.replace(/-/g, ' ');
+  const clean = body.replace(/-/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ').trim();
   return _sendSMS(to, clean, booking_id, message_type);
 }
 
@@ -56,12 +56,12 @@ function parseInbound(payload) {
 // ============================================================
 // Get conversation history for AI context
 // ============================================================
-async function getRecentMessages(from, limit = 12) {
+async function getRecentMessages(from, limit = 20) {
   const { data: msgs } = await supabaseAdmin
     .from('messages')
-    .select('body, direction, message_type, created_at')
+    .select('body, direction, message_type, sent_at')
     .or(`from_number.eq.${from},to_number.eq.${from}`)
-    .order('created_at', { ascending: false })
+    .order('sent_at', { ascending: false })
     .limit(limit);
   return (msgs || []).reverse();
 }
@@ -90,10 +90,10 @@ async function generateReply(from, text, messages, booking, media, stage) {
 
   const hasPhotos = media && media.length > 0;
 
-  // Build conversation history for the AI
+  // Build conversation history for the AI — use ALL recent messages
   const history = messages
     .filter(m => m.message_type !== 'temp_address' && m.message_type !== 'temp_name' && m.message_type !== 'temp_slots' && m.message_type !== 'photo_analysis')
-    .slice(-8)
+    .slice(-16)
     .map(m => ({
       role: m.direction === 'inbound' ? 'user' : 'assistant',
       content: m.body || '',
@@ -161,19 +161,21 @@ ${hasPhotos ? `The customer just sent ${media.length} photo(s). You already sent
 
 ABSOLUTE RULES:
 1. NEVER use dashes, hyphens, or minus signs in your reply. No " - " and no "-". Use commas or just rephrase.
-2. NEVER say you are an AI, bot, assistant, or automated system. You are Casey, a real person.
-3. Keep it short. Under 160 characters when you can. Two short sentences max usually.
-4. Always reply with something real and conversational. Never send a template or canned response.
+2. NEVER use apostrophes. Dont write "whats", write "whats". Dont write "youre", write "youre". Dont write "dont", write "dont". Just skip the apostrophe entirely. This is texting, nobody uses apostrophes in texts.
+3. NEVER say you are an AI, bot, assistant, or automated system. You are Casey, a real person.
+4. Keep it short. Under 160 characters when you can. Two short sentences max usually.
 5. MIRROR THEIR TONE. If they slang, you slang. If they formal, you formal. If they blunt, you blunt. Always match.
-6. If they want to book, walk them through it naturally: ask what theyre hauling, where, when. Dont send a link unless they specifically ask for one.
-7. If they want to cancel, say something like "no worries, I can cancel that for you. want me to go ahead?" and then tell them its done.
-8. If they want to reschedule, ask what day works better and offer the next available slots.
-9. If they ask something you dont know, say youll check and get back to them, or give them the phone number.
-10. If theyre angry or upset, be calm and empathetic. Match their energy without escalating. "oh no, thats not good. tell me what happened and Ill sort it out."
-11. If they send something random or weird, just roll with it like a real person would. Dont act confused or robotic.
-12. Do NOT use the word "deposit" unless they ask about money or booking. Just say "$50 to lock it in" naturally.
-13. Phone numbers: write them as (587) 325 0751, no dashes.
-14. Booking refs: write them as "JH ABC23" with a space, no dash.`;
+6. REMEMBER THE CONVERSATION. If they already told you what they need hauled, dont ask again. If you already gave them a price, dont reintroduce yourself. Keep the flow going naturally. You are continuing a conversation, not starting a new one.
+7. DONT REPEAT YOURSELF. If you already asked "what do you need hauled" and they answered, move forward. Dont circle back.
+8. If they want to book, walk them through it naturally: ask what theyre hauling, where, when. Dont send a link unless they specifically ask for one.
+9. If they want to cancel, say something like "no worries, I can cancel that for you. want me to go ahead?" and then tell them its done.
+10. If they want to reschedule, ask what day works better and offer the next available slots.
+11. If they ask something you dont know, say youll check and get back to them, or give them the phone number.
+12. If theyre angry or upset, be calm and empathetic. Match their energy without escalating. "oh no, thats not good. tell me what happened and Ill sort it out."
+13. If they send something random or weird, just roll with it like a real person would. Dont act confused or robotic.
+14. Do NOT use the word "deposit" unless they ask about money or booking. Just say "$50 to lock it in" naturally.
+15. Phone numbers: write them as (587) 325 0751, no dashes.
+16. Booking refs: write them as "JH ABC23" with a space, no dash.`;
 
   try {
     const allMessages = [
@@ -189,8 +191,8 @@ ABSOLUTE RULES:
       messages: allMessages,
     });
     let reply = response.choices[0]?.message?.content?.trim() || null;
-    // Strip any dashes that the AI might have added
-    if (reply) reply = reply.replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+    // Strip dashes and apostrophes that the AI might have added
+    if (reply) reply = reply.replace(/-/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ').trim();
     return reply;
   } catch (e) {
     console.error('AI reply failed:', e);
