@@ -1,0 +1,69 @@
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
+import { optimiseRoute } from '@/lib/route';
+import { crewAuth } from '@/lib/crewAuth';
+import { edmontonNowParts } from '@/lib/dates';
+
+export const runtime = 'nodejs';
+
+// GET /api/crew/jobs — today's jobs in optimized route order + day stats
+export async function GET(req) {
+  const authed = await crewAuth(req);
+  if (!authed) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const { date: todayStr } = edmontonNowParts();
+
+  const { data: bookings, error } = await supabaseAdmin
+    .from('bookings')
+    .select('*')
+    .eq('job_date', todayStr)
+    .in('status', ['confirmed', 'completed'])
+    .order('job_time', { ascending: true });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Optimize route order for incomplete jobs
+  const incomplete = (bookings || []).filter(
+    (b) => b.crew_status !== 'complete' && b.crew_status !== 'awaiting_payment'
+  );
+  const complete = (bookings || []).filter(
+    (b) => b.crew_status === 'complete' || b.crew_status === 'awaiting_payment'
+  );
+
+  let ordered;
+  try {
+    const optimized = await optimiseRoute(incomplete);
+    ordered = [...optimized, ...complete];
+  } catch {
+    ordered = [...incomplete, ...complete];
+  }
+
+  // Compute day stats
+  const stats = {
+    total_jobs: bookings.length,
+    completed: complete.length,
+    remaining: incomplete.length,
+    expected_total: bookings.reduce((sum, b) => sum + (b.balance_due || 0), 0),
+    collected_total: bookings.reduce(
+      (sum, b) => sum + (b.payment_status !== 'unpaid' ? b.balance_due || 0 : 0),
+      0
+    ),
+    collected_cash: bookings.reduce(
+      (sum, b) =>
+        sum + (b.payment_status === 'cash_crew' || b.payment_status === 'cash_declared' ? b.balance_due || 0 : 0),
+      0
+    ),
+    collected_card: bookings.reduce(
+      (sum, b) =>
+        sum +
+        (['paid_card', 'paid_apple_pay', 'paid_google_pay'].includes(b.payment_status)
+          ? b.balance_due || 0
+          : 0),
+      0
+    ),
+  };
+
+  return NextResponse.json({ jobs: ordered, stats });
+}
