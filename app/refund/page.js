@@ -85,7 +85,7 @@ export default function RefundPage() {
         />
         <textarea
           className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none resize-none"
-          placeholder="Tell us what happened and why you&apos;re requesting a refund *"
+          placeholder="Tell us what happened and why you're requesting a refund *"
           rows={5}
           value={form.reason}
           onChange={(e) => setForm({ ...form, reason: e.target.value })}
