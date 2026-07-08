@@ -330,10 +330,21 @@ export async function POST(req) {
     return NextResponse.json({ ok: true });
   }
 
-  const { type, from, text, media } = parseInbound(payload);
+  const { type, from, text, media, messageId } = parseInbound(payload);
 
   if (type && type !== 'message.received') return NextResponse.json({ ok: true });
   if (!from) return NextResponse.json({ ok: true });
+
+  // ── DEDUPLICATE: Quo retries webhooks if we're slow to respond.
+  //    If we already processed this messageId, skip immediately. ──
+  if (messageId) {
+    const { data: existing } = await supabaseAdmin
+      .from('messages')
+      .select('id')
+      .eq('provider_sid', messageId)
+      .maybeSingle();
+    if (existing) return NextResponse.json({ ok: true });
+  }
 
   const upper = (text || '').trim().toUpperCase();
   const hasPhotos = media && media.length > 0;
@@ -350,7 +361,7 @@ export async function POST(req) {
     .limit(1)
     .maybeSingle();
 
-  // Log inbound message
+  // Log inbound message (store messageId as provider_sid for dedup)
   await supabaseAdmin.from('messages').insert({
     booking_id: recentBooking?.id || null,
     direction: 'inbound',
@@ -358,6 +369,7 @@ export async function POST(req) {
     to_number: process.env.QUO_PHONE_NUMBER,
     message_type: 'inbound',
     body: text,
+    provider_sid: messageId || null,
   });
 
   // ── STOP / HELP (regulatory, must stay as keywords) ──
