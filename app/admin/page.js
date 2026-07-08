@@ -82,7 +82,7 @@ export default function AdminDashboard() {
         <Logo className="h-7" />
         <div className="flex items-center gap-3">
           <div className="flex gap-1 text-xs">
-            {['dispatch', 'schedule', 'earnings', 'waitlist', 'leads'].map((v) => (
+            {['dispatch', 'schedule', 'earnings', 'waitlist', 'leads', 'crew'].map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
