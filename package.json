@@ -3,17 +3,21 @@
   "version": "1.0.0",
   "private": true,
   "description": "Junk Haul Calgary — same-day junk removal booking platform",
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node supabase/migrations/payroll.test.js",
+    "test:payroll": "node supabase/migrations/payroll.test.js"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "3.1.1",
     "@stripe/stripe-js": "5.5.0",
     "@supabase/supabase-js": "2.48.1",
     "framer-motion": "11.18.2",
+    "googleapis": "^144.0.0",
     "groq-sdk": "0.12.0",
     "leaflet": "1.9.4",
     "next": "15.1.9",
