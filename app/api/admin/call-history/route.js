@@ -12,34 +12,43 @@ async function checkAuth() {
   return token === await adminToken();
 }
 
+// GET /api/admin/call-history
 export async function GET(req) {
   if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const phone = searchParams.get('phone');
-  const limit = parseInt(searchParams.get('limit') || '50', 10);
+  const limit = parseInt(searchParams.get('limit') || '200', 10);
 
   let query = supabaseAdmin
     .from('call_history')
     .select('*')
-    .order('call_date', { ascending: false })
     .limit(limit);
 
   if (phone) {
-    // Normalize and search by multiple phone formats
     const normalizedPhone = phone.replace(/^\+1/, '').replace(/\D/g, '');
     const phonePatterns = [
-      phone,
-      `+1${normalizedPhone}`,
-      `1${normalizedPhone}`,
-      normalizedPhone,
-    ].filter(Boolean);
-    query = query.or(phonePatterns.map(p => `caller_number.eq.${p}`).join(','));
+      `caller_number.eq.${phone}`,
+      `caller_number.eq.+1${normalizedPhone}`,
+      `caller_number.eq.1${normalizedPhone}`,
+      `caller_number.eq.${normalizedPhone}`,
+    ];
+    query = query.or(phonePatterns.join(','));
   }
 
-  const { data: calls, error } = await query;
+  const { data, error } = await query;
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ calls: calls || [] });
+  const sorted = (data || []).sort((a, b) => {
+    const rank = { frustrated: 0, negative: 1, neutral: 2, positive: 3 };
+    const rankA = rank[a.sentiment] ?? 4;
+    const rankB = rank[b.sentiment] ?? 4;
+    if (rankA !== rankB) return rankA - rankB;
+    return new Date(b.call_date) - new Date(a.call_date);
+  });
+
+  return NextResponse.json({ calls: sorted });
 }

@@ -1,7 +1,13 @@
-import { supabase, sendSMS } from '../_shared/clients.ts';
+import { supabase, sendSMS, isKillSwitchOn } from '../_shared/clients.ts';
 import { edmontonNow, formatTime } from '../_shared/time.ts';
 
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('morning_reminders'))) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'kill_switch_off' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const now = edmontonNow();
   if (now.hour !== 7) {
     return new Response(JSON.stringify({ skipped: true, reason: 'not 7AM Edmonton', now }), {

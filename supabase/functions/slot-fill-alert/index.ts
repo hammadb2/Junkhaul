@@ -1,7 +1,11 @@
-import { supabase, sendSMS } from '../_shared/clients.ts';
+import { supabase, sendSMS, isKillSwitchOn } from '../_shared/clients.ts';
 import { edmontonNow, formatDateLong } from '../_shared/time.ts';
 
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('slot_fill_alert'))) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'kill_switch_off' }), { headers: { 'Content-Type': 'application/json' } });
+  }
+
   const now = edmontonNow();
   if ((now.weekday !== 'Tue' && now.weekday !== 'Fri') || now.hour !== 9) {
     return new Response(JSON.stringify({ skipped: true }), { headers: { 'Content-Type': 'application/json' } });

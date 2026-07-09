@@ -85,6 +85,11 @@ VALUES
   ('kill_switch_slot_fill_alert', 'true', 'boolean', 'Enable slot fill alerts', 'kill_switch'),
   ('kill_switch_day_before_fill', 'true', 'boolean', 'Enable day-before fill alerts', 'kill_switch'),
   ('kill_switch_morning_reminders', 'true', 'boolean', 'Enable morning reminder SMS', 'kill_switch'),
+  ('kill_switch_day_summary', 'true', 'boolean', 'Enable day summary SMS', 'kill_switch'),
+  ('kill_switch_generate_slots', 'true', 'boolean', 'Enable weekly slot generation', 'kill_switch'),
+  ('kill_switch_review_requests_edge', 'true', 'boolean', 'Enable edge-function review requests', 'kill_switch'),
+  ('kill_switch_lead_followup', 'true', 'boolean', 'Enable legacy lead followup edge function', 'kill_switch'),
+  ('kill_switch_risk_reminders', 'true', 'boolean', 'Enable high-risk extra reminders', 'kill_switch'),
 
   -- Pricing tunables (number)
   ('pricing_load_single_item', '99', 'number', 'Base price for single-item load', 'pricing'),

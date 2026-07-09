@@ -5,13 +5,21 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Logo from '@/components/Logo';
 import { LOAD_LABELS, calculatePrice } from '@/lib/pricing';
+import ConfigPanel from '@/components/admin/ConfigPanel';
+import AuditTrail from '@/components/admin/AuditTrail';
+import CallsPanel from '@/components/admin/CallsPanel';
+import ReferralsPanel from '@/components/admin/ReferralsPanel';
+import IntelPanel from '@/components/admin/IntelPanel';
+import GrowthPanel from '@/components/admin/GrowthPanel';
+import CommandCenter from '@/components/admin/CommandCenter';
+import BookingTimeline from '@/components/admin/BookingTimeline';
 import { formatTime, formatDateLong } from '@/lib/dates';
 
 const RouteMap = dynamic(() => import('@/components/admin/RouteMap'), { ssr: false });
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [view, setView] = useState('dispatch');
+  const [view, setView] = useState('home');
   const [bookings, setBookings] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,12 +89,12 @@ export default function AdminDashboard() {
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <Logo className="h-7" />
         <div className="flex items-center gap-3">
-          <div className="flex gap-1 text-xs">
-            {['dispatch', 'schedule', 'earnings', 'waitlist', 'leads'].map((v) => (
+          <div className="flex gap-1 text-xs overflow-x-auto">
+            {['home', 'dispatch', 'schedule', 'earnings', 'waitlist', 'leads', 'growth', 'calls', 'intel', 'referrals', 'config', 'audit'].map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-3 py-1.5 rounded-lg capitalize font-medium ${
+                className={`px-3 py-1.5 rounded-lg capitalize font-medium whitespace-nowrap ${
                   view === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
                 }`}
               >
@@ -193,10 +201,17 @@ export default function AdminDashboard() {
           </>
         )}
 
+        {view === 'home' && <CommandCenter />}
         {view === 'schedule' && <ScheduleView />}
         {view === 'earnings' && <EarningsDashboard />}
         {view === 'waitlist' && <WaitlistView />}
         {view === 'leads' && <LeadsView />}
+        {view === 'growth' && <GrowthPanel />}
+        {view === 'calls' && <CallsPanel />}
+        {view === 'intel' && <IntelPanel />}
+        {view === 'referrals' && <ReferralsPanel />}
+        {view === 'config' && <ConfigPanel />}
+        {view === 'audit' && <AuditTrail />}
       </div>
     </main>
   );
@@ -226,6 +241,7 @@ function JobCard({ b, act }) {
   const [rescheduleTime, setRescheduleTime] = useState(b.job_time);
   const [rescheduleSlots, setRescheduleSlots] = useState([]);
   const [lightbox, setLightbox] = useState(null);
+  const [showTimeline, setShowTimeline] = useState(false);
   const done = b.status === 'completed';
   const isNoShow = b.status === 'no_show';
 
@@ -266,8 +282,16 @@ function JobCard({ b, act }) {
           <div className="font-bold">{formatTime(b.job_time)}</div>
           <div className="text-sm text-gray-500">{LOAD_LABELS[b.load_size]}</div>
           <div className="text-sm font-semibold">${b.total_price}</div>
+          <button
+            onClick={() => setShowTimeline(true)}
+            className="text-xs text-orange-600 underline mt-1"
+          >
+            History
+          </button>
         </div>
       </div>
+
+      {showTimeline && <BookingTimeline bookingId={b.id} onClose={() => setShowTimeline(false)} />}
 
       {/* Flags */}
       {b.flag_for_review && (

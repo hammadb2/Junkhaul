@@ -1,8 +1,14 @@
-import { supabase, sendSMS } from '../_shared/clients.ts';
+import { supabase, sendSMS, isKillSwitchOn } from '../_shared/clients.ts';
 import { edmontonNow, formatTime, formatDateLong } from '../_shared/time.ts';
 
 // ~8PM the evening before, send an extra nudge to high-no-show-risk bookings.
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('risk_reminders'))) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'kill_switch_off' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const now = edmontonNow();
   if (now.hour !== 20) {
     return new Response(JSON.stringify({ skipped: true, now }), {

@@ -1,7 +1,13 @@
-import { supabase, sendSMS } from '../_shared/clients.ts';
+import { supabase, sendSMS, isKillSwitchOn } from '../_shared/clients.ts';
 import { edmontonNow, formatTime, formatDateLong } from '../_shared/time.ts';
 
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('day_summary'))) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'kill_switch_off' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const now = edmontonNow();
   // ~6:30AM on operating days (Sundays). Cron fires at :30 each hour.
   if (now.hour !== 6 || now.weekday !== 'Sun') {

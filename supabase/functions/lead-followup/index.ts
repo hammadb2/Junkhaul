@@ -1,6 +1,10 @@
-import { supabase, sendSMS } from '../_shared/clients.ts';
+import { supabase, sendSMS, isKillSwitchOn } from '../_shared/clients.ts';
 
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('lead_followup'))) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'kill_switch_off' }), { headers: { 'Content-Type': 'application/json' } });
+  }
+
   const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 

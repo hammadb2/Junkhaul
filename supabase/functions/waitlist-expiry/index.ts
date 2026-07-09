@@ -1,9 +1,15 @@
-import { supabase, sendSMS } from '../_shared/clients.ts';
+import { supabase, sendSMS, isKillSwitchOn } from '../_shared/clients.ts';
 
 // Runs every hour. Finds waitlist entries that were notified but didn't
 // respond within 30 minutes, sends them an expiry SMS, and resets them
 // so they can be notified again when another slot opens.
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('waitlist_expiry'))) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'kill_switch_off' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const now = new Date().toISOString();
 
   const { data: expired } = await supabase

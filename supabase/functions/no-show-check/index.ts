@@ -1,9 +1,15 @@
-import { supabase, sendSMS } from '../_shared/clients.ts';
+import { supabase, sendSMS, isKillSwitchOn } from '../_shared/clients.ts';
 import { edmontonNow, formatTime } from '../_shared/time.ts';
 
 // Runs every 30 min during the day. Alerts the operator once when a job's
 // start time has passed by 45+ min and it's still not marked complete.
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('no_show_check'))) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'kill_switch_off' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const now = edmontonNow();
   if (now.hour < 7 || now.hour > 17) {
     return new Response(JSON.stringify({ skipped: true, now }), {

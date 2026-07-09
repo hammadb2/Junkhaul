@@ -1,7 +1,13 @@
-import { supabase, sendSMS } from '../_shared/clients.ts';
+import { supabase, sendSMS, isKillSwitchOn } from '../_shared/clients.ts';
 
 // Runs every 30 min. Texts a review link ~1h after a job is completed.
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('review_requests_edge'))) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'kill_switch_off' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const reviewLink =
     Deno.env.get('GOOGLE_BUSINESS_REVIEW_LINK') || 'https://junkhaul.ca';

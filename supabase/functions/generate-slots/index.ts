@@ -1,4 +1,4 @@
-import { supabase } from '../_shared/clients.ts';
+import { supabase, isKillSwitchOn } from '../_shared/clients.ts';
 import { edmontonNow } from '../_shared/time.ts';
 
 const SLOT_TIMES = ['07:30', '09:00', '11:00', '13:00'];
@@ -23,6 +23,13 @@ const STAT_HOLIDAYS = new Set([
 ]);
 
 Deno.serve(async () => {
+  if (!(await isKillSwitchOn('generate_slots'))) {
+    return new Response(
+      JSON.stringify({ skipped: true, reason: 'kill_switch_off' }),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   const now = edmontonNow();
 
   // Guard: only run at 5AM Monday Calgary time

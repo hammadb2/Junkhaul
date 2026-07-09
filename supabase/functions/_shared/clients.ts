@@ -6,6 +6,18 @@ export const supabase = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
+// Check if a kill switch is enabled. Defaults to true if missing.
+export const isKillSwitchOn = async (name: string) => {
+  const { data } = await supabase
+    .from('system_config')
+    .select('value')
+    .eq('key', `kill_switch_${name}`)
+    .single();
+
+  if (!data) return true;
+  return data.value === 'true' || data.value === '1';
+};
+
 // Send an SMS via Quo and log it to the messages table.
 export const sendSMS = async (
   to: string,
