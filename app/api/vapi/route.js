@@ -9,13 +9,19 @@ export const maxDuration = 30;
 // Single webhook for all Vapi server events: tool/function calls + call logs.
 // Authenticated with the shared VAPI_SERVER_SECRET header.
 export async function POST(req) {
-  const secret = req.headers.get('x-vapi-secret');
-  if (process.env.VAPI_SERVER_SECRET && secret !== process.env.VAPI_SERVER_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  try {
+    const secret = req.headers.get('x-vapi-secret');
+    const expectedSecret = process.env.VAPI_SERVER_SECRET;
+    if (!expectedSecret) {
+      console.error('VAPI_SERVER_SECRET is not set — rejecting all webhook calls');
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+    }
+    if (secret !== expectedSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const body = await req.json();
-  const message = body?.message || {};
+    const body = await req.json();
+    const message = body?.message || {};
 
   // ── Handoff destination request (from squad handoff tool) ──
   // When the greeter calls handoffToAgent, Vapi asks our server which
@@ -65,10 +71,13 @@ export async function POST(req) {
     const transcript = message.transcript || message.artifact?.transcript || '';
     const assistantId = message.assistant?.id || message.assistantId || '';
     const assistantName = message.assistant?.name || '';
+    const SALES_ID = process.env.VAPI_BOOKING_AGENT_ID || '8a7d8d53-3749-4814-bd36-39239e8a9c86';
+    const SERVICE_ID = process.env.VAPI_CS_AGENT_ID || '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
+    const REFUNDS_ID = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
     const agentType =
-      assistantId === '8a7d8d53-3749-4814-bd36-39239e8a9c86' ? 'sales'
-      : assistantId === '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b' ? 'service'
-      : assistantId === '204b8b2f-325b-4d2b-95da-613ed0c51c68' ? 'refunds'
+      assistantId === SALES_ID ? 'sales'
+      : assistantId === SERVICE_ID ? 'service'
+      : assistantId === REFUNDS_ID ? 'refunds'
       : assistantName === 'Casey' ? 'sales'
       : assistantName === 'Jordan' ? 'service'
       : assistantName === 'Riley' ? 'refunds'
@@ -121,6 +130,10 @@ export async function POST(req) {
   }
 
   return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error('Vapi webhook error:', e);
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+  }
 }
 
 // ============================================================
@@ -210,15 +223,15 @@ function buildApologyMessage(agentType, transcript) {
 // Determine which assistant to hand off to (squad handoff)
 // ============================================================
 async function determineHandoffDestination(callerNumber) {
-  const ASSISTANT_CASEY = '8a7d8d53-3749-4814-bd36-39239e8a9c86';
-  const ASSISTANT_JORDAN = '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
-  const ASSISTANT_RILEY = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
+  const SALES_ID = process.env.VAPI_BOOKING_AGENT_ID || '8a7d8d53-3749-4814-bd36-39239e8a9c86';
+  const SERVICE_ID = process.env.VAPI_CS_AGENT_ID || '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
+  const REFUNDS_ID = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
 
   if (!callerNumber) {
     return {
       destination: {
         type: 'assistant',
-        assistantId: ASSISTANT_CASEY,
+        assistantId: SALES_ID,
         contextEngineeringPlan: { type: 'all' },
       },
     };
@@ -256,16 +269,16 @@ async function determineHandoffDestination(callerNumber) {
     .order('created_at', { ascending: false })
     .limit(1);
 
-  let assistantId = ASSISTANT_CASEY; // default: sales
+  let assistantId = SALES_ID; // default: sales/booking
 
   if (refunds && refunds.length > 0) {
-    assistantId = ASSISTANT_RILEY;
+    assistantId = REFUNDS_ID;
   } else if (services && services.length > 0) {
-    assistantId = ASSISTANT_JORDAN;
+    assistantId = SERVICE_ID;
   } else if (bookings && bookings.length > 0) {
     const status = bookings[0].status;
     if (status === 'pending_payment' || status === 'confirmed') {
-      assistantId = ASSISTANT_JORDAN;
+      assistantId = SERVICE_ID;
     }
   }
 

@@ -19,6 +19,20 @@ export const maxDuration = 30;
 
 export async function POST(req) {
   try {
+    // Auth: require VAPI_SERVER_SECRET header for internal calls, or
+    // allow calls from within the app (service-request, refund-request routes)
+    const secret = req.headers.get('x-vapi-secret');
+    const expectedSecret = process.env.VAPI_SERVER_SECRET;
+    if (expectedSecret && secret !== expectedSecret) {
+      // Also allow internal server-side calls without the header
+      // (service-request and refund-request routes call this endpoint)
+      // These are server-to-server calls from the same deployment
+      const authHeader = req.headers.get('authorization');
+      if (authHeader !== `Bearer ${expectedSecret}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    }
+
     const { phone, agent_type, context, message } = await req.json();
 
     if (!phone) {
@@ -26,15 +40,22 @@ export async function POST(req) {
     }
 
     const VAPI_KEY = process.env.VAPI_API_KEY;
+    if (!VAPI_KEY) {
+      return NextResponse.json({ error: 'VAPI_API_KEY not configured' }, { status: 500 });
+    }
 
-    // Determine which assistant to use
+    // Determine which assistant to use (from env vars, fallback to known IDs)
+    const SALES_ID = process.env.VAPI_BOOKING_AGENT_ID || '8a7d8d53-3749-4814-bd36-39239e8a9c86';
+    const SERVICE_ID = process.env.VAPI_CS_AGENT_ID || '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
+    const REFUNDS_ID = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
+
     let assistantId;
     if (agent_type === 'refunds') {
-      assistantId = '204b8b2f-325b-4d2b-95da-613ed0c51c68'; // Riley
+      assistantId = REFUNDS_ID;
     } else if (agent_type === 'service') {
-      assistantId = '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b'; // Jordan
+      assistantId = SERVICE_ID;
     } else {
-      assistantId = '8a7d8d53-3749-4814-bd36-39239e8a9c86'; // Casey (Sales)
+      assistantId = SALES_ID;
     }
 
     // Create a Vapi outbound call

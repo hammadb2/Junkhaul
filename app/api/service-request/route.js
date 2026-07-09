@@ -71,7 +71,10 @@ export async function POST(req) {
     try {
       await fetch('https://junkhaul.ca/api/vapi-outbound', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-vapi-secret': process.env.VAPI_SERVER_SECRET || '',
+        },
         body: JSON.stringify({
           phone,
           agent_type: 'service',

@@ -25,7 +25,8 @@
           "load_size": { "type": "string", "enum": ["single_item", "quarter", "half", "full"] },
           "same_day": { "type": "boolean" },
           "stairs": { "type": "number", "description": "Number of flights of stairs" },
-          "has_freon": { "type": "boolean", "description": "Fridge/freezer/AC" }
+          "has_freon": { "type": "boolean", "description": "Fridge/freezer/AC" },
+          "freon_count": { "type": "number", "description": "Number of freon appliances (if has_freon is true)" }
         },
         "required": ["load_size"]
       }
@@ -44,7 +45,8 @@
           "job_time": { "type": "string", "description": "HH:MM 24h, e.g. 09:00" },
           "same_day": { "type": "boolean" },
           "stairs": { "type": "number" },
-          "has_freon": { "type": "boolean" }
+          "has_freon": { "type": "boolean" },
+          "freon_count": { "type": "number", "description": "Number of freon appliances (if has_freon is true)" }
         },
         "required": ["name", "phone", "address", "load_size", "job_date", "job_time"]
       }
@@ -95,6 +97,128 @@
           "address": { "type": "string" }
         },
         "required": ["name", "phone"]
+      }
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a full or partial refund via Stripe for a booking.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "booking_ref": { "type": "string", "description": "Booking reference code" },
+          "refund_type": { "type": "string", "enum": ["full", "partial"], "description": "Full refunds the entire deposit; partial refunds a specific amount" },
+          "amount": { "type": "number", "description": "Amount in CAD for partial refunds (ignored for full)" },
+          "reason": { "type": "string", "description": "Reason for the refund" }
+        },
+        "required": ["booking_ref", "refund_type"]
+      }
+    },
+    {
+      "name": "send_email",
+      "description": "Send a branded HTML email to a customer or team member.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "to": { "type": "string", "description": "Recipient email address" },
+          "subject": { "type": "string" },
+          "body": { "type": "string", "description": "Plain text body (will be wrapped in branded HTML)" },
+          "department": { "type": "string", "description": "Department name for signature" }
+        },
+        "required": ["to", "subject", "body"]
+      }
+    },
+    {
+      "name": "escalate_to_human",
+      "description": "Escalate a call to a human operator. Sends an SMS to the operator immediately.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "caller_phone": { "type": "string" },
+          "issue": { "type": "string", "description": "Description of the issue" },
+          "priority": { "type": "string", "enum": ["low", "medium", "high"] }
+        },
+        "required": ["caller_phone", "issue"]
+      }
+    },
+    {
+      "name": "notify_operator",
+      "description": "Send an urgent text message to the operator.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "caller_phone": { "type": "string" }
+        },
+        "required": ["message"]
+      }
+    },
+    {
+      "name": "get_calgary_info",
+      "description": "Get live Calgary information: weather, news, events, traffic.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "What to look up: weather, news, events, traffic, or general" }
+        }
+      }
+    },
+    {
+      "name": "get_sports_info",
+      "description": "Get live Calgary sports info: Flames, Stampeders, scores, schedules.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "What to look up: flames, hockey, football, scores, etc." }
+        }
+      }
+    },
+    {
+      "name": "get_job_photos",
+      "description": "Retrieve job photos (customer + crew arrival/completion) for a booking.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "phone": { "type": "string", "description": "Customer phone number" },
+          "booking_id": { "type": "string", "description": "Booking UUID" }
+        }
+      }
+    },
+    {
+      "name": "get_booking_details",
+      "description": "Get full booking details by phone number or reference code.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "phone": { "type": "string" },
+          "booking_ref": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "escalate_to_owner",
+      "description": "Escalate an issue directly to the business owner. Creates a record and sends SMS.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "description": "Why this needs owner attention" },
+          "caller_phone": { "type": "string" },
+          "booking_ref": { "type": "string" }
+        },
+        "required": ["reason", "caller_phone"]
+      }
+    },
+    {
+      "name": "log_compensation",
+      "description": "Log a compensation offered to a customer (free removal, refund, etc.).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "booking_ref": { "type": "string" },
+          "compensation_type": { "type": "string", "enum": ["free_removal", "partial_refund", "full_refund", "return_pickup"] },
+          "reason": { "type": "string" },
+          "caller_phone": { "type": "string" }
+        },
+        "required": ["compensation_type", "reason", "caller_phone"]
       }
     }
   ]
