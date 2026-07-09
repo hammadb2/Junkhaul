@@ -8,6 +8,7 @@ import {
   computeDiscountedPrice,
   rankLeads,
 } from '@/lib/discountEngine';
+import { isKillSwitchOn, cronStarted, cronFinished, cronFailed, logEvent } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 
@@ -29,24 +30,36 @@ export const runtime = 'nodejs';
 const UHAUL_DEPOT = { lat: 51.0595, lng: -114.0447 };
 
 export async function GET(req) {
-  if (!checkCronSecret(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  try {
+    if (!checkCronSecret(req)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const mode = req.nextUrl.searchParams.get('mode') || 'live';
-  const { date: todayStr, hour } = edmontonNowParts();
+    const mode = req.nextUrl.searchParams.get('mode') || 'live';
+    const cronName = mode === 'proactive' ? 'opportunistic-offer-proactive' : 'opportunistic-offer-live';
+    await cronStarted(cronName);
 
-  if (mode === 'proactive') {
-    return runProactiveMode(todayStr, hour);
+    if (!(await isKillSwitchOn(cronName === 'opportunistic-offer-live' ? 'opportunistic_live' : 'opportunistic_proactive'))) {
+      await cronFinished(cronName, { skipped: true, reason: 'kill_switch_off' });
+      return NextResponse.json({ ok: true, skipped: true, reason: 'kill_switch_off' });
+    }
+
+    const { date: todayStr, hour } = edmontonNowParts();
+
+    const result = mode === 'proactive'
+      ? await runProactiveMode(todayStr, hour)
+      : await runLiveMode(todayStr, hour);
+
+    await cronFinished(cronName, result);
+    return NextResponse.json(result);
+  } catch (error) {
+    await cronFailed('opportunistic-offer', error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
-  return runLiveMode(todayStr, hour);
 }
 
 // ── LIVE MODE ──────────────────────────────────────────────
-// Triggered every 5 minutes. Finds the truck's current position,
-// queries leads within 3km, sends offers to the top-ranked lead(s).
 async function runLiveMode(todayStr, hour) {
-  // Get the crew's latest position
   const { data: loc } = await supabaseAdmin
     .from('crew_location')
     .select('*')
@@ -55,10 +68,9 @@ async function runLiveMode(todayStr, hour) {
     .maybeSingle();
 
   if (!loc) {
-    return NextResponse.json({ ok: true, mode: 'live', message: 'No active crew location' });
+    return { ok: true, mode: 'live', message: 'No active crew location' };
   }
 
-  // Check if there's an in-progress job
   const { data: activeJob } = await supabaseAdmin
     .from('bookings')
     .select('id, crew_status')
@@ -68,10 +80,9 @@ async function runLiveMode(todayStr, hour) {
     .maybeSingle();
 
   if (!activeJob) {
-    return NextResponse.json({ ok: true, mode: 'live', message: 'No active job' });
+    return { ok: true, mode: 'live', message: 'No active job' };
   }
 
-  // Compute truck fill
   const { data: todayJobs } = await supabaseAdmin
     .from('bookings')
     .select('load_size, ai_weight_estimate_kg, crew_status')
@@ -80,12 +91,10 @@ async function runLiveMode(todayStr, hour) {
 
   const truckFill = computeTruckFill(todayJobs || []);
 
-  // Only proceed if there's meaningful remaining capacity
   if (truckFill.remainingKg < 150) {
-    return NextResponse.json({ ok: true, mode: 'live', message: 'Truck nearly full', truck_fill: truckFill.fillPct });
+    return { ok: true, mode: 'live', message: 'Truck nearly full', truck_fill: truckFill.fillPct };
   }
 
-  // Query unbooked leads within 3km (not on cooldown)
   const now = new Date().toISOString();
   const { data: leads } = await supabaseAdmin
     .from('leads')
@@ -101,11 +110,11 @@ async function runLiveMode(todayStr, hour) {
   );
 
   if (nearbyLeads.length === 0) {
-    return NextResponse.json({ ok: true, mode: 'live', message: 'No nearby leads' });
+    return { ok: true, mode: 'live', message: 'No nearby leads' };
   }
 
   const bookingsToday = (todayJobs || []).length;
-  const ranked = rankLeads({
+  const ranked = await rankLeads({
     leads: nearbyLeads,
     crewLat: loc.latitude,
     crewLng: loc.longitude,
@@ -121,7 +130,6 @@ async function runLiveMode(todayStr, hour) {
       }),
   });
 
-  // Send offer to the top-ranked lead only (avoid spamming)
   const topLead = ranked[0];
   let sentCount = 0;
 
@@ -133,7 +141,6 @@ async function runLiveMode(todayStr, hour) {
 
     await sendSMS(topLead.phone, smsBody, null, 'deadhead_offer');
 
-    // Create nearby_offers record
     await supabaseAdmin.from('nearby_offers').insert({
       lead_id: topLead.id,
       customer_phone: topLead.phone,
@@ -148,7 +155,6 @@ async function runLiveMode(todayStr, hour) {
       distance_km: topLead.detourKm,
     });
 
-    // Set 24-hour cooldown
     await supabaseAdmin
       .from('leads')
       .update({
@@ -159,26 +165,36 @@ async function runLiveMode(todayStr, hour) {
       })
       .eq('id', topLead.id);
 
+    await logEvent({
+      event_type: 'deadhead_offer_sent',
+      lead_id: topLead.id,
+      customer_phone: topLead.phone,
+      payload: {
+        mode: 'live',
+        original_price: discount.originalPrice,
+        discounted_price: discount.discountedPrice,
+        discount_percent: discount.discountPct,
+        distance_km: topLead.detourKm,
+        truck_fill: truckFill.fillPct,
+      },
+    });
+
     sentCount = 1;
   } catch (err) {
     console.error('Deadhead offer failed:', err);
   }
 
-  return NextResponse.json({
+  return {
     ok: true,
     mode: 'live',
     sent: sentCount,
     truck_fill: truckFill.fillPct,
     candidates: ranked.length,
-  });
+  };
 }
 
 // ── PROACTIVE MODE ─────────────────────────────────────────
-// Runs at 8 AM. Looks at today's scheduled bookings, computes
-// the truck's planned route, and texts nearby unbooked leads
-// a "we'll be in your area" pre-fill offer.
 async function runProactiveMode(todayStr, hour) {
-  // Get today's confirmed bookings
   const { data: todayBookings } = await supabaseAdmin
     .from('bookings')
     .select('id, name, phone, address, lat, lng, quadrant, load_size, ai_weight_estimate_kg, job_time')
@@ -190,13 +206,10 @@ async function runProactiveMode(todayStr, hour) {
   const bookingsCount = (todayBookings || []).length;
   const truckFill = computeTruckFill(todayBookings || []);
 
-  // Only pre-fill if truck has capacity and bookings are low
   if (truckFill.remainingKg < 150) {
-    return NextResponse.json({ ok: true, mode: 'proactive', message: 'Truck already full' });
+    return { ok: true, mode: 'proactive', message: 'Truck already full' };
   }
 
-  // If there are no bookings today, use the depot as the center
-  // Otherwise use the centroid of today's bookings
   let centerLat = UHAUL_DEPOT.lat;
   let centerLng = UHAUL_DEPOT.lng;
   if (todayBookings && todayBookings.length > 0) {
@@ -204,7 +217,6 @@ async function runProactiveMode(todayStr, hour) {
     centerLng = todayBookings.reduce((s, b) => s + b.lng, 0) / todayBookings.length;
   }
 
-  // Query unbooked leads within 5km of the route centroid (wider for proactive)
   const now = new Date().toISOString();
   const { data: leads } = await supabaseAdmin
     .from('leads')
@@ -220,10 +232,10 @@ async function runProactiveMode(todayStr, hour) {
   );
 
   if (nearbyLeads.length === 0) {
-    return NextResponse.json({ ok: true, mode: 'proactive', message: 'No nearby leads', bookings_today: bookingsCount });
+    return { ok: true, mode: 'proactive', message: 'No nearby leads', bookings_today: bookingsCount };
   }
 
-  const ranked = rankLeads({
+  const ranked = await rankLeads({
     leads: nearbyLeads,
     crewLat: centerLat,
     crewLng: centerLng,
@@ -234,12 +246,11 @@ async function runProactiveMode(todayStr, hour) {
         quadrant: lead.quadrant || 'NE',
         detourKm,
         fillPct: truckFill.fillPct,
-        hourOfDay: 8, // morning
+        hourOfDay: 8,
         bookingsToday: bookingsCount,
       }),
   });
 
-  // Send offers to top 3 leads (proactive mode is more aggressive)
   let sentCount = 0;
   for (const lead of ranked.slice(0, 3)) {
     try {
@@ -253,7 +264,7 @@ async function runProactiveMode(todayStr, hour) {
         customer_phone: lead.phone,
         customer_name: lead.name,
         offer_type: 'deadhead',
-        offer_expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2-hour window for proactive
+        offer_expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
         original_price: discount.originalPrice,
         discounted_price: discount.discountedPrice,
         discount_percent: discount.discountPct,
@@ -270,20 +281,34 @@ async function runProactiveMode(todayStr, hour) {
         })
         .eq('id', lead.id);
 
+      await logEvent({
+        event_type: 'proactive_offer_sent',
+        lead_id: lead.id,
+        customer_phone: lead.phone,
+        payload: {
+          mode: 'proactive',
+          original_price: discount.originalPrice,
+          discounted_price: discount.discountedPrice,
+          discount_percent: discount.discountPct,
+          distance_km: lead.detourKm,
+          truck_fill: truckFill.fillPct,
+        },
+      });
+
       sentCount++;
     } catch (err) {
       console.error('Proactive offer failed for lead', lead.id, err);
     }
   }
 
-  return NextResponse.json({
+  return {
     ok: true,
     mode: 'proactive',
     sent: sentCount,
     candidates: ranked.length,
     bookings_today: bookingsCount,
     truck_fill: truckFill.fillPct,
-  });
+  };
 }
 
 function haversineKm(lat1, lng1, lat2, lng2) {

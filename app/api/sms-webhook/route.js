@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { sendSMS as _sendSMS } from '@/lib/sms';
-import { calculatePrice, LOAD_LABELS } from '@/lib/pricing';
+import { calculatePrice, getPricingConfig, LOAD_LABELS } from '@/lib/pricing';
 import { cancelBooking } from '@/lib/cancellations';
 import { rescheduleBooking } from '@/lib/reschedule';
 import { analysePhotos } from '@/lib/ai';
@@ -249,7 +249,8 @@ async function getAvailableSlots() {
 // Create a booking from SMS
 // ============================================================
 async function createSmsBooking({ name, phone, address, load_size, job_date, job_time, stairs, has_freon, freon_count }) {
-  const priced = calculatePrice({ load_size, stairs, has_freon, freon_count, job_date, job_time });
+  const pricingConfig = await getPricingConfig();
+  const priced = calculatePrice({ load_size, stairs, has_freon, freon_count, job_date, job_time, pricingConfig });
   const geo = await geocodeAddress(address);
 
   const { data: slot } = await supabaseAdmin
@@ -403,7 +404,8 @@ export async function POST(req) {
         const analysis = await analysePhotos(photoBase64s);
         const load_size = analysis.load_size || 'quarter';
         const freon_count = analysis.freon_count || (analysis.has_freon ? 1 : 0);
-        const priced = calculatePrice({ load_size, has_freon: analysis.has_freon, freon_count });
+        const pricingConfig = await getPricingConfig();
+        const priced = calculatePrice({ load_size, has_freon: analysis.has_freon, freon_count, pricingConfig });
 
         // Build quote conversationally, no dashes
         let msg = `Based on your photos youre looking at a ${LOAD_LABELS[load_size]}, $${priced.total} total.`;

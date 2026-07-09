@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { checkCronSecret } from '@/lib/cronAuth';
+import { isKillSwitchOn, cronStarted, cronFinished, cronFailed, logEvent } from '@/lib/audit';
+import { getNumberConfig } from '@/lib/config';
 
 export const runtime = 'nodejs';
 
@@ -19,11 +21,21 @@ export const runtime = 'nodejs';
 // ============================================================
 
 export async function GET(req) {
-  if (!checkCronSecret(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  try {
+    if (!checkCronSecret(req)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const now = new Date();
+    const cronName = 'abandonment-followup';
+    await cronStarted(cronName);
+
+    if (!(await isKillSwitchOn('abandonment_followup'))) {
+      await cronFinished(cronName, { skipped: true, reason: 'kill_switch_off' });
+      return NextResponse.json({ ok: true, skipped: true, reason: 'kill_switch_off' });
+    }
+
+    const now = new Date();
+  const touch3Discount = await getNumberConfig('discount_touch_3_amount', 15);
   let sentCount = 0;
   const errors = [];
 
@@ -51,6 +63,7 @@ export async function GET(req) {
           updated_at: now.toISOString(),
         })
         .eq('id', lead.id);
+      await logEvent({ event_type: 'abandonment_touch1_sent', lead_id: lead.id, customer_phone: lead.phone, payload: { quote: lead.ai_price_estimate } });
       sentCount++;
     } catch (err) {
       errors.push({ lead_id: lead.id, touch: 1, error: err.message });
@@ -82,6 +95,7 @@ export async function GET(req) {
           updated_at: now.toISOString(),
         })
         .eq('id', lead.id);
+      await logEvent({ event_type: 'abandonment_touch2_sent', lead_id: lead.id, customer_phone: lead.phone, payload: { quote: lead.ai_price_estimate } });
       sentCount++;
     } catch (err) {
       errors.push({ lead_id: lead.id, touch: 2, error: err.message });
@@ -102,12 +116,12 @@ export async function GET(req) {
 
   for (const lead of touch3Leads || []) {
     try {
-      // Reciprocity offer: $15 off if they book now
+      // Reciprocity offer: configurable dollar off (default $15) if they book now
       const discountedPrice = Math.max(
-        lead.ai_price_estimate - 15,
+        lead.ai_price_estimate - touch3Discount,
         Math.round(lead.ai_price_estimate * 0.9) // never below 90% as floor
       );
-      const msg = `Last chance! We'd love to help you clear that junk. Book now and we'll take $15 off your quote — you pay $${discountedPrice} instead of $${lead.ai_price_estimate}. Offer ends tonight: https://junkhaul.ca/book`;
+      const msg = `Last chance! We'd love to help you clear that junk. Book now and we'll take $${touch3Discount} off your quote — you pay $${discountedPrice} instead of $${lead.ai_price_estimate}. Offer ends tonight: https://junkhaul.ca/book`;
       await sendSMS(lead.phone, msg, null, 'abandonment_touch3');
       await supabaseAdmin
         .from('leads')
@@ -117,15 +131,21 @@ export async function GET(req) {
           updated_at: now.toISOString(),
         })
         .eq('id', lead.id);
+      await logEvent({ event_type: 'abandonment_touch3_sent', lead_id: lead.id, customer_phone: lead.phone, payload: { quote: lead.ai_price_estimate, discounted: discountedPrice } });
       sentCount++;
     } catch (err) {
       errors.push({ lead_id: lead.id, touch: 3, error: err.message });
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    sent: sentCount,
-    errors: errors.length > 0 ? errors : undefined,
-  });
+    await cronFinished(cronName, { sent: sentCount, errors: errors.length });
+    return NextResponse.json({
+      ok: true,
+      sent: sentCount,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error) {
+    await cronFailed('abandonment-followup', error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
 }

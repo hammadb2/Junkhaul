@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { calculatePrice, PRICING, checkWeightFlag, LOAD_LABELS } from '@/lib/pricing';
+import { calculatePrice, getPricingConfig, PRICING, checkWeightFlag, LOAD_LABELS } from '@/lib/pricing';
+import { computeSurgeMultiplier } from '@/lib/surge';
 import { geocodeAddress } from '@/lib/geocode';
 import { createDepositPayment } from '@/lib/stripe';
 import { jobDateTimeUTC, dayType, formatDateLong, formatTime } from '@/lib/dates';
@@ -67,8 +68,31 @@ export async function POST(req) {
       );
     }
 
+    // Load runtime pricing config so the admin Control Panel can tune
+    // prices without a deploy.
+    const pricingConfig = await getPricingConfig();
+
+    // Real-time demand surge — computed from live slot-fill velocity
+    // vs. historical baseline (or a conservative bootstrap rule until
+    // enough history exists). See lib/surge.js.
+    const surge = await computeSurgeMultiplier({
+      job_date,
+      job_time,
+      day_type: dayType(job_date),
+    });
+
     // Price is ALWAYS computed server-side.
-    const priced = calculatePrice({ load_size, same_day, stairs, has_freon, freon_count, job_date, job_time });
+    const priced = calculatePrice({
+      load_size,
+      same_day,
+      stairs,
+      has_freon,
+      freon_count,
+      job_date,
+      job_time,
+      surge_multiplier: surge.multiplier,
+      pricingConfig,
+    });
 
     // Geocode for dispatch/quadrant — use Mapbox data from frontend if available, else geocode
     let geo;
@@ -86,7 +110,7 @@ export async function POST(req) {
     }
 
     // Weight safety flag.
-    const weight = checkWeightFlag(load_size, ai_weight_estimate_kg);
+    const weight = checkWeightFlag(load_size, ai_weight_estimate_kg, pricingConfig);
     const finalFlag = Boolean(flag_for_review) || weight.severity === 'hard';
 
     // Upgrade suggestion: AI thinks the load is bigger than what was selected.
@@ -103,6 +127,8 @@ export async function POST(req) {
         has_freon,
         job_date,
         job_time,
+        surge_multiplier: surge.multiplier,
+        pricingConfig,
       }).total;
     }
 
@@ -128,6 +154,8 @@ export async function POST(req) {
       freon_fee: priced.freon_fee,
       total_price: priced.total,
       dynamic_multiplier: priced.dynamic_multiplier,
+      surge_multiplier: priced.surge_multiplier,
+      surge_mode: surge.mode,
       deposit_amount: PRICING.deposit,
       balance_due: priced.balance_due,
       job_date,

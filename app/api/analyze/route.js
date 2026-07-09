@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { analysePhotos, analyseDescription } from '@/lib/ai';
-import { calculatePrice, PRICING, checkWeightFlag } from '@/lib/pricing';
+import { calculatePrice, getPricingConfig, checkWeightFlag } from '@/lib/pricing';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -48,14 +48,15 @@ export async function POST(req) {
       ? analysis.load_size
       : 'quarter';
 
-    const weight = checkWeightFlag(load_size, analysis.estimated_weight_kg);
+    const pricingConfig = await getPricingConfig();
+    const weight = checkWeightFlag(load_size, analysis.estimated_weight_kg, pricingConfig);
     const flag_for_review = Boolean(analysis.flag_for_review) || weight.severity === 'hard';
 
     // Price range shown in the bottom sheet: base .. base+same-day.
     const freon_count = analysis.freon_count || (analysis.has_freon ? 1 : 0);
-    const priced = calculatePrice({ load_size, has_freon: analysis.has_freon, freon_count });
+    const priced = calculatePrice({ load_size, has_freon: analysis.has_freon, freon_count, pricingConfig });
     const low = priced.total;
-    const high = priced.total + PRICING.same_day;
+    const high = priced.total + pricingConfig.same_day;
 
     return NextResponse.json({
       analysis: {

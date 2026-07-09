@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { checkCronSecret } from '@/lib/cronAuth';
+import { isKillSwitchOn, cronStarted, cronFinished, cronFailed, logEvent } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 
@@ -16,39 +17,57 @@ export const runtime = 'nodejs';
 // ============================================================
 
 export async function GET(req) {
-  if (!checkCronSecret(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Find completed bookings with payment that haven't had a review requested
-  // and were completed within the last 24 hours (don't review old jobs)
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-  const { data: bookings } = await supabaseAdmin
-    .from('bookings')
-    .select('*')
-    .eq('status', 'completed')
-    .eq('review_requested', false)
-    .neq('payment_status', 'unpaid')
-    .gt('updated_at', oneDayAgo);
-
-  let sentCount = 0;
-  for (const booking of bookings || []) {
-    try {
-      const reviewMsg = `Thanks for choosing Junk Haul Calgary, ${booking.name}! We'd love to hear how we did. Leave a quick review: https://junkhaul.ca/review/${booking.id} — it takes 30 seconds and helps us a ton.`;
-      await sendSMS(booking.phone, reviewMsg, booking.id, 'review_request');
-      await supabaseAdmin
-        .from('bookings')
-        .update({
-          review_requested: true,
-          review_requested_at: new Date().toISOString(),
-        })
-        .eq('id', booking.id);
-      sentCount++;
-    } catch (err) {
-      console.error('Review request failed for booking', booking.id, err);
+  try {
+    if (!checkCronSecret(req)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-  }
 
-  return NextResponse.json({ ok: true, sent: sentCount });
+    const cronName = 'review-request';
+    await cronStarted(cronName);
+
+    if (!(await isKillSwitchOn('review_request'))) {
+      await cronFinished(cronName, { skipped: true, reason: 'kill_switch_off' });
+      return NextResponse.json({ ok: true, skipped: true, reason: 'kill_switch_off' });
+    }
+
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: bookings } = await supabaseAdmin
+      .from('bookings')
+      .select('*')
+      .eq('status', 'completed')
+      .eq('review_requested', false)
+      .neq('payment_status', 'unpaid')
+      .gt('updated_at', oneDayAgo);
+
+    let sentCount = 0;
+    for (const booking of bookings || []) {
+      try {
+        const reviewMsg = `Thanks for choosing Junk Haul Calgary, ${booking.name}! We'd love to hear how we did. Leave a quick review: https://junkhaul.ca/review/${booking.id} — it takes 30 seconds and helps us a ton.`;
+        await sendSMS(booking.phone, reviewMsg, booking.id, 'review_request');
+        await supabaseAdmin
+          .from('bookings')
+          .update({
+            review_requested: true,
+            review_requested_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id);
+        await logEvent({
+          event_type: 'review_request_sent',
+          booking_id: booking.id,
+          customer_phone: booking.phone,
+          payload: { triggered_by: 'cron' },
+        });
+        sentCount++;
+      } catch (err) {
+        console.error('Review request failed for booking', booking.id, err);
+      }
+    }
+
+    await cronFinished(cronName, { sent: sentCount });
+    return NextResponse.json({ ok: true, sent: sentCount });
+  } catch (error) {
+    await cronFailed('review-request', error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
 }
