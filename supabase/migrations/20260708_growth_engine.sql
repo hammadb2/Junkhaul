@@ -160,3 +160,64 @@ SELECT
 FROM bookings
 GROUP BY phone
 ORDER BY lifetime_value DESC NULLS LAST;
+
+-- ============================================================
+-- 8. PG_CRON JOBS (Growth Engine crons)
+--    Vercel Hobby only allows daily cron jobs, so we use
+--    Supabase pg_cron + pg_net to call the app endpoints.
+-- ============================================================
+DO $$ BEGIN PERFORM cron.unschedule('abandonment-followup'); EXCEPTION WHEN OTHERS THEN NULL; END $$;
+SELECT cron.schedule(
+  'abandonment-followup',
+  '*/30 * * * *',  -- every 30 minutes
+  $$
+  SELECT content FROM (
+    SELECT net.http_get(
+      url := 'https://junkhaul.ca/api/cron/abandonment-followup',
+      headers := json_build_object('x-cron-secret', 'faa08af17ef626c983a22c19ce1276376baae1bf70e60252')
+    ) AS content
+  ) t;
+  $$
+);
+
+DO $$ BEGIN PERFORM cron.unschedule('opportunistic-offer-live'); EXCEPTION WHEN OTHERS THEN NULL; END $$;
+SELECT cron.schedule(
+  'opportunistic-offer-live',
+  '*/5 * * * *',  -- every 5 minutes while truck is active
+  $$
+  SELECT content FROM (
+    SELECT net.http_get(
+      url := 'https://junkhaul.ca/api/cron/opportunistic-offer?mode=live',
+      headers := json_build_object('x-cron-secret', 'faa08af17ef626c983a22c19ce1276376baae1bf70e60252')
+    ) AS content
+  ) t;
+  $$
+);
+
+DO $$ BEGIN PERFORM cron.unschedule('opportunistic-offer-proactive'); EXCEPTION WHEN OTHERS THEN NULL; END $$;
+SELECT cron.schedule(
+  'opportunistic-offer-proactive',
+  '0 8 * * *',  -- 8 AM daily
+  $$
+  SELECT content FROM (
+    SELECT net.http_get(
+      url := 'https://junkhaul.ca/api/cron/opportunistic-offer?mode=proactive',
+      headers := json_build_object('x-cron-secret', 'faa08af17ef626c983a22c19ce1276376baae1bf70e60252')
+    ) AS content
+  ) t;
+  $$
+);
+
+DO $$ BEGIN PERFORM cron.unschedule('review-request'); EXCEPTION WHEN OTHERS THEN NULL; END $$;
+SELECT cron.schedule(
+  'review-request',
+  '0 * * * *',  -- hourly
+  $$
+  SELECT content FROM (
+    SELECT net.http_get(
+      url := 'https://junkhaul.ca/api/cron/review-request',
+      headers := json_build_object('x-cron-secret', 'faa08af17ef626c983a22c19ce1276376baae1bf70e60252')
+    ) AS content
+  ) t;
+  $$
+);
