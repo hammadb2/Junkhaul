@@ -4,24 +4,22 @@ import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-// ============================================================
-// /pay/[id] — customer-facing payment page
+// /pay/[booking_id] — customer-facing payment page
 // Customer opens on their own phone, pays the balance due.
 // Apple Pay / Google Pay / Card via Stripe Elements, or declare Cash.
-// ============================================================
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
 
 export default function PayPage({ params }) {
-  const { id } = params;
+  const { booking_id } = params;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [method, setMethod] = useState(null); // 'digital' | 'cash'
+  const [method, setMethod] = useState(null);
   const [cashConfirmed, setCashConfirmed] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/crew/balance-payment/${id}`)
+    fetch('/api/crew/balance-payment/' + booking_id)
       .then((r) => r.json())
       .then((d) => {
         setData(d);
@@ -29,10 +27,10 @@ export default function PayPage({ params }) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [booking_id]);
 
   const declareCash = async () => {
-    const res = await fetch(`/api/crew/balance-payment/${id}`, {
+    const res = await fetch('/api/crew/balance-payment/' + booking_id, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'declare_cash' }),
@@ -43,7 +41,7 @@ export default function PayPage({ params }) {
   if (loading) {
     return (
       <div style={styles.screen}>
-        <p style={styles.muted}>Loading…</p>
+        <p style={styles.muted}>Loading...</p>
       </div>
     );
   }
@@ -60,10 +58,10 @@ export default function PayPage({ params }) {
     return (
       <div style={styles.screen}>
         <div style={styles.card}>
-          <div style={{ fontSize: 64, textAlign: 'center' }}>✅</div>
+          <div style={{ fontSize: 64, textAlign: 'center' }}>{'✅'}</div>
           <h1 style={{ ...styles.h1, textAlign: 'center' }}>Payment Complete</h1>
           <p style={{ ...styles.muted, textAlign: 'center' }}>
-            ${data.booking.balance_due} received for {data.booking.booking_ref}
+            {'$'}{data.booking.balance_due} received for {data.booking.booking_ref}
           </p>
           <p style={{ ...styles.muted, textAlign: 'center', marginTop: 16 }}>
             Receipt sent to {data.booking.email || 'your email'}.
@@ -89,9 +87,9 @@ export default function PayPage({ params }) {
 
         <div style={styles.amountRow}>
           <span style={styles.amountLabel}>Balance due:</span>
-          <span style={styles.amountValue}>${b.balance_due}.00</span>
+          <span style={styles.amountValue}>{'$'}{b.balance_due}.00</span>
         </div>
-        <p style={styles.depositNote}>(Deposit already paid: ${b.deposit_paid})</p>
+        <p style={styles.depositNote}>(Deposit already paid: {'$'}{b.deposit_paid})</p>
       </div>
 
       <div style={styles.card}>
@@ -100,15 +98,15 @@ export default function PayPage({ params }) {
         {!method && (
           <div style={styles.methodGrid}>
             <button style={styles.methodBtn} onClick={() => setMethod('digital')}>
-              <span style={{ fontSize: 32 }}>📱</span>
+              <span style={{ fontSize: 32 }}>{'📱'}</span>
               <span>Apple Pay / Google Pay</span>
             </button>
             <button style={styles.methodBtn} onClick={() => setMethod('digital')}>
-              <span style={{ fontSize: 32 }}>💳</span>
+              <span style={{ fontSize: 32 }}>{'💳'}</span>
               <span>Credit or Debit Card</span>
             </button>
             <button style={{ ...styles.methodBtn, borderColor: '#F59E0B' }} onClick={() => setMethod('cash')}>
-              <span style={{ fontSize: 32 }}>💵</span>
+              <span style={{ fontSize: 32 }}>{'💵'}</span>
               <span>Pay with Cash</span>
             </button>
           </div>
@@ -116,7 +114,7 @@ export default function PayPage({ params }) {
 
         {method === 'digital' && data.clientSecret && stripePromise && (
           <Elements stripe={stripePromise} options={{ clientSecret: data.clientSecret, appearance: { theme: 'night', variables: { colorPrimary: '#F97316' } } }}>
-            <PaymentForm bookingId={id} email={b.email} />
+            <PaymentForm bookingId={booking_id} email={b.email} />
           </Elements>
         )}
 
@@ -127,9 +125,9 @@ export default function PayPage({ params }) {
         {method === 'cash' && !cashConfirmed && (
           <div>
             <div style={styles.cashNotice}>
-              <strong>⚠️ IMPORTANT: The crew does not carry change.</strong>
-              <p>Please have exact change ready: <strong>${b.balance_due}.00</strong></p>
-              <p>${b.balance_due} exact — no more, no less.</p>
+              <strong>{'⚠️'} IMPORTANT: The crew does not carry change.</strong>
+              <p>Please have exact change ready: <strong>{'$'}{b.balance_due}.00</strong></p>
+              <p>{'$'}{b.balance_due} exact — no more, no less.</p>
             </div>
             <button style={styles.primaryBtn} onClick={declareCash}>
               Confirm Cash Payment
@@ -139,10 +137,10 @@ export default function PayPage({ params }) {
 
         {cashConfirmed && (
           <div style={{ textAlign: 'center', padding: 20 }}>
-            <div style={{ fontSize: 48 }}>✅</div>
+            <div style={{ fontSize: 48 }}>{'✅'}</div>
             <h2 style={styles.h2}>Cash Payment Selected</h2>
             <p style={styles.muted}>
-              You&apos;ve indicated you&apos;ll pay ${b.balance_due}.00 in cash when the crew arrives.
+              You&apos;ve indicated you&apos;ll pay {'$'}{b.balance_due}.00 in cash when the crew arrives.
               The crew has been notified.
             </p>
           </div>
@@ -170,7 +168,7 @@ function PaymentForm({ bookingId, email }) {
       elements,
       confirmParams: {
         receipt_email: email || undefined,
-        return_url: `${window.location.origin}/pay/${bookingId}`,
+        return_url: window.location.origin + '/pay/' + bookingId,
       },
     });
     if (result.error) {
@@ -184,7 +182,7 @@ function PaymentForm({ bookingId, email }) {
   if (done) {
     return (
       <div style={{ textAlign: 'center', padding: 20 }}>
-        <div style={{ fontSize: 48 }}>✅</div>
+        <div style={{ fontSize: 48 }}>{'✅'}</div>
         <h2 style={styles.h2}>Payment Successful</h2>
         <p style={styles.muted}>Receipt sent to your email. The crew has been notified.</p>
       </div>
@@ -196,7 +194,7 @@ function PaymentForm({ bookingId, email }) {
       <PaymentElement />
       {err && <p style={styles.error}>{err}</p>}
       <button type="submit" disabled={busy} style={styles.primaryBtn}>
-        {busy ? 'Processing…' : 'Pay Now'}
+        {busy ? 'Processing...' : 'Pay Now'}
       </button>
     </form>
   );
@@ -209,7 +207,7 @@ function formatDate(d) {
 function formatTime(t) {
   if (!t) return '';
   const [h, m] = t.split(':').map(Number);
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h >= 12 ? 'PM' : 'AM');
 }
 
 const styles = {
@@ -226,9 +224,9 @@ const styles = {
   amountValue: { fontFamily: 'Menlo, monospace', fontSize: 28, fontWeight: 700, color: '#F97316' },
   depositNote: { color: '#A3A3A3', fontSize: 12, marginTop: 4 },
   methodGrid: { display: 'flex', flexDirection: 'column', gap: 12 },
-  methodBtn: { background: '#262626', border: '1px solid #404040', borderRadius: 12, padding: 20, color: '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
-  primaryBtn: { background: '#F97316', color: '#0D0D0D', border: 'none', borderRadius: 12, padding: '16px 24px', fontSize: 17, fontWeight: 700, cursor: 'pointer', width: '100%', marginTop: 16 },
-  cashNotice: { background: '#262626', borderRadius: 12, padding: 16, color: '#fff', fontSize: 14, lineHeight: 1.5 },
+  methodBtn: { background: '#262626', border: '1px solid #404040', borderRadius: 12, padding: 20, color: '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16, textAlign: 'left' },
+  primaryBtn: { width: '100%', background: '#F97316', color: '#fff', border: 'none', borderRadius: 12, padding: 16, fontSize: 18, fontWeight: 700, cursor: 'pointer', marginTop: 16 },
+  cashNotice: { background: '#2A1A0A', border: '1px solid #F59E0B', borderRadius: 12, padding: 16, marginBottom: 12, color: '#FCD34D', fontSize: 14 },
   error: { color: '#EF4444', fontSize: 14, marginTop: 8 },
-  footer: { color: '#A3A3A3', fontSize: 12, textAlign: 'center', marginTop: 24 },
+  footer: { textAlign: 'center', color: '#525252', fontSize: 12, marginTop: 24 },
 };

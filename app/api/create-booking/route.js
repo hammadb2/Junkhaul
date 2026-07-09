@@ -41,6 +41,7 @@ export async function POST(req) {
       flag_for_review = false,
       flag_reason = null,
       source = 'web',
+      referral_code = null,
     } = body;
 
     // Required-field validation
@@ -147,6 +148,7 @@ export async function POST(req) {
       suggested_price,
       source,
       status: 'pending_payment',
+      referral_code: referral_code || null,
     };
 
     const { data: booking, error } = await supabaseAdmin
@@ -166,6 +168,26 @@ export async function POST(req) {
       .from('bookings')
       .update({ stripe_payment_intent_id: intent.id })
       .eq('id', booking.id);
+
+    // ── Referral processing (Step 7) ──────────────────────
+    // If a referral code was provided, create a pending referral record.
+    // The reward is fulfilled when the booking is completed.
+    if (referral_code) {
+      // Normalize: referral code can be a phone number or a code
+      const refPhone = referral_code.replace(/\D/g, '').length === 10
+        ? `+1${referral_code.replace(/\D/g, '')}`
+        : null;
+      try {
+        await supabaseAdmin.from('referrals').insert({
+          referrer_phone: refPhone || referral_code,
+          referee_phone: phone,
+          booking_id: booking.id,
+          status: 'pending',
+        });
+      } catch {
+        // best-effort — don't fail the booking over a referral error
+      }
+    }
 
     return NextResponse.json({
       booking_id: booking.id,

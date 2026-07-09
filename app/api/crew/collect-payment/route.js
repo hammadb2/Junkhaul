@@ -62,6 +62,8 @@ export async function POST(req) {
       crew_status: booking.crew_status === 'awaiting_payment' ? 'complete' : booking.crew_status,
       status: 'completed',
       receipt_sent: true,
+      review_requested: true,
+      review_requested_at: now,
     })
     .eq('id', booking_id);
 
@@ -80,6 +82,19 @@ export async function POST(req) {
     );
   } catch {
     // silent
+  }
+
+  // ── Referral fulfillment (Step 7) ──────────────────────
+  if (booking.referral_code) {
+    try {
+      await fetch(`${req.nextUrl.origin}/api/referral`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fulfill', booking_id }),
+      });
+    } catch {
+      // best-effort
+    }
   }
 
   return NextResponse.json({ ok: true });

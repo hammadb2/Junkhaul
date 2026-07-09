@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
+import { sendSMS } from '@/lib/sms';
 
 export const runtime = 'nodejs';
 
@@ -56,6 +57,40 @@ export async function POST(req) {
 
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
+
+  // ── Review request (Step 4) ────────────────────────────
+  // Send a review request at the highest-goodwill moment:
+  // immediately after job completion + payment cleared.
+  // Only send once (guarded by review_requested flag).
+  if (isPaid && !booking.review_requested) {
+    try {
+      const reviewMsg = `Thanks for choosing Junk Haul Calgary, ${booking.name}! We'd love to hear how we did. Leave a quick review: https://junkhaul.ca/review/${booking_id} — it takes 30 seconds and helps us a ton.`;
+      await sendSMS(booking.phone, reviewMsg, booking_id, 'review_request');
+      await supabaseAdmin
+        .from('bookings')
+        .update({
+          review_requested: true,
+          review_requested_at: new Date().toISOString(),
+        })
+        .eq('id', booking_id);
+    } catch {
+      // best-effort — don't fail the completion over a review SMS
+    }
+
+    // ── Referral fulfillment (Step 7) ─────────────────────
+    // If this booking had a referral code, fulfill the reward.
+    if (booking.referral_code) {
+      try {
+        await fetch(`${req.nextUrl.origin}/api/referral`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'fulfill', booking_id }),
+        });
+      } catch {
+        // best-effort
+      }
+    }
   }
 
   return NextResponse.json({ ok: true, crew_status: newStatus });

@@ -18,15 +18,11 @@ Deno.serve(async () => {
 
   let sent = 0;
   for (const b of bookings || []) {
-    const payLink = `https://junkhaul.ca/pay/${b.id}`;
     const body = `Good morning ${b.name}, Junk Haul Calgary here!
 
 Your pickup is today at ${formatTime(b.job_time)}.
 ${b.address}
-Balance due: $${b.balance_due}
-
-Pay online to save time: ${payLink}
-(Cash is fine too — exact amount, crew doesn't carry change)
+Balance due: $${b.balance_due} (cash or card on pickup)
 
 Reply CANCEL to cancel or RESCHEDULE to move to another day.
 

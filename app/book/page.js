@@ -72,6 +72,7 @@ export default function BookPage() {
     address_data: null, // full Mapbox feature with coords, postal code, etc.
     is_apartment: false, // detected from address type
     customer_notes: '', // notes from customer about pickup
+    referral_code: '', // referral code/phone for double-sided reward
   });
   const [booking, setBooking] = useState(null);
 
@@ -227,10 +228,19 @@ function PhoneStep({ sessionId, onNext }) {
     setError(null);
     const phoneToSend = `+1${rawPhone}`;
     try {
+      // Capture UTM params and click IDs from URL for ad attribution (Step 2)
+      const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+      const utm = {
+        utm_source: urlParams.get('utm_source') || null,
+        utm_medium: urlParams.get('utm_medium') || null,
+        utm_campaign: urlParams.get('utm_campaign') || null,
+        gclid: urlParams.get('gclid') || null,
+        fbclid: urlParams.get('fbclid') || null,
+      };
       const res = await fetch('/api/capture-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneToSend, session_id: sessionId, action: 'init', source: 'web' }),
+        body: JSON.stringify({ phone: phoneToSend, session_id: sessionId, action: 'init', source: 'web', ...utm }),
       });
       if (!res.ok) throw new Error('Failed');
       localStorage.setItem('jh_phone', phoneToSend);
@@ -714,34 +724,75 @@ function ScheduleStep({ state, update, onNext }) {
       <p className="text-gray-500 text-sm -mt-2">We run Thursdays and Sundays. Same-day available if you book before 11 AM.</p>
 
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        {days.map((d) => (
-          <button
-            key={d.date}
-            onClick={() => setActiveDay(d.date)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap ${
-              activeDay === d.date
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            {d.label}
-            {d.date === today && <span className="ml-1 text-orange-400">⚡</span>}
-          </button>
-        ))}
+        {days.map((d) => {
+          // Compute total remaining slots for this day for scarcity badge
+          const dayRemaining = d.slots.reduce((sum, s) => sum + (s.remaining || 0), 0);
+          const dayMax = d.slots.length * 5; // assume max 5 per slot
+          const isLow = dayRemaining <= 3 && dayRemaining > 0;
+          return (
+            <button
+              key={d.date}
+              onClick={() => setActiveDay(d.date)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap ${
+                activeDay === d.date
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              {d.label}
+              {d.date === today && <span className="ml-1 text-orange-400">⚡</span>}
+              {isLow && (
+                <span className={`ml-1.5 text-xs ${activeDay === d.date ? 'text-orange-300' : 'text-orange-600'}`}>
+                  · {dayRemaining} left
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {day?.slots.map((s) => (
-          <SlotPill
-            key={s.time}
-            time={s.label}
-            available
-            sameDay={activeDay === today}
-            selected={state.job_date === activeDay && state.job_time === s.time}
-            onClick={() => pick(activeDay, s.time)}
-          />
-        ))}
+        {day?.slots.map((s) => {
+          const remaining = s.remaining || 0;
+          const isScarce = remaining <= 2;
+          return (
+            <div key={s.time} className="relative">
+              <SlotPill
+                time={s.label}
+                available
+                sameDay={activeDay === today}
+                selected={state.job_date === activeDay && state.job_time === s.time}
+                onClick={() => pick(activeDay, s.time)}
+              />
+              {isScarce && (
+                <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  {remaining} left
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Scarcity messaging */}
+      {day && (() => {
+        const totalRemaining = day.slots.reduce((sum, s) => sum + (s.remaining || 0), 0);
+        if (totalRemaining <= 2) {
+          return (
+            <p className="text-xs text-orange-600 font-medium">
+              ⚡ Only {totalRemaining} slot{totalRemaining === 1 ? '' : 's'} left this day — book before they&apos;re gone!
+            </p>
+          );
+        }
+        if (totalRemaining <= 4) {
+          return (
+            <p className="text-xs text-orange-500">
+              Limited availability — {totalRemaining} slots remaining.
+            </p>
+          );
+        }
+        return null;
+      })()}
 
       {state.same_day && (
         <p className="text-xs text-orange-600">
@@ -802,6 +853,7 @@ function DetailsStep({ state, update, price, onCreated }) {
           flag_for_review: state.analysis?.flag_for_review || false,
           flag_reason: state.analysis?.flag_reason || null,
           source: 'web',
+          referral_code: state.referral_code || null,
         }),
       });
       const data = await res.json();
@@ -902,6 +954,13 @@ function DetailsStep({ state, update, price, onCreated }) {
           placeholder="Apt 204"
         />
       )}
+
+      <Field
+        label="Referral code (optional — get $20 off!)"
+        value={state.referral_code || ''}
+        onChange={(v) => update({ referral_code: v })}
+        placeholder="Friend's phone number or code"
+      />
 
       <label className="block">
         <span className="text-sm font-medium text-gray-700">Notes for our team (optional)</span>

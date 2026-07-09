@@ -1,0 +1,36 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/abandonment-followup",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/opportunistic-offer?mode=live",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/opportunistic-offer?mode=proactive",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/review-request",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/run-payroll",
+      "schedule": "0 10 * * 5"
+    },
+    {
+      "path": "/api/cron/remittance-reminder",
+      "schedule": "0 9 10 * *"
+    },
+    {
+      "path": "/api/cron/generate-t4s",
+      "schedule": "0 10 31 1 *"
+    },
+    {
+      "path": "/api/cron/refresh-rates",
+      "schedule": "0 6 1 1,7 *"
+    }
+  ]
+}
