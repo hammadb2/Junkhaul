@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 const CATEGORIES = [
   { key: 'kill_switch', label: 'Kill switches', bg: 'bg-red-50', border: 'border-red-200' },
@@ -22,16 +22,30 @@ export default function ConfigPanel() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
 
-  const fetchConfig = async () => {
+  const fetchConfig = useCallback(async () => {
     setLoading(true);
-    const res = await fetch('/api/admin/config');
-    const data = await res.json();
-    setConfig(data.config || []);
-    setLoading(false);
-  };
+    try {
+      const res = await fetch('/api/admin/config');
+      const data = await res.json();
+      setConfig(data.config || []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchConfig();
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/config');
+        const data = await res.json();
+        if (mounted) setConfig(data.config || []);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const grouped = useMemo(() => {

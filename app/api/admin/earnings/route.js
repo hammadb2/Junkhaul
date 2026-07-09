@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 
+async function checkAuth() {
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
+  return token === adminToken;
+}
+
 export async function GET() {
+  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { data: completed } = await supabaseAdmin
     .from('bookings')
     .select('total_price, job_date, load_size, source, created_at')

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const SENTIMENT_COLORS = {
   frustrated: 'bg-red-100 text-red-700 border-red-200',
@@ -14,16 +14,30 @@ export default function CallsPanel() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
 
-  const fetchCalls = async () => {
+  const fetchCalls = useCallback(async () => {
     setLoading(true);
-    const res = await fetch('/api/admin/call-history');
-    const data = await res.json();
-    setCalls(data.calls || []);
-    setLoading(false);
-  };
+    try {
+      const res = await fetch('/api/admin/call-history');
+      const data = await res.json();
+      setCalls(data.calls || []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchCalls();
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/call-history');
+        const data = await res.json();
+        if (mounted) setCalls(data.calls || []);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   return (

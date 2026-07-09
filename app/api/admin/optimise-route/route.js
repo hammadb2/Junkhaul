@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { optimiseRoute } from '@/lib/route';
 import { estimateProfit, LOAD_LABELS } from '@/lib/pricing';
 
 export const runtime = 'nodejs';
+
+async function checkAuth() {
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
+  return token === adminToken;
+}
 export const maxDuration = 30;
 
 // POST { date } -> ordered list of bookings with profit estimates.
 export async function POST(req) {
+  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { date } = await req.json();
   if (!date) return NextResponse.json({ error: 'date required' }, { status: 400 });
 

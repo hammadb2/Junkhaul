@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { edmontonNowParts } from '@/lib/dates';
 
 export const runtime = 'nodejs';
 
+async function checkAuth() {
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
+  return token === adminToken;
+}
+
 // GET /api/admin/bookings?date=YYYY-MM-DD  (defaults to next operating day view)
 export async function GET(req) {
+  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date');
   const today = edmontonNowParts().date;

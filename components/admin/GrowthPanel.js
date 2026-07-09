@@ -1,21 +1,35 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export default function GrowthPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    const res = await fetch('/api/admin/growth');
-    const json = await res.json();
-    setData(json);
-    setLoading(false);
-  };
+    try {
+      const res = await fetch('/api/admin/growth');
+      const json = await res.json();
+      setData(json);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchData();
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/growth');
+        const json = await res.json();
+        if (mounted) setData(json);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   if (loading) return <p className="text-gray-500 py-8">Loading growth data...</p>;

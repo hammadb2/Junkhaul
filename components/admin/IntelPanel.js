@@ -8,14 +8,19 @@ export default function IntelPanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
     const fetchData = async () => {
       setLoading(true);
-      const res = await fetch(`/api/admin/quadrant-profit?days=${days}&summary=true`);
-      const data = await res.json();
-      setSummary(data.summary || []);
-      setLoading(false);
+      try {
+        const res = await fetch(`/api/admin/quadrant-profit?days=${days}&summary=true`);
+        const data = await res.json();
+        if (mounted) setSummary(data.summary || []);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
     fetchData();
+    return () => { mounted = false; };
   }, [days]);
 
   const maxRevenue = Math.max(...summary.map((s) => s.total_revenue || 0), 1);

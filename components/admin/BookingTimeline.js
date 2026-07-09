@@ -27,16 +27,26 @@ const EVENT_LABELS = {
 export default function BookingTimeline({ bookingId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    let mounted = true;
     const fetchTimeline = async () => {
       setLoading(true);
-      const res = await fetch(`/api/admin/bookings/${bookingId}/timeline`);
-      const json = await res.json();
-      setData(json);
-      setLoading(false);
+      setError(null);
+      try {
+        const res = await fetch(`/api/admin/bookings/${bookingId}/timeline`);
+        if (!res.ok) throw new Error('Failed to load timeline');
+        const json = await res.json();
+        if (mounted) setData(json);
+      } catch (err) {
+        if (mounted) setError(err.message);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
     fetchTimeline();
+    return () => { mounted = false; };
   }, [bookingId]);
 
   return (
@@ -52,6 +62,8 @@ export default function BookingTimeline({ bookingId, onClose }) {
         <div className="p-4 overflow-y-auto flex-1">
           {loading ? (
             <p className="text-gray-500 py-8">Loading timeline...</p>
+          ) : error ? (
+            <p className="text-red-500 py-8">{error}</p>
           ) : !data || data.timeline?.length === 0 ? (
             <p className="text-gray-500 py-8">No timeline events found.</p>
           ) : (

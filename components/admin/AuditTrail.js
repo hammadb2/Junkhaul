@@ -22,17 +22,22 @@ export default function AuditTrail() {
   const [limit, setLimit] = useState(50);
 
   useEffect(() => {
+    let mounted = true;
     const fetchEvents = async () => {
       setLoading(true);
-      const url = new URL('/api/admin/events', window.location.origin);
-      if (filter !== 'All') url.searchParams.set('type', filter);
-      url.searchParams.set('limit', limit);
-      const res = await fetch(url.toString());
-      const data = await res.json();
-      setEvents(data.events || []);
-      setLoading(false);
+      try {
+        const url = new URL('/api/admin/events', window.location.origin);
+        if (filter !== 'All') url.searchParams.set('type', filter);
+        url.searchParams.set('limit', limit);
+        const res = await fetch(url.toString());
+        const data = await res.json();
+        if (mounted) setEvents(data.events || []);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
     fetchEvents();
+    return () => { mounted = false; };
   }, [filter, limit]);
 
   return (

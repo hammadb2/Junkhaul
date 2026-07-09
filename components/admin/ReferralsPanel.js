@@ -1,23 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export default function ReferralsPanel() {
   const [referrals, setReferrals] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchReferrals = async () => {
+  const fetchReferrals = useCallback(async () => {
     setLoading(true);
-    const res = await fetch('/api/admin/referrals');
-    const data = await res.json();
-    setReferrals(data.referrals || []);
-    setLeaderboard(data.leaderboard || []);
-    setLoading(false);
-  };
+    try {
+      const res = await fetch('/api/admin/referrals');
+      const data = await res.json();
+      setReferrals(data.referrals || []);
+      setLeaderboard(data.leaderboard || []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchReferrals();
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/referrals');
+        const data = await res.json();
+        if (mounted) {
+          setReferrals(data.referrals || []);
+          setLeaderboard(data.leaderboard || []);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const statusBadge = (status) => {

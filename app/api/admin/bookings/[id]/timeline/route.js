@@ -15,7 +15,7 @@ async function checkAuth() {
 // GET /api/admin/bookings/[id]/timeline
 export async function GET(req, { params }) {
   if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { id } = params;
+  const { id } = await params;
 
   try {
     const { data: events, error: eventsError } = await supabaseAdmin

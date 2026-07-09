@@ -3,7 +3,6 @@ import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { sendSMS as _sendSMS } from '@/lib/sms';
 import { calculatePrice, getPricingConfig, LOAD_LABELS } from '@/lib/pricing';
 import { cancelBooking } from '@/lib/cancellations';
-import { rescheduleBooking } from '@/lib/reschedule';
 import { analysePhotos } from '@/lib/ai';
 import { edmontonNowParts, formatDateLong, formatTime } from '@/lib/dates';
 import { geocodeAddress } from '@/lib/geocode';
