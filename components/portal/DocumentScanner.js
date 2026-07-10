@@ -16,7 +16,7 @@ const videoConstraints = {
   height: { ideal: 1080 },
 };
 
-export default function DocumentScanner({ label, onCapture, uploaded, previewUrl }) {
+export default function DocumentScanner({ label, onCapture, uploaded, previewUrl, uploading }) {
   const [mode, setMode] = useState('idle'); // idle | camera | captured | fallback
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -146,22 +146,32 @@ export default function DocumentScanner({ label, onCapture, uploaded, previewUrl
     return (
       <div className="dark-card" style={{ padding: 16, borderRadius: 16, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.05)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 10, background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          </div>
+          {uploading ? (
+            <div style={{ width: 48, height: 48, borderRadius: 10, background: '#F0F0F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 24, height: 24, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : (
+            <div style={{ width: 48, height: 48, borderRadius: 10, background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+          )}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>{label}</div>
-            <div style={{ fontSize: 13, color: '#22C55E', fontWeight: 500 }}>Uploaded</div>
+            <div style={{ fontSize: 13, color: uploading ? '#F59E0B' : '#22C55E', fontWeight: 500 }}>
+              {uploading ? 'Uploading...' : 'Uploaded'}
+            </div>
           </div>
-          {previewUrl && (
+          {previewUrl && !uploading && (
             <img src={previewUrl} alt={label} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(0,0,0,.1)' }} />
           )}
-          <button
-            onClick={() => setMode('camera')}
-            style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 13, cursor: 'pointer', padding: 4 }}
-          >
-            Retake
-          </button>
+          {!uploading && (
+            <button
+              onClick={() => setMode('camera')}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 13, cursor: 'pointer', padding: '8px 12px', minHeight: 36 }}
+            >
+              Retake
+            </button>
+          )}
         </div>
       </div>
     );
@@ -177,13 +187,13 @@ export default function DocumentScanner({ label, onCapture, uploaded, previewUrl
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={retakeCapture}
-            style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
           >
             Retake
           </button>
           <button
             onClick={confirmCapture}
-            style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', background: '#f97316', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: 'none', background: '#f97316', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
           >
             Use Photo
           </button>
@@ -197,7 +207,7 @@ export default function DocumentScanner({ label, onCapture, uploaded, previewUrl
     const isGoodLight = brightness > 0.15 && brightness < 0.85;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#000', aspectRatio: '3/4' }}>
+        <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#000', aspectRatio: '4/5' }}>
           <Webcam
             ref={webcamRef}
             audio={false}
@@ -260,14 +270,14 @@ export default function DocumentScanner({ label, onCapture, uploaded, previewUrl
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => setMode('fallback')}
-            style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
           >
             Upload File Instead
           </button>
           <button
             onClick={capture}
             disabled={!cameraReady || capturing}
-            style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', background: cameraReady ? '#f97316' : '#ccc', color: 'white', fontSize: 14, fontWeight: 600, cursor: cameraReady ? 'pointer' : 'not-allowed' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: 'none', background: cameraReady ? '#f97316' : '#ccc', color: 'white', fontSize: 14, fontWeight: 600, cursor: cameraReady ? 'pointer' : 'not-allowed', minHeight: 48 }}
           >
             {capturing ? 'Capturing...' : 'Capture'}
           </button>
@@ -330,13 +340,13 @@ export default function DocumentScanner({ label, onCapture, uploaded, previewUrl
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={startCamera}
-          style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: '#f97316', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: 'none', background: '#f97316', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 46 }}
         >
           Scan with Camera
         </button>
         <button
           onClick={() => setMode('fallback')}
-          style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 46 }}
         >
           Upload File
         </button>

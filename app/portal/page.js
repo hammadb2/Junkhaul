@@ -49,7 +49,7 @@ export default function PortalLogin() {
 
   return (
     <div className="min-h-dvh flex flex-col items-center safe-top safe-bottom" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
-      <div className="w-full max-w-md flex-1 flex flex-col overflow-y-auto" style={{ padding: '64px 28px 40px' }}>
+      <div className="w-full max-w-md flex-1 flex flex-col overflow-y-auto" style={{ padding: '64px 28px 24px' }}>
         {error && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,.10)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 12, padding: '12px 14px', marginBottom: 18 }}>
             <AlertCircle size={16} color="#EF4444" />
@@ -101,24 +101,22 @@ export default function PortalLogin() {
               </div>
             </>
           )}
-        </form>
-      </div>
 
-      <div style={{ padding: '0 28px 40px', width: '100%', maxWidth: 445 }}>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={loading}
-          style={{
-            width: '100%', height: 52, borderRadius: 14, background: '#f97316',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontWeight: 700, fontSize: 16, cursor: loading ? 'default' : 'pointer',
-            border: 'none', boxShadow: '0 8px 20px rgba(249,115,22,.28)',
-            opacity: loading ? 0.6 : 1, transition: 'opacity .15s',
-          }}
-        >
-          {loading ? '…' : mode === 'login' ? 'Log In' : 'Create Account'}
-        </button>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%', height: 52, borderRadius: 14, background: '#f97316',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontWeight: 700, fontSize: 16, cursor: loading ? 'default' : 'pointer',
+              border: 'none', boxShadow: '0 8px 20px rgba(249,115,22,.28)',
+              opacity: loading ? 0.6 : 1, transition: 'opacity .15s',
+              marginTop: 4,
+            }}
+          >
+            {loading ? '…' : mode === 'login' ? 'Log In' : 'Create Account'}
+          </button>
+        </form>
       </div>
     </div>
   );

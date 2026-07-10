@@ -59,7 +59,7 @@ export default function VerificationPending() {
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
-        <div className="w-8 h-8 border-3 border-[#f97316]/20 border-t-[#f97316] rounded-full animate-spin" />
+        <div style={{ width: 32, height: 32, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
       </div>
     );
   }
@@ -84,7 +84,7 @@ export default function VerificationPending() {
           </p>
           <button
             onClick={() => router.push('/portal')}
-            style={{ padding: '12px 32px', borderRadius: 12, border: 'none', background: '#f97316', color: 'white', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
+            style={{ padding: '14px 36px', borderRadius: 12, border: 'none', background: '#f97316', color: 'white', fontSize: 15, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
           >
             Back to Login
           </button>
@@ -129,7 +129,7 @@ export default function VerificationPending() {
 
         <button
           onClick={() => router.push('/portal')}
-          style={{ marginTop: 24, padding: '10px 24px', borderRadius: 10, border: '1px solid rgba(0,0,0,.1)', background: 'transparent', color: 'rgba(0,0,0,.4)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+          style={{ marginTop: 32, padding: '12px 28px', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: 'transparent', color: 'rgba(0,0,0,.4)', fontSize: 14, fontWeight: 500, cursor: 'pointer', minHeight: 46 }}
         >
           Back to Login
         </button>

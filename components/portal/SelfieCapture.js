@@ -15,7 +15,7 @@ const videoConstraints = {
   height: { ideal: 1280 },
 };
 
-export default function SelfieCapture({ onCapture, uploaded, previewUrl }) {
+export default function SelfieCapture({ onCapture, uploaded, previewUrl, uploading }) {
   const [mode, setMode] = useState('idle'); // idle | camera | captured | fallback
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -86,14 +86,18 @@ export default function SelfieCapture({ onCapture, uploaded, previewUrl }) {
           )}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>Crew selfie</div>
-            <div style={{ fontSize: 13, color: '#22C55E', fontWeight: 500 }}>Uploaded</div>
+            <div style={{ fontSize: 13, color: uploading ? '#F59E0B' : '#22C55E', fontWeight: 500 }}>
+              {uploading ? 'Uploading...' : 'Uploaded'}
+            </div>
           </div>
-          <button
-            onClick={() => setMode('camera')}
-            style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 13, cursor: 'pointer', padding: 4 }}
-          >
-            Retake
-          </button>
+          {!uploading && (
+            <button
+              onClick={() => setMode('camera')}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 13, cursor: 'pointer', padding: '8px 12px', minHeight: 36 }}
+            >
+              Retake
+            </button>
+          )}
         </div>
       </div>
     );
@@ -109,13 +113,13 @@ export default function SelfieCapture({ onCapture, uploaded, previewUrl }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={retakeCapture}
-            style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
           >
             Retake
           </button>
           <button
             onClick={confirmCapture}
-            style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', background: '#f97316', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: 'none', background: '#f97316', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
           >
             Use Photo
           </button>
@@ -141,12 +145,12 @@ export default function SelfieCapture({ onCapture, uploaded, previewUrl }) {
             mirrored={false}
           />
 
-          {/* Face guide overlay */}
+          {/* Face guide overlay — proper circle */}
           {cameraReady && (
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{
-                width: '60%',
-                height: '75%',
+                width: '65%',
+                aspectRatio: '1',
                 border: '3px dashed rgba(255,255,255,0.5)',
                 borderRadius: '50%',
                 boxShadow: '0 0 0 9999px rgba(0,0,0,0.3)',
@@ -169,14 +173,14 @@ export default function SelfieCapture({ onCapture, uploaded, previewUrl }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => setMode('fallback')}
-            style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
           >
             Upload Instead
           </button>
           <button
             onClick={capture}
             disabled={!cameraReady}
-            style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', background: cameraReady ? '#f97316' : '#ccc', color: 'white', fontSize: 14, fontWeight: 600, cursor: cameraReady ? 'pointer' : 'not-allowed' }}
+            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: 'none', background: cameraReady ? '#f97316' : '#ccc', color: 'white', fontSize: 14, fontWeight: 600, cursor: cameraReady ? 'pointer' : 'not-allowed', minHeight: 48 }}
           >
             Capture
           </button>
@@ -237,13 +241,13 @@ export default function SelfieCapture({ onCapture, uploaded, previewUrl }) {
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={() => setMode('camera')}
-          style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: '#f97316', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: 'none', background: '#f97316', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 46 }}
         >
           Take Selfie
         </button>
         <button
           onClick={() => setMode('fallback')}
-          style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 46 }}
         >
           Upload File
         </button>

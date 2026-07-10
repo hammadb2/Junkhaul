@@ -373,7 +373,7 @@ function OnboardInner() {
     <button
       onClick={onBack}
       className="glass-btn"
-      style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, zIndex: 20, width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 14px)', left: 16, zIndex: 20, width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
       <ArrowLeft size={20} color="rgba(0,0,0,.6)" />
     </button>
@@ -623,6 +623,7 @@ function OnboardInner() {
             <SelfieCapture
               uploaded={!!selfieUrl}
               previewUrl={selfieUrl}
+              uploading={uploading === 'selfie'}
               onCapture={async (file) => {
                 setSelfieFile(file);
                 await handleSelfieUpload(file);
@@ -631,6 +632,7 @@ function OnboardInner() {
             <DocumentScanner
               label="SIN document"
               uploaded={docStatus.sin_document === 'uploaded'}
+              uploading={uploading === 'sin_document'}
               onCapture={async (file) => {
                 setSinFile(file);
                 await handleUpload('sin_document', file, 'SIN document');
@@ -639,6 +641,7 @@ function OnboardInner() {
             <DocumentScanner
               label="Driver's license — front"
               uploaded={docStatus.drivers_license === 'uploaded'}
+              uploading={uploading === 'sin_document' || uploading === 'drivers_license'}
               onCapture={async (file) => {
                 setLicenseFront(file);
                 await handleUpload('drivers_license', file, "Driver's license — front");
@@ -647,6 +650,7 @@ function OnboardInner() {
             <DocumentScanner
               label="Driver's license — back"
               uploaded={docStatus.drivers_license === 'uploaded'}
+              uploading={uploading === 'drivers_license'}
               onCapture={async (file) => {
                 setLicenseBack(file);
                 await handleUpload('drivers_license', file, "Driver's license — back");
