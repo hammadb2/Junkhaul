@@ -14,7 +14,7 @@ import {
 } from '@/components/motion';
 import PaymentStep from '@/components/booking/PaymentStep';
 import Confirmation from '@/components/booking/Confirmation';
-import { calculatePrice, PRICING, LOAD_LABELS } from '@/lib/pricing';
+import { calculatePrice, PRICING, LOAD_LABELS } from '@/lib/pricingConstants';
 
 const LOADS = [
   { key: 'single_item', title: '1–2 items', desc: 'Couch, mattress, single appliance', price: 99 },

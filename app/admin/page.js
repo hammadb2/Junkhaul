@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Logo from '@/components/Logo';
-import { LOAD_LABELS, calculatePrice } from '@/lib/pricing';
+import { LOAD_LABELS, calculatePrice } from '@/lib/pricingConstants';
 import ConfigPanel from '@/components/admin/ConfigPanel';
 import AuditTrail from '@/components/admin/AuditTrail';
 import CallsPanel from '@/components/admin/CallsPanel';
