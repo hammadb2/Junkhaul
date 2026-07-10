@@ -39,7 +39,12 @@ export default function PortalLogin() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) { setError(data.error || 'Something went wrong'); return; }
-    router.push('/portal/schedule');
+    // If onboarding is not complete, redirect to onboarding
+    if (data.employee && !data.employee.onboarding_complete) {
+      router.push('/portal/onboard');
+    } else {
+      router.push('/portal/schedule');
+    }
   };
 
   return (

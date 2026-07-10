@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 // ============================================================
-// /portal/clock — mobile-first clock in/out. One tap, no friction.
-// Usable standing in a driveway with one hand.
+// /portal/clock — shift status (read-only).
+// Clock in/out is automatic: starts when first job starts,
+// stops when last job ends. This page just shows the status.
 // ============================================================
 
 export default function ClockPage() {
@@ -14,7 +15,6 @@ export default function ClockPage() {
   const [emp, setEmp] = useState(null);
   const [openShift, setOpenShift] = useState(null);
   const [period, setPeriod] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
 
@@ -38,45 +38,12 @@ export default function ClockPage() {
     if (res.status === 401) { router.push('/portal'); return; }
     const data = await res.json();
     setEmp(data.employee);
+    if (data.employee && !data.employee.onboarded) {
+      router.push('/portal/onboard');
+    }
   }, [router]);
 
   useEffect(() => { loadMe(); load(); }, [loadMe, load]);
-
-  const getGPS = () =>
-    new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve({});
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve({}),
-        { timeout: 5000, maximumAge: 60000 }
-      );
-    });
-
-  const clockIn = async () => {
-    setActionLoading(true); setError('');
-    const gps = await getGPS();
-    const res = await fetch('/api/employee/clock-in', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(gps),
-    });
-    const data = await res.json();
-    setActionLoading(false);
-    if (!res.ok) { setError(data.error || 'Clock in failed'); return; }
-    if (navigator.vibrate) navigator.vibrate(50);
-    load();
-  };
-
-  const clockOut = async () => {
-    setActionLoading(true); setError('');
-    const gps = await getGPS();
-    const res = await fetch('/api/employee/clock-out', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(gps),
-    });
-    const data = await res.json();
-    setActionLoading(false);
-    if (!res.ok) { setError(data.error || 'Clock out failed'); return; }
-    if (navigator.vibrate) navigator.vibrate([50, 40, 50]);
-    load();
-  };
 
   const logout = async () => {
     await fetch('/api/employee/logout', { method: 'POST' });
@@ -114,17 +81,23 @@ export default function ClockPage() {
         </div>
       </header>
 
-      {/* Big clock button — the whole point */}
+      {/* Shift status */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-        <button
-          onClick={clockedIn ? clockOut : clockIn}
-          disabled={actionLoading}
-          className={`w-64 h-64 rounded-full text-white font-bold text-3xl shadow-xl active:scale-95 transition disabled:opacity-50 ${
-            clockedIn ? 'bg-red-500' : 'bg-green-500'
-          }`}
-        >
-          {actionLoading ? '…' : clockedIn ? 'CLOCK OUT' : 'CLOCK IN'}
-        </button>
+        <div className={`w-64 h-64 rounded-full flex items-center justify-center shadow-xl ${clockedIn ? 'bg-green-500' : 'bg-gray-300'}`}>
+          <div className="text-center text-white">
+            {clockedIn ? (
+              <>
+                <div className="text-4xl font-bold mb-1">ON SHIFT</div>
+                <div className="text-sm opacity-80">Auto-tracked</div>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-bold mb-1">OFF SHIFT</div>
+                <div className="text-sm opacity-80">Start a job to clock in</div>
+              </>
+            )}
+          </div>
+        </div>
 
         {clockedIn && openShift && (
           <div className="mt-8 text-center">
@@ -132,11 +105,14 @@ export default function ClockPage() {
               {String(hh).padStart(2, '0')}:{String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}
             </div>
             <div className="text-sm text-gray-400 mt-1">on shift since {new Date(openShift.clock_in_at).toLocaleTimeString()}</div>
+            <div className="text-xs text-gray-400 mt-2">Clock out is automatic when your last job ends</div>
           </div>
         )}
 
         {!clockedIn && (
-          <div className="mt-8 text-center text-gray-400 text-sm">Tap to start your shift</div>
+          <div className="mt-8 text-center text-gray-400 text-sm">
+            Your shift starts automatically when you begin your first job.
+          </div>
         )}
 
         {error && <div className="mt-6 text-red-500 text-sm text-center">{error}</div>}

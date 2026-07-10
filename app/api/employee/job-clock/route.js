@@ -5,6 +5,8 @@ import { getAuthedEmployee } from '@/lib/employeeAuth';
 export const runtime = 'nodejs';
 
 // POST /api/employee/job-clock — clock in/out for a specific job
+// Auto-manages the employee's shift timesheet: clocks in when first job
+// starts, clocks out when last job ends.
 export async function POST(req) {
   const emp = await getAuthedEmployee(req);
   if (!emp) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,6 +29,20 @@ export async function POST(req) {
       .is('clock_out_at', null)
       .maybeSingle();
     if (existing) return NextResponse.json({ error: 'Already clocked in for this job' }, { status: 409 });
+
+    // Auto clock-in the shift timesheet if not already clocked in
+    const { data: openShift } = await supabaseAdmin
+      .from('timesheets')
+      .select('id')
+      .eq('employee_id', emp.id)
+      .is('clock_out_at', null)
+      .maybeSingle();
+    if (!openShift) {
+      await supabaseAdmin.from('timesheets').insert({
+        employee_id: emp.id,
+        clock_in_at: new Date().toISOString(),
+      });
+    }
 
     const { data, error } = await supabaseAdmin
       .from('job_clock_sessions')
@@ -64,6 +80,39 @@ export async function POST(req) {
       .update({ clock_out_at: now, duration_minutes: duration })
       .eq('id', session.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Auto clock-out the shift if no more open job sessions
+    const { data: remainingOpen } = await supabaseAdmin
+      .from('job_clock_sessions')
+      .select('id')
+      .eq('employee_id', emp.id)
+      .is('clock_out_at', null);
+    if (!remainingOpen || remainingOpen.length === 0) {
+      // Calculate shift hours and clock out
+      const { data: shift } = await supabaseAdmin
+        .from('timesheets')
+        .select('id, clock_in_at')
+        .eq('employee_id', emp.id)
+        .is('clock_out_at', null)
+        .maybeSingle();
+      if (shift) {
+        const clockInTime = new Date(shift.clock_in_at).getTime();
+        const clockOutTime = new Date(now).getTime();
+        const totalMinutes = Math.round((clockOutTime - clockInTime) / 60000);
+        const regularHours = Math.min(totalMinutes / 60, 8);
+        const overtimeHours = Math.max(0, (totalMinutes / 60) - 8);
+        const totalHours = totalMinutes / 60;
+        const grossPay = (regularHours * Number(emp.pay_rate || 0)) + (overtimeHours * Number(emp.pay_rate || 0) * 1.5);
+
+        await supabaseAdmin.from('timesheets').update({
+          clock_out_at: now,
+          regular_hours: Math.round(regularHours * 100) / 100,
+          overtime_hours: Math.round(overtimeHours * 100) / 100,
+          total_hours: Math.round(totalHours * 100) / 100,
+          gross_pay: Math.round(grossPay * 100) / 100,
+        }).eq('id', shift.id);
+      }
+    }
 
     return NextResponse.json({ ok: true, duration_minutes: duration });
   }

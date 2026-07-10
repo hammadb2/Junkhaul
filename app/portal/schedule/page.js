@@ -323,6 +323,11 @@ export default function SchedulePage() {
     if (res.status === 401) { router.push('/portal'); return null; }
     const d = await res.json();
     setEmp(d.employee);
+    // Gate: if onboarding is not complete, redirect to onboarding
+    if (d.employee && !d.employee.onboarded) {
+      router.push('/portal/onboard');
+      return null;
+    }
     return d.employee;
   }, [router]);
 
@@ -364,6 +369,51 @@ export default function SchedulePage() {
     );
   }
 
+  // ---------- Location required gate ----------
+  if (locPerm === 'denied') {
+    return (
+      <main className="min-h-dvh bg-gray-50 flex flex-col items-center justify-center px-6 safe-top">
+        <div className="max-w-sm w-full text-center">
+          <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-5">
+            <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
+              <line x1="8" y1="8" x2="16" y2="16" stroke="currentColor" strokeWidth={2} />
+              <line x1="16" y1="8" x2="8" y2="16" stroke="currentColor" strokeWidth={2} />
+            </svg>
+          </div>
+          <div className="text-xl font-bold text-gray-900 mb-2">Location Required</div>
+          <div className="text-sm text-gray-500 mb-6">
+            Junk Haul Crew needs your location to track jobs, navigate to customers, and share ETA with clients.
+            Without location access, the app cannot function.
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 text-left space-y-3">
+            <div className="text-sm font-semibold text-gray-900">To enable location:</div>
+            <div className="text-xs text-gray-500 space-y-2">
+              <div><strong className="text-gray-700">iPhone:</strong> Settings → JunkHaul → Location → Allow</div>
+              <div><strong className="text-gray-700">Android:</strong> Settings → Apps → JunkHaul → Permissions → Location → Allow</div>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.removeItem('jh-location-granted');
+                setLocPerm('default');
+                setShowLocPrompt(true);
+              }}
+              className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition mt-2"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={logout}
+              className="w-full text-gray-400 font-medium py-2 text-sm"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const assignment = data?.assignment || null;
   const partner = data?.partner || null;
   const openSessions = data?.open_sessions || [];
@@ -392,7 +442,7 @@ export default function SchedulePage() {
     return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   };
 
-  const clockedIn = !!(emp?.clock_in_at && !emp?.clock_out_at);
+  const clockedIn = !!(data?.open_shift);
 
   return (
     <main className="min-h-dvh bg-gray-50 flex flex-col">
@@ -406,7 +456,7 @@ export default function SchedulePage() {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => router.push('/portal/clock')} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 active:scale-95 transition" aria-label="Clock">
+          <button onClick={() => router.push('/portal/clock')} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 active:scale-95 transition" aria-label="Shift status">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg>
           </button>
           <button onClick={() => router.push('/portal/documents')} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 active:scale-95 transition" aria-label="Docs">
@@ -447,28 +497,25 @@ export default function SchedulePage() {
                 </button>
               </div>
             )}
-            {/* Location off indicator */}
-            {locPerm === 'denied' && (
-              <div className="absolute bottom-3 left-3 bg-white/90 rounded-full px-3 py-1.5 text-xs text-gray-500 flex items-center gap-1.5 shadow">
-                <span className="w-2 h-2 rounded-full bg-gray-400" />
-                Location off
-              </div>
-            )}
           </>
         ) : (
-          <div className="w-full h-full bg-gray-200 flex flex-col items-center justify-center text-gray-500">
+          <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center text-gray-500">
             {showLocPrompt ? (
               <div className="text-center px-6">
-                <div className="text-sm font-medium mb-2">Enable location for live maps</div>
+                <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" /><circle cx="12" cy="9" r="2.5" /></svg>
+                </div>
+                <div className="text-base font-bold text-gray-900 mb-1">Location Required</div>
+                <div className="text-xs text-gray-400 mb-4">Enable location to see your route and navigate to jobs.</div>
                 <button
                   onClick={enableLocation}
-                  className="bg-orange-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl active:scale-95 transition"
+                  className="bg-orange-500 text-white font-semibold px-6 py-3 rounded-xl active:scale-95 transition shadow-lg shadow-orange-200"
                 >
-                  Enable
+                  Enable Location
                 </button>
               </div>
             ) : (
-              <div className="text-sm text-gray-400">Enable location for live maps</div>
+              <div className="text-sm text-gray-400">Loading map…</div>
             )}
           </div>
         )}
@@ -478,37 +525,11 @@ export default function SchedulePage() {
       <div className="flex-1 overflow-y-auto pb-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5rem)' }}>
         <div className="max-w-md mx-auto px-4 pt-4 space-y-3">
 
-          {/* Location prompt card (one-time) */}
-          {showLocPrompt && locPerm === 'default' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-orange-200 p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" /><circle cx="12" cy="9" r="2.5" /></svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-900 text-sm">Enable location for live tracking and directions</div>
-                  <div className="text-xs text-gray-400 mt-1">We use your location to show the route to your next job.</div>
-                  <button
-                    onClick={enableLocation}
-                    className="mt-3 bg-orange-500 text-white text-sm font-semibold px-4 py-2 rounded-xl active:scale-95 transition"
-                  >
-                    Enable
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* No assignment */}
           {!assignment && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
               <div className="text-gray-400 text-sm">No assignment scheduled for today.</div>
-              <button
-                onClick={() => router.push('/portal/clock')}
-                className="mt-4 text-orange-600 font-semibold text-sm underline"
-              >
-                Go to Clock
-              </button>
+              <div className="text-xs text-gray-400 mt-2">Your shift starts automatically when you begin a job.</div>
             </div>
           )}
 

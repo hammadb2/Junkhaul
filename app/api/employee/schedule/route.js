@@ -70,11 +70,20 @@ export async function GET(req) {
     .gte('clock_in_at', `${date}T00:00:00`)
     .lte('clock_in_at', `${date}T23:59:59`);
 
+  // Open shift (for clock-in indicator)
+  const { data: openShift } = await supabaseAdmin
+    .from('timesheets')
+    .select('id, clock_in_at')
+    .eq('employee_id', emp.id)
+    .is('clock_out_at', null)
+    .maybeSingle();
+
   return NextResponse.json({
     assignment,
     partner,
     bookings: bookings || [],
     open_sessions: openSessions || [],
     completed_sessions: completedSessions || [],
+    open_shift: openShift || null,
   });
 }

@@ -14,6 +14,13 @@ export default function PayStubsPage() {
   const [expanded, setExpanded] = useState(null);
 
   const load = useCallback(async () => {
+    // Check onboarding status first
+    const meRes = await fetch('/api/employee/me');
+    if (meRes.status === 401) { router.push('/portal'); return; }
+    const meData = await meRes.json();
+    if (meData.employee && !meData.employee.onboarded) {
+      router.push('/portal/onboard'); return;
+    }
     const res = await fetch('/api/employee/pay-stubs');
     if (res.status === 401) { router.push('/portal'); return; }
     const data = await res.json();

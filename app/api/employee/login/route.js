@@ -13,7 +13,7 @@ export async function POST(req) {
 
   const { data: emp } = await supabaseAdmin
     .from('employees')
-    .select('id, email, name, password_hash, status')
+    .select('id, email, name, password_hash, status, onboarding_completed_at')
     .eq('email', email.toLowerCase())
     .maybeSingle();
   if (!emp || !verifyPassword(password, emp.password_hash)) {
@@ -26,7 +26,15 @@ export async function POST(req) {
   const sess = await createSession(emp.id);
   if (!sess) return NextResponse.json({ error: 'Login failed' }, { status: 500 });
 
-  const res = NextResponse.json({ employee: { id: emp.id, email: emp.email, name: emp.name, status: emp.status } });
+  const res = NextResponse.json({
+    employee: {
+      id: emp.id,
+      email: emp.email,
+      name: emp.name,
+      status: emp.status,
+      onboarding_complete: !!emp.onboarding_completed_at,
+    },
+  });
   res.headers.set('Set-Cookie', sessionCookieHeader(sess.token, sess.expiresAt));
   return res;
 }

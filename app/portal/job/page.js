@@ -73,6 +73,10 @@ function JobFlowInner() {
     if (res.status === 401) { router.push('/portal'); return null; }
     const d = await res.json();
     setEmp(d.employee);
+    if (d.employee && !d.employee.onboarded) {
+      router.push('/portal/onboard');
+      return null;
+    }
     return d.employee;
   }, [router]);
 

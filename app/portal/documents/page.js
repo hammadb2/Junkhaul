@@ -29,6 +29,9 @@ export default function DocumentsPage() {
     const d = await res.json();
     setData(d);
     setLoading(false);
+    if (d.employee && !d.employee.onboarded) {
+      router.push('/portal/onboard');
+    }
   }, [router]);
 
   useEffect(() => { load(); }, [load]);
