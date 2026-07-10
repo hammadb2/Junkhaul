@@ -520,7 +520,7 @@ function QuickSMS({ bookingId, phone, name }) {
       <button
         onClick={send}
         disabled={sending || !msg.trim()}
-        className="w-full bg-gray-800 text-white text-sm py-2 rounded-lg font-medium disabled:bg-gray-300"
+        className="w-full bg-[#f97316] text-white text-sm py-2 rounded-lg font-medium disabled:bg-gray-300"
       >
         {sending ? 'Sending…' : sent ? '✓ Sent' : `📱 Send to ${name}`}
       </button>

@@ -109,7 +109,7 @@ export default function ConfigPanel() {
           <button
             onClick={save}
             disabled={saving || Object.keys(edits).length === 0}
-            className="bg-gray-900 text-[#1a1a1a] px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+            className="bg-[#f97316] text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save changes'}
           </button>

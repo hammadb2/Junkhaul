@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { sendSMS as _sendSMS } from '@/lib/sms';
-import { calculatePrice, getPricingConfig, LOAD_LABELS } from '@/lib/pricing';
+import { calculatePrice, getPricingConfig, LOAD_LABELS, PRICING } from '@/lib/pricing';
 import { cancelBooking } from '@/lib/cancellations';
 import { analysePhotos } from '@/lib/ai';
-import { edmontonNowParts, formatDateLong, formatTime } from '@/lib/dates';
+import { edmontonNowParts, formatDateLong, formatTime, jobDateTimeUTC } from '@/lib/dates';
 import { geocodeAddress } from '@/lib/geocode';
 import { sendDepositLink } from '@/lib/messages';
+import { createDepositPayment } from '@/lib/stripe';
+import { randomBytes } from 'crypto';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -223,7 +225,7 @@ async function downloadPhotoAsBase64(url) {
 async function uploadPhotoToStorage(base64) {
   try {
     const buffer = Buffer.from(base64, 'base64');
-    const path = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.jpg`;
+    const path = `${new Date().toISOString().slice(0, 10)}/${randomBytes(16).toString('hex')}.jpg`;
     const { error } = await supabaseAdmin.storage
       .from(PHOTO_BUCKET)
       .upload(path, buffer, { contentType: 'image/jpeg', upsert: false });
@@ -283,22 +285,41 @@ async function createSmsBooking({ name, phone, address, load_size, job_date, job
       same_day: false, same_day_fee: 0,
       stairs, has_freon, freon_count, freon_fee: priced.freon_fee,
       total_price: priced.total,
+      deposit_amount: PRICING.deposit,
       deposit_paid: 0, balance_due: priced.balance_due,
       job_date, job_time,
+      job_datetime: jobDateTimeUTC(job_date, job_time).toISOString(),
       status: 'pending_payment',
       booking_ref: bookingRef,
       source: 'sms',
+      photo_skipped: true,
     })
     .select()
     .single();
 
   if (error) return { success: false, error: error.message };
 
+  // Create Stripe PaymentIntent for deposit
+  try {
+    const intent = await createDepositPayment(booking.id, name, null);
+    await supabaseAdmin
+      .from('bookings')
+      .update({ stripe_payment_intent_id: intent.id })
+      .eq('id', booking.id);
+  } catch (e) {
+    console.error('Stripe deposit intent failed for SMS booking:', e.message);
+  }
+
+  // Generate tracking token for customer portal
+  const trackingToken = randomBytes(16).toString('hex');
   await supabaseAdmin
-    .from('schedule')
-    .update({ jobs_booked: slot.jobs_booked + 1 })
-    .eq('slot_date', job_date)
-    .eq('slot_time', job_time);
+    .from('bookings')
+    .update({ tracking_token: trackingToken })
+    .eq('id', booking.id);
+
+  // NOTE: Slot is NOT incremented here — it's incremented in the Stripe webhook
+  // when the deposit is actually paid. This prevents slots being reserved by
+  // customers who never pay.
 
   return { success: true, booking };
 }

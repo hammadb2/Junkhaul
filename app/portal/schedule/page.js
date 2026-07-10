@@ -544,7 +544,7 @@ export default function SchedulePage() {
                 className="fade-in"
                 style={{
                   position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)',
-                  background: 'rgba(22,22,24,0.9)', backdropFilter: 'blur(20px)',
+                  background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)',
                   borderRadius: 999, padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10,
                   border: '1px solid rgba(0,0,0,.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
                   cursor: 'pointer',

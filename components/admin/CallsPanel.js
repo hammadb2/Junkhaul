@@ -112,7 +112,7 @@ export default function CallsPanel() {
             </div>
             <button
               onClick={() => window.open(`tel:${selected.caller_number}`)}
-              className="w-full bg-gray-900 text-[#1a1a1a] py-2 rounded-lg font-semibold"
+              className="w-full bg-[#f97316] text-white py-2 rounded-lg font-semibold"
             >
               Call back
             </button>
