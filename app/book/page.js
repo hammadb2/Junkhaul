@@ -23,7 +23,7 @@ const LOADS = [
   { key: 'full', title: 'Full load', desc: 'Garage / estate cleanout', price: 380 },
 ];
 
-const STEPS = ['phone', 'photos', 'load', 'schedule', 'details', 'payment', 'done'];
+const STEPS = ['phone', 'photos', 'load', 'schedule', 'email', 'payment', 'done'];
 
 const todayEdmonton = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -122,6 +122,8 @@ export default function BookPage() {
           {step === 'phone' && (
             <PhoneStep
               sessionId={sessionId}
+              state={state}
+              update={update}
               onNext={(phone) => {
                 setCapturedPhone(phone);
                 setStep('photos');
@@ -149,11 +151,11 @@ export default function BookPage() {
             <ScheduleStep
               state={state}
               update={update}
-              onNext={() => setStep('details')}
+              onNext={() => setStep('email')}
             />
           )}
-          {step === 'details' && (
-            <DetailsStep
+          {step === 'email' && (
+            <EmailStep
               state={state}
               update={update}
               price={price}
@@ -203,9 +205,9 @@ export default function BookPage() {
 }
 
 // ============================================================
-// STEP 0 — PHONE CAPTURE
+// STEP 0 — PHONE + NAME + ADDRESS CAPTURE
 // ============================================================
-function PhoneStep({ sessionId, onNext }) {
+function PhoneStep({ sessionId, state, update, onNext }) {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -221,7 +223,10 @@ function PhoneStep({ sessionId, onNext }) {
 
   // Strip formatting to get raw digits for storage/sending
   const rawPhone = phone.replace(/\D/g, '');
-  const valid = rawPhone.length === 10;
+  const phoneValid = rawPhone.length === 10;
+  const nameValid = state.name.trim().length >= 2;
+  const addressValid = state.address.trim().length >= 5;
+  const valid = phoneValid && nameValid && addressValid;
 
   const submit = async () => {
     setSubmitting(true);
@@ -244,6 +249,8 @@ function PhoneStep({ sessionId, onNext }) {
       });
       if (!res.ok) throw new Error('Failed');
       localStorage.setItem('jh_phone', phoneToSend);
+      // Store phone in state for booking creation
+      update({ phone: phoneToSend });
       onNext(phoneToSend);
     } catch {
       setError('Something went wrong. Try again.');
@@ -256,8 +263,16 @@ function PhoneStep({ sessionId, onNext }) {
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Get your instant price</h2>
-        <p className="mt-2 text-gray-500 text-sm">Enter your number and we&apos;ll text you your quote. No spam, ever.</p>
+        <p className="mt-2 text-gray-500 text-sm">Enter your details and we&apos;ll text you your quote. No spam, ever.</p>
       </div>
+
+      <Field
+        label="Full name"
+        value={state.name}
+        onChange={(v) => update({ name: v })}
+        placeholder="Jane Doe"
+      />
+
       <input
         type="tel"
         inputMode="numeric"
@@ -267,6 +282,79 @@ function PhoneStep({ sessionId, onNext }) {
         onKeyDown={(e) => e.key === 'Enter' && valid && submit()}
         className="w-full border border-gray-300 rounded-2xl px-4 py-4 text-lg font-medium"
       />
+      <div className="-mt-3">
+        <span className="text-xs font-medium text-gray-700">Mobile number</span>
+      </div>
+
+      <AddressField
+        label="Pickup address"
+        value={state.address}
+        onChange={(v, data) => {
+          if (data) {
+            const ctx = (data.context || []).reduce((acc, c) => {
+              const key = c.id.split('.')[0];
+              acc[key] = c.text;
+              return acc;
+            }, {});
+            const isApt = ['apartments', 'residential', 'condominium', 'building'].some(
+              (t) => (data.place_type || []).includes(t)
+            ) || /apt|apartment|condo|unit|suite|tower|building|complex/i.test(data.text || '');
+            update({
+              address: data.place_name,
+              address_data: {
+                full_address: data.place_name,
+                street: data.text,
+                postal_code: ctx.postcode || '',
+                city: ctx.place || 'Calgary',
+                province: ctx.region || 'Alberta',
+                country: ctx.country || 'Canada',
+                lat: data.center?.[1] || null,
+                lng: data.center?.[0] || null,
+                place_id: data.id,
+              },
+              is_apartment: isApt,
+              stairs: isApt && !state.stairs_confirmed ? Math.max(state.stairs, 1) : state.stairs,
+            });
+          } else {
+            update({ address: v, address_data: null, is_apartment: false });
+          }
+        }}
+        placeholder="123 5 Ave NE, Calgary"
+      />
+
+      {state.is_apartment && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
+          <p className="text-sm font-medium text-orange-700">
+            This looks like an apartment or condo. We need your unit number.
+          </p>
+          <input
+            type="text"
+            value={state.unit}
+            onChange={(e) => update({ unit: e.target.value })}
+            placeholder="Apt 204, Unit 15, Suite 301..."
+            className="w-full border border-orange-300 rounded-lg px-3 py-2.5 text-sm focus:border-orange-500 focus:outline-none"
+          />
+          <p className="text-xs text-orange-600">
+            A stair charge of $25 (1 flight) has been added. If there are no stairs or an elevator, tap &quot;No stairs&quot; below.
+          </p>
+          <button
+            type="button"
+            onClick={() => update({ stairs: 0, stairs_confirmed: true })}
+            className="text-xs font-medium text-orange-700 underline"
+          >
+            No stairs / has elevator
+          </button>
+        </div>
+      )}
+      {!state.is_apartment && (
+        <Field
+          label="Unit / buzzer (optional)"
+          value={state.unit}
+          onChange={(v) => update({ unit: v })}
+          placeholder="Apt 204"
+        />
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <BookButton disabled={!valid || submitting} onClick={submit}>
         {submitting ? 'One sec…' : 'Get my price →'}
@@ -808,16 +896,11 @@ function ScheduleStep({ state, update, onNext }) {
 }
 
 // ============================================================
-// STEP 4 — DETAILS
+// STEP 4 — EMAIL (optional) + CREATE BOOKING
 // ============================================================
-function DetailsStep({ state, update, price, onCreated }) {
+function EmailStep({ state, update, price, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-
-  const valid =
-    state.name.trim() &&
-    /^\+?[\d\s\-()]{10,}$/.test(state.phone) &&
-    state.address.trim();
 
   const submit = async () => {
     setSubmitting(true);
@@ -867,119 +950,68 @@ function DetailsStep({ state, update, price, onCreated }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-2xl font-bold text-gray-900">Where & who</h2>
+      <h2 className="text-2xl font-bold text-gray-900">Your quote is ready</h2>
 
-      <Field label="Full name" value={state.name} onChange={(v) => update({ name: v })} placeholder="Jane Doe" />
-      <Field
-        label="Mobile number"
-        value={state.phone}
-        onChange={(v) => update({ phone: v })}
-        placeholder="+1 403 555 0123"
-        type="tel"
-      />
-      <Field
-        label="Email (optional)"
-        value={state.email}
-        onChange={(v) => update({ email: v })}
-        placeholder="you@email.com"
-        type="email"
-      />
-      <AddressField
-        label="Pickup address"
-        value={state.address}
-        onChange={(v, data) => {
-          if (data) {
-            // Full address selected from Mapbox — extract all details
-            const ctx = (data.context || []).reduce((acc, c) => {
-              const key = c.id.split('.')[0];
-              acc[key] = c.text;
-              return acc;
-            }, {});
-            const isApt = ['apartments', 'residential', 'condominium', 'building'].some(
-              (t) => (data.place_type || []).includes(t)
-            ) || /apt|apartment|condo|unit|suite|tower|building|complex/i.test(data.text || '');
-            update({
-              address: data.place_name,
-              address_data: {
-                full_address: data.place_name,
-                street: data.text,
-                postal_code: ctx.postcode || '',
-                city: ctx.place || 'Calgary',
-                province: ctx.region || 'Alberta',
-                country: ctx.country || 'Canada',
-                lat: data.center?.[1] || null,
-                lng: data.center?.[0] || null,
-                place_id: data.id,
-              },
-              is_apartment: isApt,
-              // Auto-apply 1 flight of stairs for apartments unless user already confirmed no stairs
-              stairs: isApt && !state.stairs_confirmed ? Math.max(state.stairs, 1) : state.stairs,
-            });
-          } else {
-            // User is typing manually
-            update({ address: v, address_data: null, is_apartment: false });
-          }
-        }}
-        placeholder="123 5 Ave NE, Calgary"
-      />
-      {state.is_apartment && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
-          <p className="text-sm font-medium text-orange-700">
-            This looks like an apartment or condo. We need your unit number.
-          </p>
-          <input
-            type="text"
-            value={state.unit}
-            onChange={(e) => update({ unit: e.target.value })}
-            placeholder="Apt 204, Unit 15, Suite 301..."
-            className="w-full border border-orange-300 rounded-lg px-3 py-2.5 text-sm focus:border-orange-500 focus:outline-none"
-          />
-          <p className="text-xs text-orange-600">
-            A stair charge of $25 (1 flight) has been added. If there are no stairs or an elevator, tap &quot;No stairs&quot; below.
-          </p>
-          <button
-            type="button"
-            onClick={() => update({ stairs: 0, stairs_confirmed: true })}
-            className="text-xs font-medium text-orange-700 underline"
-          >
-            No stairs / has elevator
-          </button>
+      {/* Quote summary */}
+      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Load size</span>
+          <span className="font-medium text-gray-900">{LOAD_LABELS[state.load_size]}</span>
         </div>
-      )}
-      {!state.is_apartment && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Pickup date</span>
+          <span className="font-medium text-gray-900">{state.job_date}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Pickup time</span>
+          <span className="font-medium text-gray-900">{state.job_time}</span>
+        </div>
+        {price.freon_fee > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span>
+            <span className="font-medium text-gray-900">${price.freon_fee}</span>
+          </div>
+        )}
+        {price.stairs_fee > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span>
+            <span className="font-medium text-gray-900">${price.stairs_fee}</span>
+          </div>
+        )}
+        {price.same_day_fee > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Same-day</span>
+            <span className="font-medium text-gray-900">${price.same_day_fee}</span>
+          </div>
+        )}
+        <div className="border-t border-gray-200 pt-2 flex items-center justify-between">
+          <span className="font-semibold text-gray-900">Total</span>
+          <span className="text-2xl font-bold text-gray-900">${price.total}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500">Deposit today</span>
+          <span className="font-medium text-gray-700">$50</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500">Balance on pickup</span>
+          <span className="font-medium text-gray-700">${price.balance_due}</span>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm text-gray-600 mb-3">Want a receipt by email? Add it below (optional).</p>
         <Field
-          label="Unit / buzzer (optional)"
-          value={state.unit}
-          onChange={(v) => update({ unit: v })}
-          placeholder="Apt 204"
+          label="Email (optional)"
+          value={state.email}
+          onChange={(v) => update({ email: v })}
+          placeholder="you@email.com"
+          type="email"
         />
-      )}
-
-      <Field
-        label="Referral code (optional — get $20 off!)"
-        value={state.referral_code || ''}
-        onChange={(v) => update({ referral_code: v })}
-        placeholder="Friend's phone number or code"
-      />
-
-      <label className="block">
-        <span className="text-sm font-medium text-gray-700">Notes for our team (optional)</span>
-        <textarea
-          value={state.customer_notes}
-          onChange={(e) => update({ customer_notes: e.target.value })}
-          placeholder="Any details about the junk, access, parking, gate codes, heavy items, etc."
-          rows={3}
-          className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none resize-none"
-        />
-      </label>
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="mt-2 flex items-end justify-between">
-        <span className="text-gray-500 text-sm">Deposit today $50 · Total ${price.total}</span>
-      </div>
-
-      <BookButton disabled={!valid || submitting} onClick={submit}>
+      <BookButton disabled={submitting} onClick={submit}>
         {submitting ? 'Creating booking…' : 'Continue to payment →'}
       </BookButton>
     </div>
