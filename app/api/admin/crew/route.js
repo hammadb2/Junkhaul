@@ -83,8 +83,8 @@ ${bodyHTML}
 <img src="https://junkhaul.ca/logo/stampede-alt.png" alt="Junk Haul Calgary" height="56" style="display:block;" />
 </td></tr>
 <tr><td style="border-top:3px solid #f97316;padding-top:14px;">
-<p style="margin:0 0 2px;font-size:17px;font-weight:bold;color:#1a1a1a;">Sales Department</p>
-<p style="margin:0 0 12px;font-size:13px;color:#888888;">Calgary, AB</p>
+<p style="margin:0 0 2px;font-size:17px;font-weight:bold;color:#1a1a1a;">Junk Haul Calgary</p>
+<p style="margin:0 0 12px;font-size:13px;color:#888888;">Crew Team &middot; Calgary, AB</p>
 <table cellpadding="0" cellspacing="0" border="0"><tr>
 <td style="padding-right:14px;"><a href="tel:+15873250751" style="font-size:13px;color:#f97316;text-decoration:none;font-weight:600;">(587) 325-0751</a></td>
 <td style="color:#ddd;padding-right:14px;font-size:13px;">|</td>
@@ -103,8 +103,8 @@ ${bodyHTML}
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'Junk Haul Calgary <support@junkhaul.ca>',
-        reply_to: 'contact@junkhaul.ca',
+        from: 'Junk Haul Calgary <crew@junkhaul.ca>',
+        reply_to: 'crew@junkhaul.ca',
         to: email,
         subject,
         html,
