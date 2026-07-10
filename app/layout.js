@@ -1,13 +1,20 @@
 import './globals.css';
+import PWARegister from '@/components/PWARegister';
 
 export const metadata = {
   title: 'Junk Haul Calgary — Same Day Junk Removal',
   description:
     'Calgary junk removal. Book in 60 seconds, get an instant price from photos, same-day pickup available. Fully licensed and insured. Canadian owned and operated.',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://junkhaul.ca'),
+  manifest: '/manifest.json',
   icons: {
     icon: [{ url: '/favicon-32.png', sizes: '32x32', type: 'image/png' }],
-    apple: [{ url: '/favicon.png', sizes: '180x180', type: 'image/png' }],
+    apple: [{ url: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'JunkHaul',
   },
   openGraph: {
     title: 'Junk Haul Calgary — Same Day Junk Removal',
@@ -31,6 +38,7 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: 'cover',
 };
 
 const jsonLd = {
@@ -119,6 +127,7 @@ export default function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        <PWARegister />
         {children}
       </body>
     </html>

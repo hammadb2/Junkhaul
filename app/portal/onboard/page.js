@@ -47,6 +47,9 @@ function OnboardInner() {
 
   // Step 0 form
   const [accountForm, setAccountForm] = useState({ password: '', phone: '', address: '' });
+  const [pwErrors, setPwErrors] = useState([]);
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [addressFocused, setAddressFocused] = useState(false);
 
   // Step 1 form
   const [personal, setPersonal] = useState({ name: '', email: '', address: '' });
@@ -116,24 +119,73 @@ function OnboardInner() {
     validateInvite();
   }, [validateInvite]);
 
+  // ---- Step 0: password validation ----
+  const validatePw = (pw) => {
+    const errs = [];
+    if (pw.length < 8) errs.push('At least 8 characters');
+    if (!/[0-9]/.test(pw)) errs.push('At least one number');
+    if (!/[^A-Za-z0-9]/.test(pw)) errs.push('At least one special character');
+    return errs;
+  };
+
+  const onPwChange = (val) => {
+    setAccountForm({ ...accountForm, password: val });
+    setPwErrors(validatePw(val));
+  };
+
+  // ---- Step 0: address autocomplete via Mapbox ----
+  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+  const searchAddress = useCallback(async (query) => {
+    if (!query || query.length < 3 || !MAPBOX_TOKEN) { setAddressSuggestions([]); return; }
+    try {
+      const res = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=ca&limit=5&types=address`
+      );
+      const data = await res.json();
+      setAddressSuggestions((data.features || []).map((f) => f.place_name));
+    } catch { setAddressSuggestions([]); }
+  }, [MAPBOX_TOKEN]);
+
+  const onAddressChange = (val) => {
+    setAccountForm({ ...accountForm, address: val });
+    setAddressFocused(true);
+    searchAddress(val);
+  };
+
   // ---- Step 0 submit: create account ----
   const createAccount = async (e) => {
     e.preventDefault();
-    setSaving(true); setError('');
+    setError('');
+
+    // Validate password
+    const pwErrs = validatePw(accountForm.password);
+    if (pwErrs.length > 0) { setError('Password: ' + pwErrs.join(', ')); return; }
+
+    // Validate phone
+    const phoneClean = accountForm.phone.replace(/[\s\-\(\)]/g, '');
+    if (!phoneClean || phoneClean.length < 10) { setError('A valid phone number is required.'); return; }
+
+    // Validate address
+    if (!accountForm.address.trim() || accountForm.address.trim().length < 5) {
+      setError('Your home address is required.'); return;
+    }
+
+    setSaving(true);
     const res = await fetch('/api/employee/onboard/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token,
         password: accountForm.password,
-        phone: accountForm.phone || undefined,
-        address: accountForm.address || undefined,
+        phone: accountForm.phone,
+        address: accountForm.address,
       }),
     });
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Could not create account'); return; }
-    if (accountForm.address) setPersonal((p) => ({ ...p, address: accountForm.address }));
+    setPersonal((p) => ({ ...p, address: accountForm.address }));
     setStep(1);
   };
 
@@ -254,22 +306,22 @@ function OnboardInner() {
   };
 
   // ============ render helpers ============
-  const inputCls = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm';
-  const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
-  const cardCls = 'bg-white rounded-2xl border border-gray-200 p-5';
+  const inputCls = 'w-full px-4 py-3 rounded-xl border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent';
+  const labelCls = 'block text-sm font-semibold text-gray-700 mb-1.5';
+  const cardCls = 'bg-white rounded-2xl border border-gray-200 p-5 shadow-sm';
 
   const ProgressBar = () => (
-    <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+    <div className="bg-white border-b border-gray-100 px-5 py-3 sticky top-0 z-10 safe-top">
       <div className="max-w-md mx-auto">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-500">Step {step} of 7</span>
+          <span className="text-xs font-bold text-gray-700">Step {step} of 7</span>
           <span className="text-xs text-gray-400">{STEP_LABELS[step]}</span>
         </div>
         <div className="flex gap-1">
           {[1, 2, 3, 4, 5, 6, 7].map((s) => (
             <div
               key={s}
-              className={`h-1.5 flex-1 rounded-full ${s <= step ? 'bg-orange-500' : 'bg-gray-200'}`}
+              className={`h-2 flex-1 rounded-full transition-colors ${s <= step ? 'bg-orange-500' : 'bg-gray-200'}`}
             />
           ))}
         </div>
@@ -278,12 +330,12 @@ function OnboardInner() {
   );
 
   const NavButtons = ({ onBack, onNext, nextLabel = 'Next', nextDisabled = false }) => (
-    <div className="flex gap-3 mt-5">
+    <div className="flex gap-3 mt-6">
       {onBack && (
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 py-3 rounded-lg bg-gray-100 text-gray-700 font-medium text-sm"
+          className="flex-1 py-3.5 rounded-xl bg-gray-100 text-gray-600 font-medium text-sm active:scale-[0.98] transition-transform"
         >
           Back
         </button>
@@ -291,7 +343,7 @@ function OnboardInner() {
       <button
         type="submit"
         disabled={saving || nextDisabled}
-        className="flex-[2] bg-orange-500 text-white font-semibold py-3 rounded-lg disabled:bg-orange-300"
+        className="flex-[2] bg-orange-500 text-white font-bold py-3.5 rounded-xl disabled:bg-orange-300 active:scale-[0.98] transition-transform shadow-lg shadow-orange-200 text-sm"
       >
         {saving ? '…' : nextLabel}
       </button>
@@ -301,94 +353,199 @@ function OnboardInner() {
   // ============ STEP 0: invite validation + account ============
   if (step === 0) {
     if (loading) {
-      return <Shell><div className="text-center text-gray-400 py-12">Validating invite…</div></Shell>;
+      return (
+        <Shell>
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            <div className="w-10 h-10 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-4" />
+            <div className="text-gray-400 text-sm">Validating your invite…</div>
+          </div>
+        </Shell>
+      );
     }
     return (
       <Shell>
-        <div className="max-w-md mx-auto p-4">
-          <div className="text-center mb-6">
-            <div className="text-2xl font-bold text-gray-900">Junk Haul Crew</div>
-            <div className="text-sm text-gray-400">Onboarding</div>
-          </div>
-
-          {inviteError && !invite && (
-            <div className={cardCls}>
-              <div className="text-red-500 text-sm font-medium mb-2">Invite problem</div>
-              <div className="text-gray-600 text-sm">{inviteError}</div>
-              <div className="text-xs text-gray-400 mt-3">
-                If you believe this is an error, contact your manager for a new invite link.
+        <div className="flex-1 overflow-y-auto px-5 pt-8 pb-8">
+          <div className="max-w-md mx-auto">
+            {/* Logo header */}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-14 h-14 bg-orange-500 rounded-2xl mb-3 shadow-lg shadow-orange-200">
+                <span className="text-white font-black text-xl">JH</span>
               </div>
+              <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
+              <div className="text-sm text-gray-400 mt-0.5">Onboarding Portal</div>
             </div>
-          )}
 
-          {inviteError && invite && (
-            <div className={cardCls + ' mb-4'}>
-              <div className="text-red-500 text-sm font-medium mb-1">{inviteError}</div>
-              <div className="text-gray-500 text-xs">Invite for {invite.email}</div>
-            </div>
-          )}
+            {inviteError && !invite && (
+              <div className="bg-white rounded-2xl border border-red-100 p-6 text-center shadow-sm">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <div className="text-red-600 font-semibold text-sm mb-2">Invite problem</div>
+                <div className="text-gray-600 text-sm">{inviteError}</div>
+                <div className="text-xs text-gray-400 mt-4">
+                  Contact your manager for a new invite link.
+                </div>
+              </div>
+            )}
 
-          {invite && !inviteError && (
+            {inviteError && invite && (
+              <div className="bg-white rounded-2xl border border-red-100 p-5 mb-4 shadow-sm">
+                <div className="text-red-600 font-medium text-sm mb-1">{inviteError}</div>
+                <div className="text-gray-400 text-xs">Invite for {invite.email}</div>
+              </div>
+            )}
+
+            {invite && !inviteError && (
             <>
-              <div className={cardCls + ' mb-4'}>
-                <div className="text-sm text-gray-400 mb-1">You&apos;ve been invited to join</div>
-                <div className="text-lg font-bold text-gray-900">
+              {/* Invite card */}
+              <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-5 mb-5">
+                <div className="text-xs font-medium text-orange-600 uppercase tracking-wide mb-2">You&apos;re invited to join</div>
+                <div className="text-xl font-bold text-gray-900">
                   {invite.first_name} {invite.last_name}
                 </div>
-                <div className="text-sm text-gray-600">{invite.email}</div>
+                <div className="text-sm text-gray-600 mt-0.5">{invite.email}</div>
                 {invite.pay_rate != null && (
-                  <div className="mt-2 inline-block bg-gray-100 rounded-lg px-3 py-1 text-sm text-gray-700">
-                    Pay rate: <span className="font-semibold">${Number(invite.pay_rate).toFixed(2)}/hr</span>
+                  <div className="mt-3 inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 text-sm shadow-sm">
+                    <span className="text-gray-500">Pay rate</span>
+                    <span className="font-bold text-gray-900">${Number(invite.pay_rate).toFixed(2)}</span>
+                    <span className="text-gray-400 text-xs">/hr</span>
                   </div>
                 )}
               </div>
 
-              <form onSubmit={createAccount} className={cardCls}>
-                <div className="font-semibold text-gray-900 mb-3">Create your account</div>
-                <div className="space-y-3">
+              {/* Account form */}
+              <form onSubmit={createAccount} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <div className="font-bold text-gray-900 mb-1 text-lg">Create your account</div>
+                <div className="text-sm text-gray-400 mb-5">Set up your password and contact info to get started.</div>
+
+                <div className="space-y-4">
+                  {/* Password */}
                   <div>
-                    <label className={labelCls}>Password</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Password <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="password"
                       value={accountForm.password}
-                      onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
-                      placeholder="At least 8 characters"
+                      onChange={(e) => onPwChange(e.target.value)}
+                      placeholder="Create a strong password"
                       required
-                      minLength={8}
-                      className={inputCls}
+                      autoComplete="new-password"
+                      className={`w-full px-4 py-3 rounded-xl border text-base ${
+                        accountForm.password && pwErrors.length > 0
+                          ? 'border-amber-300 bg-amber-50'
+                          : accountForm.password && pwErrors.length === 0
+                            ? 'border-green-300 bg-green-50'
+                            : 'border-gray-200'
+                      } focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent`}
                     />
+                    {/* Password requirements */}
+                    {accountForm.password && (
+                      <div className="mt-2 space-y-1">
+                        {[
+                          { check: accountForm.password.length >= 8, label: '8+ characters' },
+                          { check: /[0-9]/.test(accountForm.password), label: '1 number' },
+                          { check: /[^A-Za-z0-9]/.test(accountForm.password), label: '1 special character' },
+                        ].map((req, i) => (
+                          <div key={i} className="flex items-center gap-1.5 text-xs">
+                            <span className={req.check ? 'text-green-600' : 'text-gray-400'}>
+                              {req.check ? '✓' : '○'}
+                            </span>
+                            <span className={req.check ? 'text-green-600 font-medium' : 'text-gray-400'}>
+                              {req.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Phone */}
                   <div>
-                    <label className={labelCls}>Phone (optional)</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Mobile phone <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="tel"
                       value={accountForm.phone}
                       onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })}
-                      placeholder="Your mobile number"
-                      className={inputCls}
+                      placeholder="(587) 555-0123"
+                      required
+                      autoComplete="tel"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                     />
+                    <div className="text-xs text-gray-400 mt-1">We use this to contact you about shifts and jobs.</div>
                   </div>
-                  <div>
-                    <label className={labelCls}>Address (optional)</label>
+
+                  {/* Address with autocomplete */}
+                  <div className="relative">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Home address <span className="text-red-500">*</span>
+                    </label>
                     <input
                       value={accountForm.address}
-                      onChange={(e) => setAccountForm({ ...accountForm, address: e.target.value })}
-                      placeholder="Street, city, province"
-                      className={inputCls}
+                      onChange={(e) => onAddressChange(e.target.value)}
+                      onFocus={() => setAddressFocused(true)}
+                      onBlur={() => setTimeout(() => setAddressFocused(false), 200)}
+                      placeholder="Start typing your address…"
+                      required
+                      autoComplete="street-address"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                     />
+                    {/* Autocomplete dropdown */}
+                    {addressFocused && addressSuggestions.length > 0 && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                        {addressSuggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              setAccountForm({ ...accountForm, address: s });
+                              setAddressSuggestions([]);
+                              setAddressFocused(false);
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 border-b border-gray-50 last:border-0 flex items-center gap-2"
+                          >
+                            <span className="text-orange-400 flex-shrink-0">📍</span>
+                            <span className="truncate">{s}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-400 mt-1">Type your address and select from the list.</div>
                   </div>
                 </div>
-                {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
+
+                {error && (
+                  <div className="mt-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 font-medium">
+                    {error}
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full bg-orange-500 text-white font-semibold py-3 rounded-lg disabled:bg-orange-300 mt-4"
+                  className="w-full bg-orange-500 text-white font-bold py-4 rounded-xl disabled:bg-orange-300 mt-6 text-base active:scale-[0.98] transition-transform shadow-lg shadow-orange-200"
                 >
-                  {saving ? 'Creating account…' : 'Create account & continue'}
+                  {saving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Creating account…
+                    </span>
+                  ) : (
+                    'Create account & continue →'
+                  )}
                 </button>
               </form>
+
+              <div className="text-center mt-5">
+                <div className="text-xs text-gray-400">
+                  🔒 Your data is encrypted and stored securely.
+                </div>
+              </div>
             </>
-          )}
+            )}
+          </div>
         </div>
       </Shell>
     );
@@ -424,7 +581,7 @@ function OnboardInner() {
     return (
       <Shell>
         <ProgressBar />
-        <div className="max-w-md mx-auto p-4">
+        <div className="max-w-md mx-auto px-5 py-6">
           <form onSubmit={submitPersonal} className={cardCls}>
             <div className="font-semibold text-gray-900 mb-1">Personal Information</div>
             <div className="text-xs text-gray-400 mb-4">Pre-filled from your invite. Upload your documents below.</div>
@@ -488,7 +645,7 @@ function OnboardInner() {
     return (
       <Shell>
         <ProgressBar />
-        <div className="max-w-md mx-auto p-4">
+        <div className="max-w-md mx-auto px-5 py-6">
           <form onSubmit={(e) => { e.preventDefault(); submitTd1('federal', td1Federal, TD1_BASIC_PERSONAL, 3); }} className={cardCls}>
             <div className="font-semibold text-gray-900 mb-1">TD1 — Federal Tax Form</div>
             <div className="text-xs text-gray-400 mb-4">
@@ -510,7 +667,7 @@ function OnboardInner() {
     return (
       <Shell>
         <ProgressBar />
-        <div className="max-w-md mx-auto p-4">
+        <div className="max-w-md mx-auto px-5 py-6">
           <form onSubmit={(e) => { e.preventDefault(); submitTd1('ab', td1Ab, TD1AB_BASIC_PERSONAL, 4); }} className={cardCls}>
             <div className="font-semibold text-gray-900 mb-1">TD1AB — Alberta Provincial Tax Form</div>
             <div className="text-xs text-gray-400 mb-4">
@@ -532,7 +689,7 @@ function OnboardInner() {
     return (
       <Shell>
         <ProgressBar />
-        <div className="max-w-md mx-auto p-4">
+        <div className="max-w-md mx-auto px-5 py-6">
           <form onSubmit={submitContract} className={cardCls}>
             <div className="font-semibold text-gray-900 mb-3">Employment Contract</div>
             <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600 max-h-64 overflow-y-auto space-y-2">
@@ -581,7 +738,7 @@ function OnboardInner() {
     return (
       <Shell>
         <ProgressBar />
-        <div className="max-w-md mx-auto p-4">
+        <div className="max-w-md mx-auto px-5 py-6">
           <form onSubmit={submitBanking} className={cardCls}>
             <div className="font-semibold text-gray-900 mb-1">Direct Deposit — Banking Info</div>
             <div className="text-xs text-gray-400 mb-4">Your account details are encrypted at rest.</div>
@@ -647,7 +804,7 @@ function OnboardInner() {
     return (
       <Shell>
         <ProgressBar />
-        <div className="max-w-md mx-auto p-4">
+        <div className="max-w-md mx-auto px-5 py-6">
           <form onSubmit={submitAcks} className={cardCls}>
             <div className="font-semibold text-gray-900 mb-4">Acknowledgments</div>
             <div className="space-y-3">
@@ -677,7 +834,7 @@ function OnboardInner() {
     return (
       <Shell>
         <ProgressBar />
-        <div className="max-w-md mx-auto p-4">
+        <div className="max-w-md mx-auto px-5 py-6">
           <div className={cardCls + ' text-center'}>
             {!done && !completeData?.missing && (
               <>
@@ -805,7 +962,7 @@ function Td1Fields({ form, setForm, basic, spousalDefault }) {
 
 // ============ shell wrapper ============
 function Shell({ children }) {
-  return <main className="min-h-dvh bg-gray-50 flex flex-col">{children}</main>;
+  return <main className="min-h-dvh bg-gray-50 flex flex-col safe-top safe-bottom">{children}</main>;
 }
 
 export default function OnboardPage() {

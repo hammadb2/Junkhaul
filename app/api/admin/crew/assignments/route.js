@@ -95,5 +95,20 @@ export async function POST(req) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Send push notifications to assigned crew members
+  try {
+    const { sendPushToEmployees } = await import('@/lib/pushNotifications');
+    const empIds = [assignment.driver_employee_id, assignment.secondary_employee_id].filter(Boolean);
+    if (empIds.length > 0) {
+      await sendPushToEmployees(empIds, {
+        title: 'New Schedule Assignment',
+        body: `You've been assigned for ${assignment_date}${assignment.uhaul_location ? ` — U-Haul pickup at ${assignment.uhaul_location}` : ''}`,
+        url: '/portal/schedule',
+      });
+    }
+  } catch (e) {
+    console.warn('Push notification failed:', e);
+  }
+
   return NextResponse.json({ ok: true, assignment });
 }

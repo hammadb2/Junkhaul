@@ -34,6 +34,18 @@ export async function POST(req) {
   if (password.length < 8) {
     return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
   }
+  if (!/[0-9]/.test(password)) {
+    return NextResponse.json({ error: 'Password must contain at least one number' }, { status: 400 });
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return NextResponse.json({ error: 'Password must contain at least one special character' }, { status: 400 });
+  }
+  if (!phone || phone.replace(/[\s\-\(\)]/g, '').length < 10) {
+    return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 });
+  }
+  if (!address || address.trim().length < 5) {
+    return NextResponse.json({ error: 'Your home address is required' }, { status: 400 });
+  }
 
   // Look up invite
   const { data: invite, error: inviteErr } = await supabaseAdmin
