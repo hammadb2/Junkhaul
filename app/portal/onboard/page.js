@@ -248,6 +248,8 @@ function OnboardInner() {
       const d = await res.json();
       if (!res.ok) { setError(d.error || `${label} upload failed`); return; }
       setDocStatus((s) => ({ ...s, [docType]: 'uploaded' }));
+    } catch (e) {
+      setError(e.message || `${label} upload failed. Check your connection.`);
     } finally {
       setUploading('');
     }
@@ -263,6 +265,8 @@ function OnboardInner() {
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'Selfie upload failed'); return; }
       setSelfieUrl(d.selfie_url);
+    } catch (e) {
+      setError(e.message || 'Selfie upload failed. Check your connection.');
     } finally {
       setUploading('');
     }

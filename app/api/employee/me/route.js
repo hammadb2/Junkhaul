@@ -41,6 +41,7 @@ export async function GET(req) {
       pay_rate: full.pay_rate,
       onboarded: full.status === 'onboarded' || full.status === 'active',
       pending_verification: full.status === 'pending_verification',
+      onboarding_completed_at: full.onboarding_completed_at,
       has_banking: !!full.bank_account_enc,
       has_sin: !!full.sin_enc,
       td1_federal_claim: full.td1_federal_claim,
