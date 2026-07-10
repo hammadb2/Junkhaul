@@ -13,6 +13,7 @@ import IntelPanel from '@/components/admin/IntelPanel';
 import GrowthPanel from '@/components/admin/GrowthPanel';
 import CommandCenter from '@/components/admin/CommandCenter';
 import BookingTimeline from '@/components/admin/BookingTimeline';
+import CrewView from '@/components/admin/CrewView';
 import { formatTime, formatDateLong } from '@/lib/dates';
 
 const RouteMap = dynamic(() => import('@/components/admin/RouteMap'), { ssr: false });
@@ -90,7 +91,7 @@ export default function AdminDashboard() {
         <Logo className="h-7" />
         <div className="flex items-center gap-3">
           <div className="flex gap-1 text-xs overflow-x-auto">
-            {['home', 'dispatch', 'schedule', 'earnings', 'waitlist', 'leads', 'growth', 'calls', 'intel', 'referrals', 'config', 'audit'].map((v) => (
+            {['home', 'dispatch', 'schedule', 'earnings', 'waitlist', 'leads', 'growth', 'calls', 'intel', 'referrals', 'crew', 'config', 'audit'].map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -210,6 +211,7 @@ export default function AdminDashboard() {
         {view === 'calls' && <CallsPanel />}
         {view === 'intel' && <IntelPanel />}
         {view === 'referrals' && <ReferralsPanel />}
+        {view === 'crew' && <CrewView />}
         {view === 'config' && <ConfigPanel />}
         {view === 'audit' && <AuditTrail />}
       </div>

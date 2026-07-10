@@ -102,6 +102,7 @@ export default function ClockPage() {
           <div className="text-xs text-gray-400">{emp?.email}</div>
         </div>
         <div className="flex gap-3 text-xs">
+          <button onClick={() => router.push('/portal/schedule')} className="text-orange-600 font-semibold underline">Today</button>
           <button onClick={() => router.push('/portal/documents')} className="text-gray-500 underline">Docs</button>
           <button onClick={() => router.push('/portal/paystubs')} className="text-gray-500 underline">Pay</button>
           <button onClick={logout} className="text-gray-400 underline">Out</button>

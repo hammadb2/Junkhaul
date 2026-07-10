@@ -33,7 +33,7 @@ export async function POST(req) {
     return NextResponse.json({ error: 'doc_type and file are required' }, { status: 400 });
   }
 
-  const allowed = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'other'];
+  const allowed = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'sin_document', 'drivers_license', 'other'];
   if (!allowed.includes(docType)) {
     return NextResponse.json({ error: 'Invalid doc_type' }, { status: 400 });
   }
@@ -71,7 +71,7 @@ export async function POST(req) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Check if all required docs are now uploaded -> flag onboarded
-  const required = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info'];
+  const required = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'sin_document', 'drivers_license'];
   const { data: allDocs } = await supabaseAdmin
     .from('employee_documents').select('doc_type, status').eq('employee_id', emp.id);
   const complete = required.every((t) => (allDocs || []).find((d) => d.doc_type === t && (d.status === 'uploaded' || d.status === 'verified')));

@@ -29,7 +29,7 @@ export default function PortalLogin() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) { setError(data.error || 'Something went wrong'); return; }
-    router.push('/portal/clock');
+    router.push('/portal/schedule');
   };
 
   return (
