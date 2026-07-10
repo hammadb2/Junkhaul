@@ -85,7 +85,7 @@ export async function POST(req) {
   } catch (err) {
     console.error('Analyze error:', err.message, err.stack);
     return NextResponse.json(
-      { error: 'Could not analyse right now. Please pick your load size manually.', debug: err.message },
+      { error: 'Could not analyse right now. Please pick your load size manually.' },
       { status: 500 }
     );
   }
