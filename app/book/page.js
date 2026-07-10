@@ -15,6 +15,7 @@ import {
 import PaymentStep from '@/components/booking/PaymentStep';
 import Confirmation from '@/components/booking/Confirmation';
 import { calculatePrice, PRICING, LOAD_LABELS } from '@/lib/pricingConstants';
+import { buildItemizedQuote, recalcWithDisposal } from '@/lib/itemPricing';
 
 const LOADS = [
   { key: 'single_item', title: '1–2 items', desc: 'Couch, mattress, single appliance', price: 99 },
@@ -23,7 +24,7 @@ const LOADS = [
   { key: 'full', title: 'Full load', desc: 'Garage / estate cleanout', price: 380 },
 ];
 
-const STEPS = ['phone', 'photos', 'load', 'schedule', 'email', 'payment', 'done'];
+const STEPS = ['phone', 'photos', 'items', 'load', 'schedule', 'email', 'payment', 'done'];
 
 const todayEdmonton = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -73,6 +74,8 @@ export default function BookPage() {
     is_apartment: false, // detected from address type
     customer_notes: '', // notes from customer about pickup
     referral_code: '', // referral code/phone for double-sided reward
+    itemized: null, // itemized quote from photo analysis
+    is_custom_slot: false, // custom slot selected by customer
   });
   const [booking, setBooking] = useState(null);
 
@@ -98,7 +101,7 @@ export default function BookPage() {
         </Link>
         {step !== 'done' && (
           <div className="flex gap-1">
-            {STEPS.slice(1, 6).map((s, i) => (
+            {STEPS.slice(1, 7).map((s, i) => (
               <div
                 key={s}
                 className={`h-1.5 w-6 rounded-full ${
@@ -136,6 +139,13 @@ export default function BookPage() {
               update={update}
               capturedPhone={capturedPhone}
               sessionId={sessionId}
+              onNext={() => setStep(state.itemized ? 'items' : 'load')}
+            />
+          )}
+          {step === 'items' && (
+            <ItemsStep
+              state={state}
+              update={update}
               onNext={() => setStep('load')}
             />
           )}
@@ -449,6 +459,7 @@ function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
         freon_count: data.analysis.freon_count || (data.analysis.has_freon ? 1 : 0),
         photoUrls: data.photoUrls || [],
         photo_skipped: false,
+        itemized: data.itemized || null,
       });
       if (capturedPhone && data.analysis) {
         const priceEstimate = calculatePrice({
@@ -588,6 +599,184 @@ function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
           </a>
         </>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// STEP 1.5 — ITEMIZED REVIEW (dump vs donate selection)
+// ============================================================
+function ItemsStep({ state, update, onNext }) {
+  const itemized = state.itemized;
+  if (!itemized || !itemized.items || itemized.items.length === 0) {
+    // No items to review, skip
+    return <div><p className="text-gray-500 py-10 text-center">No items detected. Continue to pick your load size.</p><BookButton onClick={onNext}>Continue →</BookButton></div>;
+  }
+
+  const items = itemized.items;
+
+  const toggleDisposal = (idx, disposal) => {
+    const newItems = [...items];
+    newItems[idx] = { ...newItems[idx], disposal };
+    const recalced = recalcWithDisposal(newItems, {
+      stairs: state.stairs,
+      same_day: state.same_day,
+    });
+    update({ itemized: recalced });
+  };
+
+  const updateQty = (idx, delta) => {
+    const newItems = [...items];
+    newItems[idx] = {
+      ...newItems[idx],
+      quantity: Math.max(1, newItems[idx].quantity + delta),
+      line_total: Math.max(1, newItems[idx].quantity + delta) * newItems[idx].unit_price,
+    };
+    const recalced = recalcWithDisposal(newItems, {
+      stairs: state.stairs,
+      same_day: state.same_day,
+    });
+    update({ itemized: recalced });
+  };
+
+  const removeItem = (idx) => {
+    const newItems = items.filter((_, i) => i !== idx);
+    if (newItems.length === 0) {
+      update({ itemized: null });
+      onNext();
+      return;
+    }
+    const recalced = recalcWithDisposal(newItems, {
+      stairs: state.stairs,
+      same_day: state.same_day,
+    });
+    update({ itemized: recalced });
+  };
+
+  const dumpTotal = items.filter((i) => i.disposal === 'dump' && !i.is_hazmat).reduce((s, i) => s + i.line_total, 0);
+  const donateCount = items.filter((i) => i.disposal === 'donate').length;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Your items</h2>
+        <p className="text-gray-500 text-sm mt-1">
+          Here&apos;s what we see. Mark items to <b>donate</b> (free — we drop them at charity) or <b>dump</b>.
+        </p>
+      </div>
+
+      {/* Hazmat warning */}
+      {items.some((i) => i.is_hazmat) && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+          <p className="text-sm font-medium text-red-700">Items we cannot take:</p>
+          <ul className="text-sm text-red-600 mt-1">
+            {items.filter((i) => i.is_hazmat).map((i, idx) => (
+              <li key={idx}>• {i.name} — please remove before pickup</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Item list */}
+      <div className="space-y-2">
+        {items.map((item, idx) => (
+          <div key={idx} className={`bg-white rounded-xl border p-3 ${item.is_hazmat ? 'border-red-200 opacity-60' : item.disposal === 'donate' ? 'border-green-200' : 'border-gray-200'}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900 text-sm">{item.name}</span>
+                  {item.is_freon && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Freon</span>}
+                  {item.note && <span className="text-[10px] text-gray-400">{item.note}</span>}
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {item.disposal === 'donate' ? (
+                    <span className="text-green-600 font-medium">Free — donated to charity</span>
+                  ) : item.is_hazmat ? (
+                    <span className="text-red-600">Cannot take</span>
+                  ) : (
+                    <span>${item.unit_price} each × {item.quantity} = ${item.line_total}</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => removeItem(idx)}
+                className="text-gray-300 hover:text-red-500 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quantity + disposal toggle */}
+            {!item.is_hazmat && (
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateQty(idx, -1)}
+                    className="w-7 h-7 rounded-full border border-gray-300 text-sm"
+                  >−</button>
+                  <span className="text-sm w-4 text-center">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQty(idx, 1)}
+                    className="w-7 h-7 rounded-full border border-gray-300 text-sm"
+                  >+</button>
+                </div>
+
+                {item.donatable && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => toggleDisposal(idx, 'dump')}
+                      className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+                        item.disposal === 'dump'
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      Dump
+                    </button>
+                    <button
+                      onClick={() => toggleDisposal(idx, 'donate')}
+                      className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+                        item.disposal === 'donate'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      Donate (free)
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Running total */}
+      <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">Items to dump</span>
+          <span className="font-medium text-gray-900">${dumpTotal}</span>
+        </div>
+        {donateCount > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Items to donate</span>
+            <span className="font-medium text-green-600">{donateCount} item{donateCount > 1 ? 's' : ''} — free</span>
+          </div>
+        )}
+        {itemized.is_minimum && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-2 mt-2">
+            <p className="text-sm font-medium text-orange-700">
+              Minimum charge is $99 — your items total ${dumpTotal}, so we&apos;ve topped it up to $99.
+            </p>
+          </div>
+        )}
+        <div className="border-t border-gray-200 pt-2 flex justify-between">
+          <span className="font-semibold text-gray-900">Your price</span>
+          <span className="text-2xl font-bold text-gray-900">${itemized.total}</span>
+        </div>
+      </div>
+
+      <BookButton onClick={onNext}>Continue →</BookButton>
     </div>
   );
 }
@@ -775,12 +964,14 @@ function ScheduleStep({ state, update, onNext }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeDay, setActiveDay] = useState(null);
+  const [noStandardSlots, setNoStandardSlots] = useState(false);
 
   useEffect(() => {
     fetch('/api/slots')
       .then((r) => r.json())
       .then((data) => {
         setDays(data.days || []);
+        setNoStandardSlots(data.no_standard_slots || false);
         if (data.days?.length) setActiveDay(data.days[0].date);
       })
       .finally(() => setLoading(false));
@@ -789,8 +980,13 @@ function ScheduleStep({ state, update, onNext }) {
   const today = todayEdmonton();
   const day = days.find((d) => d.date === activeDay);
 
-  const pick = (date, time) => {
-    update({ job_date: date, job_time: time, same_day: date === today });
+  const pick = (date, time, isCustom = false) => {
+    update({
+      job_date: date,
+      job_time: time,
+      same_day: date === today,
+      is_custom_slot: isCustom,
+    });
   };
 
   if (loading) return <p className="text-gray-500 py-10 text-center">Loading available times…</p>;
@@ -809,13 +1005,21 @@ function ScheduleStep({ state, update, onNext }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-2xl font-bold text-gray-900">Pick a time</h2>
-      <p className="text-gray-500 text-sm -mt-2">We run Thursdays and Sundays. Same-day available if you book before 11 AM.</p>
+      <p className="text-gray-500 text-sm -mt-2">
+        We run Thursdays and Sundays. All bookings must be at least 24 hours in advance.
+      </p>
+
+      {noStandardSlots && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <p className="text-sm font-medium text-blue-700">
+            Our regular slots are full — pick any available time below and we&apos;ll make it work.
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {days.map((d) => {
-          // Compute total remaining slots for this day for scarcity badge
           const dayRemaining = d.slots.reduce((sum, s) => sum + (s.remaining || 0), 0);
-          const dayMax = d.slots.length * 5; // assume max 5 per slot
           const isLow = dayRemaining <= 3 && dayRemaining > 0;
           return (
             <button
@@ -850,9 +1054,9 @@ function ScheduleStep({ state, update, onNext }) {
                 available
                 sameDay={activeDay === today}
                 selected={state.job_date === activeDay && state.job_time === s.time}
-                onClick={() => pick(activeDay, s.time)}
+                onClick={() => pick(activeDay, s.time, day?.is_custom)}
               />
-              {isScarce && (
+              {isScarce && !day?.is_custom && (
                 <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                   {remaining} left
                 </span>
@@ -863,7 +1067,7 @@ function ScheduleStep({ state, update, onNext }) {
       </div>
 
       {/* Scarcity messaging */}
-      {day && (() => {
+      {day && !day?.is_custom && (() => {
         const totalRemaining = day.slots.reduce((sum, s) => sum + (s.remaining || 0), 0);
         if (totalRemaining <= 2) {
           return (
@@ -882,12 +1086,6 @@ function ScheduleStep({ state, update, onNext }) {
         return null;
       })()}
 
-      {state.same_day && (
-        <p className="text-xs text-orange-600">
-          ⚡ Same-day pickup adds ${PRICING.same_day}.
-        </p>
-      )}
-
       <BookButton disabled={!state.job_time} onClick={onNext}>
         Continue →
       </BookButton>
@@ -901,8 +1099,19 @@ function ScheduleStep({ state, update, onNext }) {
 function EmailStep({ state, update, price, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [showAddressPopup, setShowAddressPopup] = useState(!state.address || state.address.trim().length < 5);
 
   const submit = async () => {
+    // Final address check before creating booking
+    if (!state.address || state.address.trim().length < 5) {
+      setShowAddressPopup(true);
+      return;
+    }
+    if (!state.name || !state.phone) {
+      setError('Missing name or phone number. Please go back and fill those in.');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -937,6 +1146,8 @@ function EmailStep({ state, update, price, onCreated }) {
           flag_reason: state.analysis?.flag_reason || null,
           source: 'web',
           referral_code: state.referral_code || null,
+          is_custom_slot: state.is_custom_slot || false,
+          itemized_items: state.itemized?.items || null,
         }),
       });
       const data = await res.json();
@@ -948,9 +1159,54 @@ function EmailStep({ state, update, price, onCreated }) {
     }
   };
 
+  // Address fallback popup
+  if (showAddressPopup) {
+    return (
+      <AddressPopup
+        state={state}
+        update={update}
+        onClose={() => setShowAddressPopup(false)}
+      />
+    );
+  }
+
+  // Use itemized total if available, otherwise standard price
+  const displayTotal = state.itemized ? state.itemized.total : price.total;
+  const displayBalance = state.itemized ? state.itemized.balance_due : price.balance_due;
+
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-2xl font-bold text-gray-900">Your quote is ready</h2>
+
+      {/* Itemized breakdown if available */}
+      {state.itemized && state.itemized.items && state.itemized.items.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
+          <h3 className="font-semibold text-gray-900 text-sm mb-2">Itemized breakdown</h3>
+          {state.itemized.items.filter((i) => i.disposal === 'dump' && !i.is_hazmat).map((item, idx) => (
+            <div key={idx} className="flex justify-between text-sm">
+              <span className="text-gray-600">
+                {item.quantity > 1 ? `${item.quantity}x ` : ''}{item.name}
+              </span>
+              <span className="font-medium text-gray-900">${item.line_total}</span>
+            </div>
+          ))}
+          {state.itemized.items.some((i) => i.disposal === 'donate') && (
+            <div className="flex justify-between text-sm pt-1">
+              <span className="text-green-600">Donated items (free)</span>
+              <span className="text-green-600 font-medium">
+                {state.itemized.items.filter((i) => i.disposal === 'donate').length} item(s)
+              </span>
+            </div>
+          )}
+          {state.itemized.is_minimum && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-2 mt-2">
+              <p className="text-sm font-medium text-orange-700">
+                Minimum charge is $99 — topped up from ${state.itemized.subtotal + state.itemized.stairs_fee + state.itemized.same_day_fee}.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Quote summary */}
       <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 space-y-2">
@@ -986,7 +1242,7 @@ function EmailStep({ state, update, price, onCreated }) {
         )}
         <div className="border-t border-gray-200 pt-2 flex items-center justify-between">
           <span className="font-semibold text-gray-900">Total</span>
-          <span className="text-2xl font-bold text-gray-900">${price.total}</span>
+          <span className="text-2xl font-bold text-gray-900">${displayTotal}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Deposit today</span>
@@ -994,7 +1250,7 @@ function EmailStep({ state, update, price, onCreated }) {
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Balance on pickup</span>
-          <span className="font-medium text-gray-700">${price.balance_due}</span>
+          <span className="font-medium text-gray-700">${displayBalance}</span>
         </div>
       </div>
 
@@ -1025,6 +1281,108 @@ function EmailStep({ state, update, price, onCreated }) {
       <BookButton disabled={submitting} onClick={submit}>
         {submitting ? 'Creating booking…' : 'Continue to payment →'}
       </BookButton>
+    </div>
+  );
+}
+
+// ============================================================
+// ADDRESS POPUP — fallback if address is missing at quote step
+// ============================================================
+function AddressPopup({ state, update, onClose }) {
+  const [localAddress, setLocalAddress] = useState(state.address || '');
+  const [localUnit, setLocalUnit] = useState(state.unit || '');
+  const [isApt, setIsApt] = useState(state.is_apartment || false);
+  const [error, setError] = useState(null);
+
+  const valid = localAddress.trim().length >= 5;
+
+  const confirm = () => {
+    if (!valid) {
+      setError('Please enter a valid pickup address.');
+      return;
+    }
+    update({
+      address: localAddress,
+      unit: localUnit,
+      is_apartment: isApt,
+      stairs: isApt && !state.stairs_confirmed ? Math.max(state.stairs, 1) : state.stairs,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">We need your pickup address</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            We need your address to confirm your booking and plan the route.
+          </p>
+        </div>
+
+        <AddressField
+          label="Pickup address"
+          value={localAddress}
+          onChange={(v, data) => {
+            setLocalAddress(v);
+            if (data) {
+              const apt = ['apartments', 'residential', 'condominium', 'building'].some(
+                (t) => (data.place_type || []).includes(t)
+              ) || /apt|apartment|condo|unit|suite|tower|building|complex/i.test(data.text || '');
+              setIsApt(apt);
+              const ctx = (data.context || []).reduce((acc, c) => {
+                const key = c.id.split('.')[0];
+                acc[key] = c.text;
+                return acc;
+              }, {});
+              update({
+                address_data: {
+                  full_address: data.place_name,
+                  street: data.text,
+                  postal_code: ctx.postcode || '',
+                  city: ctx.place || 'Calgary',
+                  province: ctx.region || 'Alberta',
+                  country: ctx.country || 'Canada',
+                  lat: data.center?.[1] || null,
+                  lng: data.center?.[0] || null,
+                  place_id: data.id,
+                },
+              });
+            }
+          }}
+          placeholder="123 5 Ave NE, Calgary"
+        />
+
+        {isApt && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
+            <p className="text-sm font-medium text-orange-700">
+              This looks like an apartment or condo. What&apos;s your unit number?
+            </p>
+            <input
+              type="text"
+              value={localUnit}
+              onChange={(e) => setLocalUnit(e.target.value)}
+              placeholder="Apt 204, Unit 15, Suite 301..."
+              className="w-full border border-orange-300 rounded-lg px-3 py-2.5 text-sm focus:border-orange-500 focus:outline-none"
+            />
+            <p className="text-xs text-orange-600">
+              A stair charge of $25 (1 flight) has been added. If there are no stairs or an elevator, you can adjust later.
+            </p>
+          </div>
+        )}
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <div className="flex gap-2">
+          <button
+            onClick={confirm}
+            disabled={!valid}
+            className="flex-1 bg-orange-500 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
+          >
+            Confirm address
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

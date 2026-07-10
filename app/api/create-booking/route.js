@@ -43,6 +43,7 @@ export async function POST(req) {
       flag_reason = null,
       source = 'web',
       referral_code = null,
+      is_custom_slot = false,
     } = body;
 
     // Required-field validation
@@ -53,7 +54,18 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid load size.' }, { status: 400 });
     }
 
-    // Verify the slot still has capacity.
+    // Enforce 24-hour minimum booking window
+    const now = new Date();
+    const earliest = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const jobDateTime = new Date(`${job_date}T${job_time}:00-07:00`); // Edmonton timezone
+    if (jobDateTime < earliest) {
+      return NextResponse.json(
+        { error: 'Booking must be at least 24 hours from now. Please pick a later time.' },
+        { status: 400 }
+      );
+    }
+
+    // Verify the slot still has capacity — or create a custom slot if needed
     const { data: slot } = await supabaseAdmin
       .from('schedule')
       .select('*')
@@ -61,7 +73,34 @@ export async function POST(req) {
       .eq('slot_time', job_time)
       .maybeSingle();
 
-    if (!slot || slot.jobs_booked >= slot.max_jobs || !slot.is_available) {
+    const isCustomSlot = body.is_custom_slot === true;
+
+    if (!slot) {
+      if (isCustomSlot) {
+        // Create the slot on the fly for custom bookings
+        const { error: createErr } = await supabaseAdmin
+          .from('schedule')
+          .insert({
+            slot_date: job_date,
+            slot_time: job_time,
+            day_type: dayType(job_date),
+            is_available: true,
+            max_jobs: 5,
+            jobs_booked: 0,
+          });
+        if (createErr) {
+          return NextResponse.json(
+            { error: 'Could not create that time slot. Please try another.' },
+            { status: 500 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: 'That time slot is not available. Please pick another.' },
+          { status: 409 }
+        );
+      }
+    } else if (slot.jobs_booked >= slot.max_jobs || !slot.is_available) {
       return NextResponse.json(
         { error: 'That time slot was just taken. Please pick another.' },
         { status: 409 }

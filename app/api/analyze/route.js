@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { analysePhotos, analyseDescription } from '@/lib/ai';
 import { calculatePrice, getPricingConfig, checkWeightFlag } from '@/lib/pricing';
+import { buildItemizedQuote } from '@/lib/itemPricing';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -58,6 +59,9 @@ export async function POST(req) {
     const low = priced.total;
     const high = priced.total + pricingConfig.same_day;
 
+    // Build itemized quote with per-item Calgary pricing
+    const itemized = buildItemizedQuote(analysis.items_detected, { stairs: 0, same_day: false });
+
     return NextResponse.json({
       analysis: {
         ...analysis,
@@ -67,6 +71,7 @@ export async function POST(req) {
         flag_reason: analysis.flag_reason || (weight.flag ? weight.reason : null),
       },
       price: { low, high, base: priced.base_price, freon_fee: priced.freon_fee },
+      itemized,
       photoUrls,
     });
   } catch (err) {
