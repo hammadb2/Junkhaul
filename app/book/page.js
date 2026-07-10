@@ -36,6 +36,34 @@ const todayEdmonton = () => {
   return parts; // en-CA gives YYYY-MM-DD
 };
 
+// Check if a Mapbox address feature is within Calgary service area.
+// Calgary bounding box: roughly -114.3 to -113.8 longitude, 50.85 to 51.25 latitude.
+// We also check the city/region context from Mapbox for a more reliable match.
+const isInCalgary = (data) => {
+  if (!data) return true; // manual entry — assume in area, let them proceed
+
+  // Check coords against Calgary bounding box (generous to include outskirts)
+  if (data.center) {
+    const [lng, lat] = data.center;
+    if (lng >= -114.5 && lng <= -113.8 && lat >= 50.85 && lat <= 51.25) {
+      return true;
+    }
+  }
+
+  // Check context for Calgary place name
+  const contextText = (data.context || []).map((c) => (c.text || '').toLowerCase()).join(' ');
+  const placeName = (data.place_name || '').toLowerCase();
+  const fullText = contextText + ' ' + placeName;
+
+  if (fullText.includes('calgary')) return true;
+
+  // Check if region is Alberta and place is Calgary
+  const place = (data.context || []).find((c) => c.id?.startsWith('place'));
+  if (place && place.text?.toLowerCase() === 'calgary') return true;
+
+  return false;
+};
+
 export default function BookPage() {
   const [sessionId] = useState(() => {
     if (typeof window === 'undefined') return crypto.randomUUID();
@@ -76,6 +104,7 @@ export default function BookPage() {
     referral_code: '', // referral code/phone for double-sided reward
     itemized: null, // itemized quote from photo analysis
     is_custom_slot: false, // custom slot selected by customer
+    out_of_area: false, // address is outside Calgary service area
   });
   const [booking, setBooking] = useState(null);
 
@@ -261,6 +290,25 @@ function PhoneStep({ sessionId, state, update, onNext }) {
       localStorage.setItem('jh_phone', phoneToSend);
       // Store phone in state for booking creation
       update({ phone: phoneToSend });
+
+      // If out of area, capture the lead with address info and don't proceed
+      if (state.out_of_area) {
+        await fetch('/api/capture-lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: phoneToSend,
+            session_id: sessionId,
+            action: 'out_of_area',
+            name: state.name,
+            address: state.address,
+            address_data: state.address_data,
+          }),
+        }).catch(() => {});
+        setSubmitting(false);
+        return; // Stay on this step — the OutOfAreaNotice will show
+      }
+
       onNext(phoneToSend);
     } catch {
       setError('Something went wrong. Try again.');
@@ -301,6 +349,7 @@ function PhoneStep({ sessionId, state, update, onNext }) {
         value={state.address}
         onChange={(v, data) => {
           if (data) {
+            const inCalgary = isInCalgary(data);
             const ctx = (data.context || []).reduce((acc, c) => {
               const key = c.id.split('.')[0];
               acc[key] = c.text;
@@ -323,14 +372,19 @@ function PhoneStep({ sessionId, state, update, onNext }) {
                 place_id: data.id,
               },
               is_apartment: isApt,
+              out_of_area: !inCalgary,
               stairs: isApt && !state.stairs_confirmed ? Math.max(state.stairs, 1) : state.stairs,
             });
           } else {
-            update({ address: v, address_data: null, is_apartment: false });
+            update({ address: v, address_data: null, is_apartment: false, out_of_area: false });
           }
         }}
         placeholder="123 5 Ave NE, Calgary"
       />
+
+      {state.out_of_area && (
+        <OutOfAreaNotice state={state} sessionId={sessionId} />
+      )}
 
       {state.is_apartment && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
@@ -367,10 +421,97 @@ function PhoneStep({ sessionId, state, update, onNext }) {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <BookButton disabled={!valid || submitting} onClick={submit}>
-        {submitting ? 'One sec…' : 'Get my price →'}
+        {submitting ? 'One sec…' : state.out_of_area ? 'Submit my info →' : 'Get my price →'}
       </BookButton>
       <p className="text-center text-xs text-gray-400">
         By continuing you agree to receive texts about your booking. Standard rates may apply.
+      </p>
+    </div>
+  );
+}
+
+// ============================================================
+// OUT OF AREA NOTICE — shown when address is outside Calgary
+// ============================================================
+function OutOfAreaNotice({ state, sessionId }) {
+  const [submitted, setSubmitted] = useState(false);
+  const [email, setEmail] = useState(state.email || '');
+  const [notes, setNotes] = useState('');
+
+  const submitInfo = async () => {
+    setSubmitted(true);
+    // Update the lead with email and notes
+    fetch('/api/capture-lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: state.phone,
+        session_id: sessionId,
+        action: 'out_of_area',
+        name: state.name,
+        address: state.address,
+        address_data: state.address_data,
+        email: email || null,
+        notes: notes || null,
+      }),
+    }).catch(() => {});
+  };
+
+  if (submitted) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+        <p className="font-semibold text-blue-900">Thanks, {state.name}!</p>
+        <p className="text-sm text-blue-700">
+          We&apos;ve saved your info. We currently service Calgary and surrounding areas only,
+          but we&apos;re expanding. We&apos;ll reach out as soon as we cover your area.
+        </p>
+        <p className="text-xs text-blue-500 mt-2">
+          Questions? Call or text us at <a href="tel:+15873250751" className="underline font-medium">(587) 325-0751</a>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-orange-50 border border-orange-300 rounded-xl p-4 space-y-3">
+      <div>
+        <p className="font-semibold text-orange-800">
+          Unfortunately, we don&apos;t service your area yet.
+        </p>
+        <p className="text-sm text-orange-700 mt-1">
+          We currently operate in Calgary and surrounding areas. But we&apos;re expanding fast —
+          leave us your info and we&apos;ll reach out when we cover your area.
+        </p>
+      </div>
+
+      <Field
+        label="Email (optional)"
+        value={email}
+        onChange={setEmail}
+        placeholder="you@email.com"
+        type="email"
+      />
+
+      <label className="block">
+        <span className="text-sm font-medium text-gray-700">What do you need hauled? (optional)</span>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Tell us what you've got and we'll keep it on file."
+          rows={2}
+          className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:border-orange-500 focus:outline-none resize-none"
+        />
+      </label>
+
+      <button
+        onClick={submitInfo}
+        className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-xl"
+      >
+        Save my info
+      </button>
+
+      <p className="text-xs text-orange-600 text-center">
+        We&apos;ll only contact you about servicing your area. No spam.
       </p>
     </div>
   );

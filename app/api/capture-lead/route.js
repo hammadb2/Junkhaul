@@ -70,5 +70,50 @@ export async function POST(req) {
     return NextResponse.json({ ok: true });
   }
 
+  if (action === 'out_of_area') {
+    // Customer is outside our service area — save their info so we can
+    // reach out when we expand. Still valuable as a lead.
+    const leadData = {
+      phone,
+      session_id,
+      source: rest.source || 'web',
+      name: rest.name || null,
+      address: rest.address || null,
+      address_data: rest.address_data || null,
+      email: rest.email || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Try with out_of_area columns — if they don't exist yet, the upsert
+    // will still work with the base fields
+    const { error } = await supabaseAdmin.from('leads').upsert(
+      leadData,
+      { onConflict: 'session_id' }
+    );
+
+    // Try to update out_of_area flag separately (may fail if column doesn't exist)
+    if (!error) {
+      await supabaseAdmin.from('leads')
+        .update({ out_of_area: true, out_of_area_notes: rest.notes || null })
+        .eq('session_id', session_id).catch(() => {});
+    }
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Notify operator about the out-of-area lead
+    try {
+      await sendSMS(
+        process.env.HAMMAD_PHONE || '+18259458282',
+        `Out-of-area lead: ${rest.name || 'Unknown'} at ${rest.address || 'unknown address'}. Phone: ${phone}. They want service when we expand.`,
+        null,
+        'out_of_area_lead'
+      );
+    } catch {
+      // best-effort
+    }
+
+    return NextResponse.json({ ok: true, out_of_area: true });
+  }
+
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 }
