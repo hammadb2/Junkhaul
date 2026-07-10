@@ -7,18 +7,34 @@ import { analysePhotos } from '@/lib/ai';
 import { edmontonNowParts, formatDateLong, formatTime } from '@/lib/dates';
 import { geocodeAddress } from '@/lib/geocode';
 import { sendDepositLink } from '@/lib/messages';
-import Groq from 'groq-sdk';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-let _groq = null;
-function getGroq() {
-  if (_groq) return _groq;
+async function groqChat(messages, maxTokens = 300) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
-  _groq = new Groq({ apiKey });
-  return _groq;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        max_tokens: maxTokens,
+        temperature: 0.5,
+        messages,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.choices[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    console.error('Groq chat failed:', e.message);
+    return null;
+  }
 }
 
 // Wrapper that strips ALL dashes and apostrophes from outgoing SMS
@@ -84,9 +100,6 @@ function detectStage(messages) {
 // AI: Generate a natural SMS reply
 // ============================================================
 async function generateReply(from, text, messages, booking, media, stage) {
-  const client = getGroq();
-  if (!client) return null;
-
   const hasPhotos = media && media.length > 0;
 
   // Build conversation history for the AI — use ALL recent messages
@@ -183,13 +196,7 @@ ABSOLUTE RULES:
       { role: 'user', content: userContent },
     ];
 
-    const response = await client.chat.completions.create({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      max_tokens: 300,
-      temperature: 0.5,
-      messages: allMessages,
-    });
-    let reply = response.choices[0]?.message?.content?.trim() || null;
+    let reply = await groqChat(allMessages, 300);
     // Strip dashes and apostrophes that the AI might have added
     if (reply) reply = reply.replace(/-/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ').trim();
     return reply;
