@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { formatDateLong } from '@/lib/dates';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
-import { X, Check, Circle, UserPlus, Radio, Truck, Warehouse, Heart, ChevronRight, Mail, Phone, Clock, FileText, AlertTriangle } from 'lucide-react';
+import { X, Check, Circle, UserPlus, Radio, Truck, Warehouse, Heart, ChevronRight, Mail, Phone, Clock, FileText, AlertTriangle, Send } from 'lucide-react';
 
 // ── Dark theme tokens (Tailwind classes) ──
 const CARD = 'bg-[#161618] border border-white/[0.06] rounded-2xl';
@@ -363,6 +363,7 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
   const [payRate, setPayRate] = useState('');
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -399,6 +400,17 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
     const d = await res.json();
     if (res.ok) { flash('success', 'Employee terminated'); onSaved(); onClose(); }
     else { flash('error', d.error || 'Terminate failed'); }
+  };
+
+  const resendInvite = async () => {
+    setResending(true);
+    try {
+      const res = await fetch(`/api/admin/crew/${id}/resend-invite`, { method: 'POST' });
+      const d = await res.json();
+      if (res.ok) { flash('success', `Invite resent to ${detail.employee.email}`); }
+      else { flash('error', d.error || 'Resend failed'); }
+    } catch { flash('error', 'Resend failed'); }
+    setResending(false);
   };
 
   return (
@@ -471,6 +483,16 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
                 <DetailRow label="Acknowledgments" value={detail.employee.acknowledgments ? 'Signed' : 'Not signed'} />
                 <DetailRow label="Address" value={detail.employee.address || '—'} />
               </div>
+              {!detail.employee.onboarding_completed_at && (
+                <button
+                  onClick={resendInvite}
+                  disabled={resending}
+                  className="mt-3 w-full flex items-center justify-center gap-2 bg-[#f97316] text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 active:scale-95 transition-transform"
+                >
+                  <Send size={14} />
+                  {resending ? 'Sending...' : 'Resend invite link'}
+                </button>
+              )}
             </Section>
 
             {/* Documents */}
