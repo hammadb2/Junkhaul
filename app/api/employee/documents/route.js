@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getAuthedEmployee } from '@/lib/employeeAuth';
-import { uploadDocToDrive, isDriveConfigured } from '@/lib/googleDrive';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
+
+const DOC_BUCKET = 'employee-documents';
 
 // GET /api/employee/documents — list this employee's onboarding docs + status
 export async function GET(req) {
@@ -17,11 +18,12 @@ export async function GET(req) {
     .eq('employee_id', emp.id)
     .order('doc_type');
 
-  return NextResponse.json({ documents: docs || [], drive_configured: isDriveConfigured() });
+  return NextResponse.json({ documents: docs || [] });
 }
 
-// POST /api/employee/documents — upload a signed/filled doc.
-// Multipart form: field `doc_type`, field `file` (the PDF/image).
+// POST /api/employee/documents — upload a document (SIN, license, TD1, etc.)
+// Multipart form: field `doc_type`, field `file` (the image/PDF).
+// Stored in Supabase Storage bucket `employee-documents`.
 export async function POST(req) {
   const emp = await getAuthedEmployee(req);
   if (!emp) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -39,31 +41,39 @@ export async function POST(req) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const filename = `${docType}-${new Date().toISOString().slice(0, 10)}-${file.name}`;
+  const ext = (file.name || '').split('.').pop() || 'jpg';
+  const storagePath = `${emp.id}/${docType}-${Date.now()}.${ext}`;
+  const mimeType = file.type || 'image/jpeg';
 
-  // Upload to Google Drive (per-employee private folder) if configured.
-  let driveFileId = null, driveFileUrl = null;
-  if (isDriveConfigured()) {
-    const full = await supabaseAdmin.from('employees').select('*').eq('id', emp.id).maybeSingle();
-    const result = await uploadDocToDrive({
-      employee: full.data,
-      filename,
-      mimeType: file.type || 'application/octet-stream',
-      buffer: bytes,
+  // Upload to Supabase Storage
+  const { error: uploadErr } = await supabaseAdmin.storage
+    .from(DOC_BUCKET)
+    .upload(storagePath, bytes, {
+      contentType: mimeType,
+      upsert: false,
     });
-    driveFileId = result.drive_file_id;
-    driveFileUrl = result.drive_file_url;
+
+  if (uploadErr) {
+    console.error('Document upload failed:', uploadErr);
+    return NextResponse.json({ error: 'Failed to upload document' }, { status: 500 });
   }
 
-  // Upsert the document record (status -> uploaded)
+  // Get public URL
+  const { data: urlData } = supabaseAdmin.storage
+    .from(DOC_BUCKET)
+    .getPublicUrl(storagePath);
+
+  const storageUrl = urlData.publicUrl;
+
+  // Upsert the document record
   const { data: doc, error } = await supabaseAdmin
     .from('employee_documents')
     .upsert({
       employee_id: emp.id,
       doc_type: docType,
       status: 'uploaded',
-      drive_file_id: driveFileId,
-      drive_file_url: driveFileUrl,
+      storage_url: storageUrl,
+      storage_path: storagePath,
       uploaded_at: new Date().toISOString(),
     }, { onConflict: 'employee_id,doc_type' })
     .select()

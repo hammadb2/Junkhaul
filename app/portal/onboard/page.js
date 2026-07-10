@@ -7,6 +7,8 @@ import {
   Camera, FileText, IdCard, Car, User, Calculator, PenTool, Landmark,
   AlertTriangle, ChevronRight, Sparkles,
 } from 'lucide-react';
+import DocumentScanner from '@/components/portal/DocumentScanner';
+import SelfieCapture from '@/components/portal/SelfieCapture';
 
 // ============================================================
 // /portal/onboard — multi-step crew onboarding flow (dark theme).
@@ -612,65 +614,44 @@ function OnboardInner() {
 
   // ============ STEP 2: Personal Info + Documents ============
   if (step === 2) {
-    const CaptureCard = ({ file, setFile, docType, label, icon: Icon, onUpload, uploadKey }) => {
-      const isUploading = uploading === uploadKey;
-      const isDone = file && (docType ? docStatus[docType] === 'uploaded' : selfieUrl);
-      return (
-        <div className="dark-card" style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 14, background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-            {isDone ? (
-              <>
-                {selfieUrl && uploadKey === 'selfie' ? (
-                  <img src={selfieUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <Icon size={24} color="#22C55E" />
-                )}
-                <div style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Check size={12} color="white" />
-                </div>
-              </>
-            ) : isUploading ? (
-              <div style={{ width: 24, height: 24, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <Icon size={24} color="rgba(0,0,0,.3)" />
-            )}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>{label}</div>
-            <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 2 }}>
-              {isDone ? 'Uploaded' : isUploading ? 'Uploading...' : 'Tap to capture'}
-            </div>
-          </div>
-          <label style={{ cursor: 'pointer', flexShrink: 0 }}>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) { setFile(f); if (onUpload) onUpload(f); else if (docType) handleUpload(docType, f, label); }
-              }}
-              disabled={isUploading}
-            />
-            <div className="glass-btn" style={{ minHeight: 40, padding: '8px 16px', borderRadius: 12, fontSize: 14, fontWeight: 600, color: isDone ? 'rgba(0,0,0,.6)' : '#f97316', display: 'flex', alignItems: 'center', gap: 6 }}>
-              {isDone ? 'Retake' : 'Capture'}
-            </div>
-          </label>
-        </div>
-      );
-    };
-
     return (
       <Shell>
         <StepShell onBack={() => setStep(1)}>
-          <Headline title="Your documents" subtitle="We need your photo ID and a selfie" />
+          <Headline title="Your documents" subtitle="Scan or upload your photo ID and selfie" />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-            <CaptureCard file={selfieFile} setFile={setSelfieFile} label="Crew selfie" icon={Camera} onUpload={handleSelfieUpload} uploadKey="selfie" />
-            <CaptureCard file={sinFile} setFile={setSinFile} docType="sin_document" label="SIN document" icon={FileText} uploadKey="sin_document" />
-            <CaptureCard file={licenseFront} setFile={setLicenseFront} docType="drivers_license" label="Driver's license — front" icon={IdCard} uploadKey="license_front" />
-            <CaptureCard file={licenseBack} setFile={setLicenseBack} docType="drivers_license" label="Driver's license — back" icon={Car} uploadKey="license_back" />
+            <SelfieCapture
+              uploaded={!!selfieUrl}
+              previewUrl={selfieUrl}
+              onCapture={async (file) => {
+                setSelfieFile(file);
+                await handleSelfieUpload(file);
+              }}
+            />
+            <DocumentScanner
+              label="SIN document"
+              uploaded={docStatus.sin_document === 'uploaded'}
+              onCapture={async (file) => {
+                setSinFile(file);
+                await handleUpload('sin_document', file, 'SIN document');
+              }}
+            />
+            <DocumentScanner
+              label="Driver's license — front"
+              uploaded={docStatus.drivers_license === 'uploaded'}
+              onCapture={async (file) => {
+                setLicenseFront(file);
+                await handleUpload('drivers_license', file, "Driver's license — front");
+              }}
+            />
+            <DocumentScanner
+              label="Driver's license — back"
+              uploaded={docStatus.drivers_license === 'uploaded'}
+              onCapture={async (file) => {
+                setLicenseBack(file);
+                await handleUpload('drivers_license', file, "Driver's license — back");
+              }}
+            />
           </div>
 
           <div className="dark-card" style={{ padding: 16, marginBottom: 16 }}>
