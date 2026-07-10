@@ -17,6 +17,13 @@ async function checkAuth() {
 // ------------------------------------------------------------
 // Send onboarding invite email via Resend.
 // ------------------------------------------------------------
+function getSiteUrl() {
+  const env = process.env.NEXT_PUBLIC_SITE_URL;
+  // Only use env var if it's a real https production URL — never localhost
+  if (env && env.startsWith('https://')) return env.replace(/\/$/, '');
+  return 'https://junkhaul.ca';
+}
+
 async function sendInviteEmail({ email, first_name, last_name, token }) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
@@ -24,7 +31,7 @@ async function sendInviteEmail({ email, first_name, last_name, token }) {
     return;
   }
 
-  const inviteUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://junkhaul.ca'}/portal/onboard?token=${token}`;
+  const inviteUrl = `${getSiteUrl()}/portal/onboard?token=${token}`;
   const subject = `You're invited to join Junk Haul Calgary`;
   const body = `Hi ${first_name},
 

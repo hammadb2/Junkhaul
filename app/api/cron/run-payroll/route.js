@@ -55,7 +55,8 @@ export async function GET(req) {
   }
 
   // Trigger the pay run via the internal API (same logic as the admin button)
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const siteUrl = (rawUrl && rawUrl.startsWith('https://')) ? rawUrl.replace(/\/$/, '') : 'https://junkhaul.ca';
   const res = await fetch(`${siteUrl}/api/admin/payroll/run`, {
     method: 'POST',
     headers: {
