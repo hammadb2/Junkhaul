@@ -29,7 +29,7 @@ export default function PayStubsPage() {
 
   return (
     <main className="min-h-dvh bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 safe-top">
         <button onClick={() => router.push('/portal/schedule')} className="text-gray-500 text-sm">‹ Today</button>
         <span className="font-bold text-gray-900">Pay Stubs</span>
         <button onClick={logout} className="text-gray-400 text-sm underline">Out</button>

@@ -97,12 +97,18 @@ function OnboardInner() {
 
   // ---- Step 0: validate invite ----
   const validateInvite = useCallback(async () => {
-    if (!token) {
+    // Try URL token first, then localStorage (for PWA resume after Add to Home Screen)
+    const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('jh-onboard-token') : null);
+    if (!effectiveToken) {
       setInviteError('No invite token found in the link. Please use the link from your invite email.');
       setLoading(false);
       return;
     }
-    const res = await fetch(`/api/employee/onboard/invite?token=${encodeURIComponent(token)}`);
+    // Save token so PWA can resume onboarding after Add to Home Screen
+    if (token && typeof localStorage !== 'undefined') {
+      localStorage.setItem('jh-onboard-token', token);
+    }
+    const res = await fetch(`/api/employee/onboard/invite?token=${encodeURIComponent(effectiveToken)}`);
     const data = await res.json();
     setLoading(false);
     if (!res.ok) {
@@ -116,7 +122,7 @@ function OnboardInner() {
       email: data.invite.email || '',
       address: '',
     });
-  }, [token]);
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     validateInvite();
@@ -321,6 +327,8 @@ function OnboardInner() {
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Onboarding incomplete'); setCompleteData(data); return; }
+    // Clear the onboarding token — onboarding is done
+    if (typeof localStorage !== 'undefined') localStorage.removeItem('jh-onboard-token');
     setCompleteData({ ok: true, completed_at: data.completed_at });
   };
 

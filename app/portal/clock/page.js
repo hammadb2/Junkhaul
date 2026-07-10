@@ -88,15 +88,20 @@ export default function ClockPage() {
   }
 
   const clockedIn = !!openShift;
-  const durationMin = clockedIn ? Math.floor((now - new Date(openShift.clock_in_at).getTime()) / 60000) : 0;
+  const shiftStart = openShift?.clock_in_at ? new Date(openShift.clock_in_at).getTime() : 0;
+  const durationMin = clockedIn ? Math.floor((now - shiftStart) / 60000) : 0;
   const hh = Math.floor(durationMin / 60);
   const mm = durationMin % 60;
-  const ss = Math.floor((now - new Date(openShift.clock_in_at).getTime()) / 1000) % 60;
+  const ss = clockedIn ? Math.floor((now - shiftStart) / 1000) % 60 : 0;
+
+  const periodHours = Number(period?.total_hours || 0);
+  const periodOT = Number(period?.overtime_hours || 0);
+  const periodGross = Number(period?.gross || 0);
 
   return (
     <main className="min-h-dvh bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between safe-top">
         <div>
           <div className="font-bold text-gray-900">{emp?.name || 'Crew'}</div>
           <div className="text-xs text-gray-400">{emp?.email}</div>
@@ -121,7 +126,7 @@ export default function ClockPage() {
           {actionLoading ? '…' : clockedIn ? 'CLOCK OUT' : 'CLOCK IN'}
         </button>
 
-        {clockedIn && (
+        {clockedIn && openShift && (
           <div className="mt-8 text-center">
             <div className="text-5xl font-mono font-bold text-gray-900 tabular-nums">
               {String(hh).padStart(2, '0')}:{String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}
@@ -138,19 +143,19 @@ export default function ClockPage() {
       </div>
 
       {/* Period summary */}
-      <div className="bg-white border-t border-gray-200 p-4">
+      <div className="bg-white border-t border-gray-200 p-4 safe-bottom">
         <div className="text-xs text-gray-400 mb-2">This pay period</div>
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
-            <div className="text-xl font-bold text-gray-900">{period?.total_hours?.toFixed(1) || '0'}</div>
+            <div className="text-xl font-bold text-gray-900">{periodHours.toFixed(1)}</div>
             <div className="text-xs text-gray-400">hours</div>
           </div>
           <div>
-            <div className="text-xl font-bold text-gray-900">{period?.overtime_hours?.toFixed(1) || '0'}</div>
+            <div className="text-xl font-bold text-gray-900">{periodOT.toFixed(1)}</div>
             <div className="text-xs text-gray-400">OT hours</div>
           </div>
           <div>
-            <div className="text-xl font-bold text-gray-900">${period?.gross?.toFixed(2) || '0.00'}</div>
+            <div className="text-xl font-bold text-gray-900">${periodGross.toFixed(2)}</div>
             <div className="text-xs text-gray-400">gross</div>
           </div>
         </div>

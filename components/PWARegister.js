@@ -25,7 +25,10 @@ export default function PWARegister() {
       window.navigator.standalone === true ||
       window.matchMedia('(display-mode: standalone)').matches;
 
-    if (isIOS && !isStandalone) {
+    // Don't show the prompt on the onboarding page — it has its own Step 0
+    const isOnboarding = window.location.pathname.includes('/portal/onboard');
+
+    if (isIOS && !isStandalone && !isOnboarding) {
       // Check if user previously dismissed
       const dismissed = localStorage.getItem('jh-ios-prompt-dismissed');
       if (!dismissed) {

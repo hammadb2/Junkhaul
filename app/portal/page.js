@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 // ============================================================
 // /portal — employee login + signup landing.
+// If there's a pending onboarding token in localStorage (from
+// Add to Home Screen), redirect to onboarding automatically.
 // ============================================================
 
 export default function PortalLogin() {
@@ -13,6 +15,14 @@ export default function PortalLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', sin: '', address: '' });
+
+  useEffect(() => {
+    // Check for pending onboarding token (PWA resume after Add to Home Screen)
+    const onboardToken = localStorage.getItem('jh-onboard-token');
+    if (onboardToken) {
+      router.push(`/portal/onboard?token=${onboardToken}`);
+    }
+  }, [router]);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -33,7 +43,7 @@ export default function PortalLogin() {
   };
 
   return (
-    <main className="min-h-dvh bg-gray-50 flex flex-col items-center justify-center px-4">
+    <main className="min-h-dvh bg-gray-50 flex flex-col items-center justify-center px-4 safe-top">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="text-2xl font-bold text-gray-900">Junk Haul Crew</div>

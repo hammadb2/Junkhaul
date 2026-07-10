@@ -54,8 +54,8 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 // --- Basic cache for offline shell --------------------------
-const CACHE = 'junkhaul-portal-v1';
-const ASSETS = ['/portal', '/portal/schedule', '/portal/clock', '/manifest.json', '/favicon.png'];
+const CACHE = 'junkhaul-portal-v2';
+const ASSETS = ['/portal', '/portal/schedule', '/portal/clock', '/portal/onboard', '/manifest.json', '/favicon-32.png', '/crew-logo.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
