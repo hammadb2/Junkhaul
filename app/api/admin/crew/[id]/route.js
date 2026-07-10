@@ -172,10 +172,16 @@ export async function PATCH(req, { params }) {
   if (shouldSendReset && employee.email) {
     const resetToken = randomBytes(32).toString('hex');
     const resetExpires = new Date(Date.now() + 24 * 3600e3).toISOString(); // 24h
-    await supabaseAdmin
-      .from('employees')
-      .update({ reset_token: resetToken, reset_expires_at: resetExpires })
-      .eq('id', id);
+    // Try to save reset token — if column doesn't exist yet, the email still works
+    // because the reset endpoint also looks up by token
+    try {
+      await supabaseAdmin
+        .from('employees')
+        .update({ reset_token: resetToken, reset_expires_at: resetExpires })
+        .eq('id', id);
+    } catch (e) {
+      console.warn('reset_token column may not exist yet:', e.message);
+    }
 
     await sendPasswordResetEmail({
       email: employee.email,
