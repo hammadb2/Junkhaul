@@ -65,6 +65,7 @@ function OnboardInner() {
   const [licenseBack, setLicenseBack] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
   const [selfieUrl, setSelfieUrl] = useState(null);
+  const [licenseData, setLicenseData] = useState(null);
   const [uploading, setUploading] = useState('');
   const [docStatus, setDocStatus] = useState({
     sin_document: 'pending',
@@ -358,7 +359,11 @@ function OnboardInner() {
   // ---- Complete ----
   const completeOnboarding = async () => {
     setSaving(true); setError('');
-    const res = await fetch('/api/employee/onboard/complete', { method: 'POST' });
+    const res = await fetch('/api/employee/onboard/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ license_data: licenseData }),
+    });
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Onboarding incomplete'); setCompleteData(data); return; }
@@ -634,6 +639,7 @@ function OnboardInner() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
             <DocumentScanner
               label="SIN document"
+              docType="sin_document"
               uploaded={docStatus.sin_document === 'uploaded'}
               uploading={uploading === 'sin_document'}
               onCapture={async (file) => {
@@ -643,6 +649,7 @@ function OnboardInner() {
             />
             <DocumentScanner
               label="Driver's license — front"
+              docType="drivers_license_front"
               uploaded={docStatus.drivers_license_front === 'uploaded'}
               uploading={uploading === 'drivers_license_front'}
               onCapture={async (file) => {
@@ -652,11 +659,18 @@ function OnboardInner() {
             />
             <DocumentScanner
               label="Driver's license — back"
+              docType="drivers_license_back"
               uploaded={docStatus.drivers_license_back === 'uploaded'}
               uploading={uploading === 'drivers_license_back'}
               onCapture={async (file) => {
                 setLicenseBack(file);
                 await handleUpload('drivers_license_back', file, "Driver's license — back");
+              }}
+              onBarcodeData={(data) => {
+                // Store extracted license data for onboarding completion
+                if (data && Object.keys(data).length > 0) {
+                  setLicenseData(data);
+                }
               }}
             />
             <SelfieCapture

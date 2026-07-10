@@ -52,10 +52,24 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Onboarding incomplete', missing, docStatus }, { status: 400 });
   }
 
+  // Parse and merge license data from request body
+  let body = {};
+  try { body = await req.json(); } catch { /* no body */ }
+  const licenseUpdate = {};
+  if (body.license_data && Object.keys(body.license_data).length > 0) {
+    const { data: currentEmp } = await supabaseAdmin
+      .from('employees').select('license_data').eq('id', emp.id).maybeSingle();
+    licenseUpdate.license_data = {
+      ...(currentEmp?.license_data || {}),
+      ...body.license_data,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
   const now = new Date().toISOString();
   const { error } = await supabaseAdmin
     .from('employees')
-    .update({ onboarding_completed_at: now, status: 'pending_verification', updated_at: now })
+    .update({ onboarding_completed_at: now, status: 'pending_verification', updated_at: now, ...licenseUpdate })
     .eq('id', emp.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
