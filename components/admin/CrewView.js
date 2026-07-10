@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { formatDateLong } from '@/lib/dates';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { X, Check, Circle, UserPlus, Radio, Truck, Warehouse, Heart, ChevronRight, Mail, Phone, Clock, FileText, AlertTriangle } from 'lucide-react';
 
 // ── Dark theme tokens (Tailwind classes) ──
@@ -704,7 +705,7 @@ function StorageSection({ facilities, onSaved, flash }) {
       {open && (
         <form onSubmit={submit} className="p-4 border-b border-white/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name" required><input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
-          <Field label="Address" required><input value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} required className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
+          <Field label="Address" required><AddressAutocomplete value={form.address} onChange={(v) => setForm((p) => ({ ...p, address: v }))} onSelect={(f) => setForm((p) => ({ ...p, address: f.place_name }))} placeholder="Storage facility address" dark /></Field>
           <Field label="Access code"><input value={form.access_code} onChange={(e) => setForm((p) => ({ ...p, access_code: e.target.value }))} className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
           <Field label="Capacity (sqft)"><input type="number" value={form.capacity_sqft} onChange={(e) => setForm((p) => ({ ...p, capacity_sqft: e.target.value }))} className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
           <div className="sm:col-span-2 flex justify-end">
@@ -769,7 +770,7 @@ function DonationSection({ centers, onSaved, flash }) {
       {open && (
         <form onSubmit={submit} className="p-4 border-b border-white/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name" required><input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
-          <Field label="Address" required><input value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} required className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
+          <Field label="Address" required><AddressAutocomplete value={form.address} onChange={(v) => setForm((p) => ({ ...p, address: v }))} onSelect={(f) => setForm((p) => ({ ...p, address: f.place_name }))} placeholder="Donation center address" dark /></Field>
           <Field label="Phone"><input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
           <Field label="Hours"><input value={form.hours} onChange={(e) => setForm((p) => ({ ...p, hours: e.target.value }))} placeholder="Mon-Sun 9-9" className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
           <Field label="Accepted items"><input value={form.accepted_items} onChange={(e) => setForm((p) => ({ ...p, accepted_items: e.target.value }))} placeholder="Furniture, clothing, etc." className={'w-full px-3 py-2 text-sm sm:col-span-2 ' + INPUT} /></Field>

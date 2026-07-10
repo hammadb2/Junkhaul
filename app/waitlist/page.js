@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import { BookButton } from '@/components/motion';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 
 export default function WaitlistPage() {
   const [form, setForm] = useState({
@@ -17,7 +18,7 @@ export default function WaitlistPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: typeof e === 'string' ? e : e.target.value }));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -75,11 +76,11 @@ export default function WaitlistPage() {
             type="tel"
             className="border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
           />
-          <input
+          <AddressAutocomplete
             value={form.address}
             onChange={set('address')}
+            onSelect={(f) => setForm((p) => ({ ...p, address: f.place_name }))}
             placeholder="Pickup address (optional)"
-            className="border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
           />
 
           <label className="text-sm font-medium text-gray-700">Preferred day</label>

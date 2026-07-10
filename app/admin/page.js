@@ -14,6 +14,7 @@ import GrowthPanel from '@/components/admin/GrowthPanel';
 import CommandCenter from '@/components/admin/CommandCenter';
 import BookingTimeline from '@/components/admin/BookingTimeline';
 import CrewView from '@/components/admin/CrewView';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { formatTime, formatDateLong } from '@/lib/dates';
 
 const RouteMap = dynamic(() => import('@/components/admin/RouteMap'), { ssr: false });
@@ -682,7 +683,7 @@ function WaitlistView() {
 function ManualBookingButton({ onCreated }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    name: '', phone: '', email: '', address: '', unit: '',
+    name: '', phone: '', email: '', address: '', address_data: null, unit: '',
     load_size: 'quarter',
     job_date: '', job_time: '09:00',
     same_day: false, stairs: 0, has_freon: false, freon_count: 0,
@@ -722,7 +723,7 @@ function ManualBookingButton({ onCreated }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
       setOpen(false);
-      setForm({ name: '', phone: '', email: '', address: '', unit: '', load_size: 'quarter', job_date: '', job_time: '09:00', same_day: false, stairs: 0, has_freon: false, freon_count: 0, notes: '' });
+      setForm({ name: '', phone: '', email: '', address: '', address_data: null, unit: '', load_size: 'quarter', job_date: '', job_time: '09:00', same_day: false, stairs: 0, has_freon: false, freon_count: 0, notes: '' });
       onCreated();
     } catch (err) {
       setError(err.message);
@@ -758,7 +759,29 @@ function ManualBookingButton({ onCreated }) {
         <input value={form.name} onChange={set('name')} placeholder="Customer name" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
         <input value={form.phone} onChange={set('phone')} placeholder="Phone (+1...)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
         <input value={form.email} onChange={set('email')} placeholder="Email (optional)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-        <input value={form.address} onChange={set('address')} placeholder="Pickup address" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        <AddressAutocomplete
+          value={form.address}
+          onChange={(v) => setForm((f) => ({ ...f, address: v, address_data: null }))}
+          onSelect={(feature) => {
+            const ctx = (feature.context || []).reduce((acc, c) => { acc[c.id.split('.')[0]] = c.text; return acc; }, {});
+            setForm((f) => ({
+              ...f,
+              address: feature.place_name,
+              address_data: {
+                full_address: feature.place_name,
+                street: feature.text,
+                postal_code: ctx.postcode || '',
+                city: ctx.place || 'Calgary',
+                province: ctx.region || 'Alberta',
+                country: ctx.country || 'Canada',
+                lat: feature.center?.[1] || null,
+                lng: feature.center?.[0] || null,
+                place_id: feature.id,
+              },
+            }));
+          }}
+          placeholder="Pickup address"
+        />
         <input value={form.unit} onChange={set('unit')} placeholder="Unit / apt (optional)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
       </div>
 

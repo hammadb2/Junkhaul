@@ -138,7 +138,7 @@ function OnboardInner() {
     if (!query || query.length < 3 || !MAPBOX_TOKEN) { setAddressSuggestions([]); return; }
     try {
       const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=ca&limit=5&types=address`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=ca&limit=5&types=address&autocomplete=true&proximity=-114.0719,51.0447&bbox=-114.3,50.9,-113.9,51.2`
       );
       const data = await res.json();
       setAddressSuggestions((data.features || []).map((f) => f.place_name));
