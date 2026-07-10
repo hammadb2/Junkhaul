@@ -4,15 +4,49 @@
 
 :root {
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Dark theme tokens (default) */
+  --bg-base: #0A0A0B;
+  --bg-card: #161618;
+  --bg-elevated: #1E1E22;
+  --bg-input: #1A1A1E;
+  --accent: #f97316;
+  --accent-dark: #ea580c;
+  --text-primary: rgba(255,255,255,0.90);
+  --text-secondary: rgba(255,255,255,0.60);
+  --text-disabled: rgba(255,255,255,0.40);
+  --status-green: #22C55E;
+  --status-amber: #F59E0B;
+  --status-gray: #6B7280;
+  --status-red: #EF4444;
+  --border-subtle: rgba(255,255,255,0.08);
+  --border-card: rgba(255,255,255,0.06);
+}
+
+/* Auto-switch to light theme for customer-facing pages when system prefers light.
+   The crew portal forces dark via inline styles, so this only affects the
+   landing page, booking flow, and other customer pages that use CSS variables. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg-base: #FAFAFA;
+    --bg-card: #FFFFFF;
+    --bg-elevated: #F5F5F7;
+    --bg-input: #F0F0F2;
+    --text-primary: rgba(0,0,0,0.90);
+    --text-secondary: rgba(0,0,0,0.60);
+    --text-disabled: rgba(0,0,0,0.40);
+    --border-subtle: rgba(0,0,0,0.08);
+    --border-card: rgba(0,0,0,0.06);
+  }
 }
 
 html,
 body {
   padding: 0;
   margin: 0;
-  background: #ffffff;
-  color: #111827;
+  background: var(--bg-base);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+  font-family: var(--font-sans);
 }
 
 * {
@@ -68,4 +102,184 @@ button {
 /* Border-3 utility (used in spinner) */
 .border-3 {
   border-width: 3px;
+}
+
+/* ============================================================
+   DARK THEME COMPONENTS
+   ============================================================ */
+
+/* Glassmorphism floating bar */
+.glass-bar {
+  background: rgba(10, 10, 11, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Glass button (circular, translucent) */
+.glass-btn {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.glass-btn:active {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(0.95);
+}
+
+/* Dark card */
+.dark-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+}
+
+/* Dark input field */
+.dark-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: 12px;
+  transition: border-color 0.2s;
+}
+.dark-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.dark-input::placeholder {
+  color: var(--text-disabled);
+}
+
+/* Primary orange button */
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  border-radius: 14px;
+  transition: all 0.15s;
+}
+.btn-primary:active {
+  background: var(--accent-dark);
+  transform: scale(0.98);
+}
+.btn-primary:disabled {
+  background: rgba(249, 115, 22, 0.3);
+}
+
+/* Ghost button (secondary) */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  transition: all 0.15s;
+}
+.btn-ghost:active {
+  background: rgba(255, 255, 255, 0.06);
+  transform: scale(0.98);
+}
+
+/* Status dot */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Pulsing animation (for crew location dot) */
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.pulse-ring::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+/* Bounce animation (for active job pin) */
+@keyframes gentle-bounce {
+  0%, 100% { transform: translateY(0) rotate(-45deg); }
+  50% { transform: translateY(-6px) rotate(-45deg); }
+}
+.bounce-pin {
+  animation: gentle-bounce 2s ease-in-out infinite;
+}
+
+/* Slide up animation (for bottom sheets, confirmation cards) */
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Slide in from right (for sequential flow transitions) */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.slide-in-right {
+  animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Fade in (for confirmation overlays) */
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Confetti / celebratory checkmark */
+@keyframes celebrate {
+  0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+  60% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.celebrate {
+  animation: celebrate 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tabular numerals for live-updating numbers */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Draggle bottom sheet handle */
+.sheet-handle {
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 8px auto;
+}
+
+/* Mapbox dark style overrides */
+.mapboxgl-canvas {
+  background: #0A0A0B !important;
+}
+.mapboxgl-ctrl-attrib {
+  display: none !important;
+}
+
+/* Progress line (thin orange bar at top) */
+.progress-line {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-line-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }

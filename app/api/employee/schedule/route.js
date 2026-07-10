@@ -11,6 +11,60 @@ export async function GET(req) {
 
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date') || new Date().toISOString().slice(0, 10);
+  const weekly = searchParams.get('weekly') === 'true';
+
+  // Weekly view: return assignments + bookings for the current week (Mon-Sun)
+  if (weekly) {
+    const now = new Date(date + 'T00:00:00');
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const dateStr = (d) => d.toISOString().slice(0, 10);
+    const startDate = dateStr(monday);
+    const endDate = dateStr(sunday);
+
+    const { data: assignments } = await supabaseAdmin
+      .from('crew_assignments')
+      .select(`
+        id, assignment_date, uhaul_location,
+        driver:driver_employee_id (id, name, first_name, last_name),
+        secondary:secondary_employee_id (id, name, first_name, last_name)
+      `)
+      .gte('assignment_date', startDate)
+      .lte('assignment_date', endDate)
+      .or(`driver_employee_id.eq.${emp.id},secondary_employee_id.eq.${emp.id}`)
+      .order('assignment_date', { ascending: true });
+
+    const { data: weekBookings } = await supabaseAdmin
+      .from('bookings')
+      .select('id, name, address, job_date, time_slot, total_price, status, load_size')
+      .gte('job_date', startDate)
+      .lte('job_date', endDate)
+      .in('status', ['confirmed', 'scheduled', 'in_progress', 'completed'])
+      .order('job_date', { ascending: true })
+      .order('time_slot', { ascending: true });
+
+    // Group by date
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const ds = dateStr(d);
+      days.push({
+        date: ds,
+        dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        dayNum: d.getDate(),
+        isToday: ds === new Date().toISOString().slice(0, 10),
+        assignment: (assignments || []).find((a) => a.assignment_date === ds) || null,
+        bookings: (weekBookings || []).filter((b) => b.job_date === ds),
+      });
+    }
+
+    return NextResponse.json({ week: days, startDate, endDate });
+  }
 
   // Find today's crew assignment where this employee is driver or secondary
   const { data: assignment } = await supabaseAdmin

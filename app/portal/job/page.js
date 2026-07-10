@@ -2,27 +2,28 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Navigation, CreditCard, Banknote, Trash2, Warehouse, Camera, Check, CheckCircle, Eraser, Truck, ChevronRight, Send, MapPin, Flag } from 'lucide-react';
 
 // ============================================================
-// /portal/job — full job workflow stepper for the crew.
-// En Route → Arrived → Payment → Load → Route → Drop → Signature → EOD
+// /portal/job — full job workflow stepper (dark theme).
+// En Route -> Arrived -> Payment -> Load -> Route -> Drop -> Signature -> EOD
 // ============================================================
 
 const STEPS = [
   { key: 'enroute', label: 'En Route' },
-  { key: 'arrived', label: 'Arrived / Load Verify' },
-  { key: 'payment', label: 'Collect Payment' },
+  { key: 'arrived', label: 'Arrived' },
+  { key: 'payment', label: 'Payment' },
   { key: 'loaded', label: 'Load Truck' },
-  { key: 'route', label: 'Route Decision' },
-  { key: 'drop', label: 'Drop Required Flow' },
-  { key: 'signature', label: 'Customer Signature' },
+  { key: 'route', label: 'Route' },
+  { key: 'drop', label: 'Drop Flow' },
+  { key: 'signature', label: 'Signature' },
 ];
 
 const FUEL_LEVELS = ['Empty', '1/4', '1/2', '3/4', 'Full'];
 
 export default function JobFlowPage() {
   return (
-    <Suspense fallback={<div className="min-h-dvh flex items-center justify-center bg-gray-50 text-gray-400">Loading…</div>}>
+    <Suspense fallback={<div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0B', color: 'rgba(255,255,255,0.4)' }}>Loading...</div>}>
       <JobFlowInner />
     </Suspense>
   );
@@ -32,15 +33,15 @@ function JobFlowInner() {
   const router = useRouter();
   const params = useSearchParams();
   const bookingId = params.get('booking_id');
-  const checkParam = params.get('check'); // 'pickup' | 'return'
+  const checkParam = params.get('check');
 
   const [loading, setLoading] = useState(true);
   const [emp, setEmp] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [confirmMsg, setConfirmMsg] = useState('');
 
-  // Per-step state
   const [stepIdx, setStepIdx] = useState(0);
   const [gps, setGps] = useState(null);
   const [landfill, setLandfill] = useState(null);
@@ -52,10 +53,19 @@ function JobFlowInner() {
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [amountConfirmed, setAmountConfirmed] = useState('');
   const [loadConfirmed, setLoadConfirmed] = useState(false);
+  const [checkedItems, setCheckedItems] = useState({});
   const [custName, setCustName] = useState('');
   const [sigDataUrl, setSigDataUrl] = useState(null);
+  const [jobComplete, setJobComplete] = useState(false);
 
-  // EOD truck return
+  // Issue flag
+  const [showIssueForm, setShowIssueForm] = useState(false);
+  const [issueType, setIssueType] = useState('access');
+  const [issueSeverity, setIssueSeverity] = useState('medium');
+  const [issueDesc, setIssueDesc] = useState('');
+  const [issueSubmitting, setIssueSubmitting] = useState(false);
+
+  // EOD
   const [dashPhoto, setDashPhoto] = useState(null);
   const [odometer, setOdometer] = useState('');
   const [fuelLevel, setFuelLevel] = useState('');
@@ -67,16 +77,12 @@ function JobFlowInner() {
   const sigCanvasRef = useRef(null);
   const drawingRef = useRef(false);
 
-  // ---------- Load ----------
   const loadMe = useCallback(async () => {
     const res = await fetch('/api/employee/me');
     if (res.status === 401) { router.push('/portal'); return null; }
     const d = await res.json();
     setEmp(d.employee);
-    if (d.employee && !d.employee.onboarded) {
-      router.push('/portal/onboard');
-      return null;
-    }
+    if (d.employee && !d.employee.onboarded) { router.push('/portal/onboard'); return null; }
     return d.employee;
   }, [router]);
 
@@ -90,7 +96,6 @@ function JobFlowInner() {
 
   useEffect(() => { loadMe(); loadSchedule(); }, [loadMe, loadSchedule]);
 
-  // If check param present, jump to EOD section
   useEffect(() => {
     if (checkParam === 'return') setStepIdx(STEPS.length);
   }, [checkParam]);
@@ -105,7 +110,6 @@ function JobFlowInner() {
       );
     }), []);
 
-  // Load landfill + storage when route step reached
   useEffect(() => {
     if (stepIdx < 4) return;
     (async () => {
@@ -119,7 +123,6 @@ function JobFlowInner() {
     })();
   }, [stepIdx, gps, getGPS]);
 
-  // ---------- Helpers ----------
   const fileToDataUrl = (file) =>
     new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -137,9 +140,7 @@ function JobFlowInner() {
         ? (() => { try { return JSON.parse(booking.itemized_items); } catch { return []; } })()
         : [])) : [];
 
-  // ---------- Signature pad ----------
-  const sigCanvas = sigCanvasRef.current;
-
+  // Signature pad
   const getSigCtx = () => sigCanvasRef.current?.getContext('2d');
 
   const startDraw = (e) => {
@@ -170,18 +171,20 @@ function JobFlowInner() {
 
   const clearSig = () => {
     const ctx = getSigCtx();
-    if (ctx && sigCanvasRef.current) {
-      ctx.clearRect(0, 0, sigCanvasRef.current.width, sigCanvasRef.current.height);
-    }
+    if (ctx && sigCanvasRef.current) ctx.clearRect(0, 0, sigCanvasRef.current.width, sigCanvasRef.current.height);
     setSigDataUrl(null);
   };
 
-  // ---------- Step actions ----------
+  const showConfirm = (msg) => {
+    setConfirmMsg(msg);
+    setTimeout(() => setConfirmMsg(''), 2000);
+  };
+
+  // Step actions
   const markEnRoute = async () => {
     setBusy(true); setError('');
     const g = await getGPS();
     setGps(g);
-    // No dedicated status endpoint; use job-clock to mark in_progress
     const res = await fetch('/api/employee/job-clock', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -191,7 +194,8 @@ function JobFlowInner() {
     setBusy(false);
     if (!res.ok && res.status !== 409) { setError(d.error || 'Failed'); return; }
     if (navigator.vibrate) navigator.vibrate(50);
-    setStepIdx(1);
+    showConfirm('Customer notified');
+    setTimeout(() => setStepIdx(1), 1200);
   };
 
   const markArrived = async () => {
@@ -199,15 +203,16 @@ function JobFlowInner() {
     const g = await getGPS();
     setGps(g);
     setBusy(false);
-    setStepIdx(2);
+    showConfirm('Customer notified');
+    setTimeout(() => setStepIdx(2), 1200);
   };
 
   const collectPayment = async () => {
     if (!amountConfirmed) { setError('Enter confirmed amount'); return; }
-    setStepIdx(3); // advance to Load Truck
+    setStepIdx(3);
   };
 
-  const markLoaded = () => setStepIdx(4); // Route Decision
+  const markLoaded = () => setStepIdx(4);
 
   const recordDrop = async () => {
     if (!selectedFacility) { setError('Select a storage facility'); return; }
@@ -228,7 +233,7 @@ function JobFlowInner() {
     setBusy(false);
     if (!res.ok) { setError(d.error || 'Drop failed'); return; }
     if (navigator.vibrate) navigator.vibrate(50);
-    setStepIdx(6); // signature
+    setStepIdx(6);
   };
 
   const skipDrop = () => setStepIdx(6);
@@ -236,11 +241,8 @@ function JobFlowInner() {
   const completeJob = async () => {
     if (!custName) { setError('Customer must type their name'); return; }
     if (!amountConfirmed) { setError('Enter confirmed amount'); return; }
-    // Capture signature canvas
     let sigUrl = sigDataUrl;
-    if (!sigUrl && sigCanvasRef.current) {
-      sigUrl = sigCanvasRef.current.toDataURL('image/png');
-    }
+    if (!sigUrl && sigCanvasRef.current) sigUrl = sigCanvasRef.current.toDataURL('image/png');
     setBusy(true); setError('');
     const res = await fetch('/api/employee/signature', {
       method: 'POST',
@@ -257,7 +259,8 @@ function JobFlowInner() {
     setBusy(false);
     if (!res.ok) { setError(d.error || 'Signature failed'); return; }
     if (navigator.vibrate) navigator.vibrate([50, 40, 50]);
-    setStepIdx(STEPS.length); // EOD
+    setJobComplete(true);
+    setTimeout(() => { setStepIdx(STEPS.length); setJobComplete(false); }, 2000);
   };
 
   const submitReturnCheck = async () => {
@@ -280,18 +283,11 @@ function JobFlowInner() {
     setBusy(false);
     if (!res.ok) { setError(d.error || 'Return check failed'); return; }
     if (navigator.vibrate) navigator.vibrate(50);
-    setError('');
-    // Upload dump receipt if provided
     if (dumpReceipt && dumpAmount) {
       await fetch('/api/employee/receipts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assignment_id: assignment.id,
-          receipt_type: 'dump',
-          amount_cad: Number(dumpAmount),
-          receipt_photo_url: dumpReceipt,
-        }),
+        body: JSON.stringify({ assignment_id: assignment.id, receipt_type: 'dump', amount_cad: Number(dumpAmount), receipt_photo_url: dumpReceipt }),
       });
     }
     router.push('/portal/schedule');
@@ -302,474 +298,512 @@ function JobFlowInner() {
     router.push('/portal');
   };
 
+  // ---------- Render ----------
   if (loading) {
-    return <div className="min-h-dvh flex items-center justify-center bg-gray-50 text-gray-400">Loading…</div>;
+    return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0B', color: 'rgba(255,255,255,0.4)' }}>Loading...</div>;
   }
 
   if (!booking) {
     return (
-      <main className="min-h-dvh bg-gray-50">
-        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0">
-          <button onClick={() => router.push('/portal/schedule')} className="text-gray-500 text-sm">‹ Schedule</button>
-          <span className="font-bold text-gray-900">Job Flow</span>
-          <button onClick={logout} className="text-gray-400 text-sm underline">Out</button>
-        </header>
-        <div className="max-w-md mx-auto p-4">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center text-gray-400 text-sm">
-            Job not found. <button onClick={() => router.push('/portal/schedule')} className="text-orange-600 underline">Back to schedule</button>
+      <main style={{ minHeight: '100dvh', background: '#0A0A0B' }} className="safe-top">
+        <div style={{ maxWidth: 448, margin: '0 auto', padding: 24 }}>
+          <div className="dark-card" style={{ padding: 24, textAlign: 'center' }}>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginBottom: 16 }}>Job not found.</div>
+            <button onClick={() => router.push('/portal/schedule')} className="btn-primary" style={{ minHeight: 48, width: '100%' }}>Back to schedule</button>
           </div>
         </div>
       </main>
     );
   }
 
-  const mapsUrl = booking.address
-    ? `https://maps.google.com/?q=${encodeURIComponent(booking.address)}`
-    : null;
   const eod = stepIdx >= STEPS.length;
+  const mapsUrl = booking.address ? `https://maps.google.com/?q=${encodeURIComponent(booking.address)}` : null;
 
-  return (
-    <main className="min-h-dvh bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <button onClick={() => router.push('/portal/schedule')} className="text-gray-500 text-sm">‹ Schedule</button>
-        <span className="font-bold text-gray-900 truncate max-w-[50%]">{booking.name}</span>
-        <button onClick={logout} className="text-gray-400 text-sm underline">Out</button>
-      </header>
-
-      <div className="max-w-md mx-auto p-4 space-y-4">
-        {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl p-3">{error}</div>}
-
-        {/* Customer summary */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="font-bold text-gray-900">{booking.name}</div>
-          <div className="mt-1 text-sm space-y-1">
-            {booking.phone && <a href={`tel:${booking.phone}`} className="block text-orange-600 font-medium">{booking.phone}</a>}
-            {booking.address && (
-              <a href={mapsUrl} target="_blank" rel="noreferrer" className="block text-gray-700 underline">{booking.address}</a>
-            )}
+  // Issue flag overlay (rendered inside PageShell)
+  const IssueFlagOverlay = () => {
+    if (!showIssueForm) return null;
+    const ISSUE_TYPES = [
+      { value: 'access', label: 'Access', icon: '🚧' },
+      { value: 'damage', label: 'Damage', icon: '🏠' },
+      { value: 'safety', label: 'Safety', icon: '🦺' },
+      { value: 'customer', label: 'Customer', icon: '👤' },
+      { value: 'vehicle', label: 'Vehicle', icon: '🚛' },
+      { value: 'other', label: 'Other', icon: '📋' },
+    ];
+    const SEVS = [
+      { value: 'low', label: 'Low', color: '#22C55E' },
+      { value: 'medium', label: 'Medium', color: '#F59E0B' },
+      { value: 'high', label: 'High', color: '#EF4444' },
+    ];
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setShowIssueForm(false)}>
+        <div className="dark-card slide-up" style={{ width: '100%', maxWidth: 448, borderRadius: '20px 20px 0 0', padding: 24, maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Flag size={20} color="#f97316" /> Flag an Issue
+            </div>
+            <button onClick={() => setShowIssueForm(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer' }}>✕</button>
           </div>
-          <div className="mt-2 text-sm text-gray-500">
-            {booking.time_slot} · ${Number(booking.total_price || 0).toFixed(2)}
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>Report a problem with this job. Your supervisor will be notified immediately.</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>Type</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+            {ISSUE_TYPES.map((t) => (
+              <button key={t.value} onClick={() => setIssueType(t.value)} className="dark-card" style={{ padding: 10, textAlign: 'center', cursor: 'pointer', border: issueType === t.value ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.06)', background: issueType === t.value ? 'rgba(249,115,22,0.08)' : '#161618' }}>
+                <div style={{ fontSize: 20 }}>{t.icon}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: issueType === t.value ? '#f97316' : 'rgba(255,255,255,0.7)', marginTop: 4 }}>{t.label}</div>
+              </button>
+            ))}
           </div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>Severity</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {SEVS.map((s) => (
+              <button key={s.value} onClick={() => setIssueSeverity(s.value)} className="dark-card" style={{ flex: 1, padding: '10px 8px', textAlign: 'center', cursor: 'pointer', border: issueSeverity === s.value ? `2px solid ${s.color}` : '1px solid rgba(255,255,255,0.06)', background: issueSeverity === s.value ? `${s.color}15` : '#161618' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: issueSeverity === s.value ? s.color : 'rgba(255,255,255,0.7)' }}>{s.label}</div>
+              </button>
+            ))}
+          </div>
+          <textarea value={issueDesc} onChange={(e) => setIssueDesc(e.target.value)} placeholder="Describe the issue..." rows={3} className="dark-input" style={{ width: '100%', padding: '12px 16px', fontSize: 14, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, resize: 'none', marginBottom: 16 }} />
+          <button
+            onClick={async () => {
+              setIssueSubmitting(true);
+              try {
+                await fetch('/api/employee/issues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking_id: bookingId, issue_type: issueType, severity: issueSeverity, description: issueDesc }) });
+                if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+                setShowIssueForm(false); setIssueDesc('');
+                showConfirm('Issue reported to supervisor');
+              } catch {}
+              setIssueSubmitting(false);
+            }}
+            disabled={issueSubmitting}
+            className="btn-primary"
+            style={{ width: '100%', minHeight: 48 }}
+          >
+            {issueSubmitting ? 'Submitting...' : 'Report Issue'}
+          </button>
         </div>
-
-        {/* Stepper */}
-        {!eod && !checkParam && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <ol className="space-y-0">
-              {STEPS.map((s, i) => {
-                const done = i < stepIdx;
-                const current = i === stepIdx;
-                return (
-                  <li key={s.key} className="flex items-center gap-3 py-2">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                      done ? 'bg-green-500 text-white' : current ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'
-                    }`}>
-                      {done ? '✓' : i + 1}
-                    </div>
-                    <span className={`text-sm ${done ? 'text-gray-400 line-through' : current ? 'text-gray-900 font-semibold' : 'text-gray-400'}`}>
-                      {s.label}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        )}
-
-        {/* Step 1: En Route */}
-        {!eod && stepIdx === 0 && !checkParam && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="font-semibold text-gray-900 mb-2">Step 1 · En Route</div>
-            <p className="text-sm text-gray-500 mb-4">Mark when you&apos;re heading to the customer. We&apos;ll grab your GPS.</p>
-            <button
-              onClick={markEnRoute}
-              disabled={busy}
-              className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
-            >
-              {busy ? '…' : 'Mark En Route'}
-            </button>
-          </div>
-        )}
-
-        {/* Step 2: Arrived / Load Verification */}
-        {!eod && stepIdx === 1 && !checkParam && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="font-semibold text-gray-900 mb-2">Step 2 · Arrived / Load Verification</div>
-            <button
-              onClick={markArrived}
-              disabled={busy}
-              className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl mb-4 disabled:opacity-50"
-            >
-              {busy ? '…' : 'Mark Arrived'}
-            </button>
-            {items.length > 0 && (
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Quoted items — verify the load matches</div>
-                <ul className="text-sm text-gray-700 list-disc list-inside space-y-0.5 mb-4">
-                  {items.map((it, i) => (
-                    <li key={i}>
-                      {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}× ${it.name || it.item || it.description || ''}`}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  onClick={() => setStepIdx(2)}
-                  className="w-full bg-green-500 text-white font-semibold py-3 rounded-xl"
-                >
-                  Confirm Load Matches
-                </button>
-              </div>
-            )}
-            {items.length === 0 && (
-              <button
-                onClick={() => setStepIdx(2)}
-                className="w-full bg-green-500 text-white font-semibold py-3 rounded-xl"
-              >
-                Confirm Load
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Step 3: Collect Payment */}
-        {!eod && stepIdx === 2 && !checkParam && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="font-semibold text-gray-900 mb-2">Step 3 · Collect Payment</div>
-            <div className="text-sm text-gray-500 mb-3">Collect payment before loading.</div>
-            <div className="text-2xl font-bold text-gray-900 mb-4">${Number(booking.total_price || 0).toFixed(2)}</div>
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Payment method</div>
-                <div className="flex gap-2">
-                  {['cash', 'card'].map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setPaymentMethod(m)}
-                      className={`flex-1 py-2.5 rounded-lg text-sm font-medium capitalize ${
-                        paymentMethod === m ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Amount confirmed ($)</div>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={amountConfirmed}
-                  onChange={(e) => setAmountConfirmed(e.target.value)}
-                  placeholder={Number(booking.total_price || 0).toFixed(2)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm"
-                />
-              </div>
-              <button
-                onClick={collectPayment}
-                className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl"
-              >
-                Confirm Payment
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Load Truck */}
-        {!eod && stepIdx === 3 && !checkParam && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="font-semibold text-gray-900 mb-2">Step 4 · Load Truck</div>
-            <p className="text-sm text-gray-500 mb-4">Confirm all items are loaded into the truck.</p>
-            <button
-              onClick={markLoaded}
-              className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl"
-            >
-              Mark Loaded
-            </button>
-          </div>
-        )}
-
-        {/* Step 5: Route Decision */}
-        {!eod && stepIdx === 4 && !checkParam && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="font-semibold text-gray-900 mb-3">Step 5 · Route Decision</div>
-            <div className="space-y-3 text-sm">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="font-medium text-gray-900">Dump items → Landfill</div>
-                {landfill ? (
-                  <div className="mt-1 text-gray-600">
-                    <div>{landfill.name}</div>
-                    {landfill.address && <div>{landfill.address}</div>}
-                    {landfill.distance_km != null && <div className="text-xs text-gray-400">{landfill.distance_km} km away</div>}
-                    {landfill.lat && landfill.lng && (
-                      <a
-                        href={`https://maps.google.com/?daddr=${landfill.lat},${landfill.lng}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-orange-600 underline text-xs"
-                      >
-                        Directions ›
-                      </a>
-                    )}
-                  </div>
-                ) : <div className="text-gray-400 mt-1">Loading landfill…</div>}
-                {landfill?.warnings?.map((w, i) => (
-                  <div key={i} className="text-xs text-amber-700 bg-amber-50 rounded p-1 mt-1">{w}</div>
-                ))}
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="font-medium text-gray-900">Donate items → Storage</div>
-                <div className="text-gray-600 mt-1">Drop at storage facility for donation sorting.</div>
-              </div>
-            </div>
-            <button
-              onClick={() => setStepIdx(5)}
-              className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl mt-4"
-            >
-              Continue to Drop Flow
-            </button>
-          </div>
-        )}
-
-        {/* Step 6: Drop Required Flow */}
-        {!eod && stepIdx === 5 && !checkParam && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="font-semibold text-gray-900 mb-3">Step 6 · Drop Required Flow</div>
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Storage facility</div>
-                <select
-                  value={selectedFacility}
-                  onChange={(e) => setSelectedFacility(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
-                >
-                  <option value="">Select facility…</option>
-                  {storageFacilities.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.current_usage_pct ?? '?'}% full)</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Item photos (multiple)</div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  multiple
-                  onChange={async (e) => {
-                    const files = Array.from(e.target.files || []);
-                    const urls = await Promise.all(files.map(fileToDataUrl));
-                    setItemPhotos((prev) => [...prev, ...urls]);
-                  }}
-                  className="block w-full text-xs text-gray-500"
-                />
-                {itemPhotos.length > 0 && <div className="text-xs text-gray-400 mt-1">{itemPhotos.length} photo(s) attached</div>}
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Capacity photo</div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={async (e) => setCapacityPhoto(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)}
-                  className="block w-full text-xs text-gray-500"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Capacity estimate (%)</div>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={capacityPct}
-                  onChange={(e) => setCapacityPct(e.target.value)}
-                  placeholder="e.g. 65"
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm"
-                />
-              </div>
-              <button
-                onClick={recordDrop}
-                disabled={busy}
-                className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
-              >
-                {busy ? '…' : 'Record Drop'}
-              </button>
-              <button
-                onClick={skipDrop}
-                className="w-full bg-white border border-gray-300 text-gray-700 font-semibold py-3 rounded-xl text-sm"
-              >
-                No storage drop — landfill only
-              </button>
-              {landfill && (
-                <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                  <div className="font-medium text-gray-900">Landfill</div>
-                  <div className="text-gray-600">{landfill.name} — {landfill.address}</div>
-                  {landfill.lat && landfill.lng && (
-                    <a href={`https://maps.google.com/?daddr=${landfill.lat},${landfill.lng}`} target="_blank" rel="noreferrer" className="text-orange-600 underline text-xs">Directions ›</a>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Step 7: Customer Signature */}
-        {!eod && stepIdx === 6 && !checkParam && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="font-semibold text-gray-900 mb-3">Step 7 · Customer Signature</div>
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Customer types full name</div>
-                <input
-                  value={custName}
-                  onChange={(e) => setCustName(e.target.value)}
-                  placeholder="Customer name"
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Crew member</div>
-                <input
-                  value={emp?.name || ''}
-                  disabled
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-gray-50"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Amount confirmed ($)</div>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={amountConfirmed}
-                  onChange={(e) => setAmountConfirmed(e.target.value)}
-                  placeholder={Number(booking.total_price || 0).toFixed(2)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Customer signature (draw below)</div>
-                <canvas
-                  ref={sigCanvasRef}
-                  width={320}
-                  height={160}
-                  onTouchStart={startDraw}
-                  onTouchMove={draw}
-                  onTouchEnd={endDraw}
-                  onMouseDown={startDraw}
-                  onMouseMove={draw}
-                  onMouseUp={endDraw}
-                  onMouseLeave={endDraw}
-                  className="w-full bg-white border border-gray-300 rounded-lg touch-none"
-                  style={{ aspectRatio: '2 / 1' }}
-                />
-                <button onClick={clearSig} className="text-xs text-gray-500 underline mt-1">Clear signature</button>
-              </div>
-              <button
-                onClick={completeJob}
-                disabled={busy}
-                className="w-full bg-green-500 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
-              >
-                {busy ? '…' : 'Complete Job'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* EOD: Truck Return Check */}
-        {eod && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="font-semibold text-gray-900 mb-1">End of Day · Truck Return Check</div>
-            <p className="text-sm text-gray-500 mb-4">Complete the return check before clocking out.</p>
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Dashboard photo</div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={async (e) => setDashPhoto(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)}
-                  className="block w-full text-xs text-gray-500"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Odometer (km)</div>
-                <input
-                  type="number"
-                  value={odometer}
-                  onChange={(e) => setOdometer(e.target.value)}
-                  placeholder="e.g. 14250"
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Fuel level</div>
-                <div className="flex gap-1 flex-wrap">
-                  {FUEL_LEVELS.map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFuelLevel(f)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-                        fuelLevel === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Gas receipt photo</div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={async (e) => setGasReceipt(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)}
-                  className="block w-full text-xs text-gray-500"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Gas amount ($)</div>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={gasAmount}
-                  onChange={(e) => setGasAmount(e.target.value)}
-                  placeholder="e.g. 45.00"
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm"
-                />
-              </div>
-              <div className="border-t border-gray-100 pt-3">
-                <div className="text-xs text-gray-400 mb-1">Dump receipt photo (optional)</div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={async (e) => setDumpReceipt(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)}
-                  className="block w-full text-xs text-gray-500"
-                />
-                <div className="text-xs text-gray-400 mb-1 mt-2">Dump amount ($)</div>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={dumpAmount}
-                  onChange={(e) => setDumpAmount(e.target.value)}
-                  placeholder="e.g. 35.00"
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm"
-                />
-              </div>
-              <button
-                onClick={submitReturnCheck}
-                disabled={busy}
-                className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
-              >
-                {busy ? '…' : 'Submit Return Check'}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+    );
+  };
+
+  // Shared components
+  const PageShell = ({ children, onBack }) => (
+    <main style={{ minHeight: '100dvh', background: '#0A0A0B' }} className="safe-top safe-bottom">
+      {!eod && !checkParam && (
+        <div className="progress-line" style={{ borderRadius: 0 }}>
+          <div className="progress-line-fill" style={{ width: `${(stepIdx / (STEPS.length - 1)) * 100}%` }} />
+        </div>
+      )}
+      {onBack && (
+        <button onClick={onBack} className="glass-btn" style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, zIndex: 20, width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ArrowLeft size={20} color="rgba(255,255,255,0.7)" />
+        </button>
+      )}
+      <button onClick={() => setShowIssueForm(true)} className="glass-btn" style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, zIndex: 20, width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Flag issue">
+        <Flag size={20} color="rgba(255,255,255,0.5)" />
+      </button>
+      <div style={{ maxWidth: 448, margin: '0 auto', padding: '24px', paddingBottom: 80 }}>
+        {children}
+      </div>
+      <IssueFlagOverlay />
     </main>
   );
+
+  const Headline = ({ title, subtitle }) => (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{subtitle}</div>}
+    </div>
+  );
+
+  const BookingCard = () => (
+    <div className="dark-card" style={{ padding: 16, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <MapPin size={20} color="#f97316" />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.name}</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.address || 'No address'}</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+          {booking.time_slot} · <span className="tabular" style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>${Number(booking.total_price || 0).toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const ErrorBanner = () => error ? (
+    <div className="slide-up" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', fontSize: 14, padding: '10px 16px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.2)', marginBottom: 16 }}>
+      {error}
+    </div>
+  ) : null;
+
+  const PrimaryBtn = ({ children, onClick, disabled }) => (
+    <button onClick={onClick} disabled={disabled} className="btn-primary safe-bottom" style={{ width: '100%', minHeight: 52, fontSize: 16, position: 'sticky', bottom: 0 }}>
+      {disabled ? '...' : children}
+    </button>
+  );
+
+  const ConfirmOverlay = () => confirmMsg ? (
+    <div className="fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(10,10,11,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+      <div style={{ textAlign: 'center' }}>
+        <CheckCircle size={64} color="#22C55E" className="celebrate" />
+        <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginTop: 16 }}>{confirmMsg}</div>
+      </div>
+    </div>
+  ) : null;
+
+  // ===== STEP 0: En Route =====
+  if (!eod && stepIdx === 0 && !checkParam) {
+    return (
+      <PageShell onBack={() => router.push('/portal/schedule')}>
+        <BookingCard />
+        <Headline title="On your way" subtitle="Let the customer know you're coming" />
+        {items.length > 0 && (
+          <div className="dark-card" style={{ padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>Items to pick up ({items.length})</div>
+            {items.map((it, i) => (
+              <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', padding: '4px 0' }}>
+                {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`}
+              </div>
+            ))}
+          </div>
+        )}
+        <ErrorBanner />
+        <PrimaryBtn onClick={markEnRoute} disabled={busy}>Mark En Route</PrimaryBtn>
+        <ConfirmOverlay />
+      </PageShell>
+    );
+  }
+
+  // ===== STEP 1: Arrived =====
+  if (!eod && stepIdx === 1 && !checkParam) {
+    return (
+      <PageShell onBack={() => setStepIdx(0)}>
+        <BookingCard />
+        <Headline title="You've arrived" subtitle="Verify the load size" />
+        <div className="dark-card" style={{ padding: 20, marginBottom: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Load size</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginTop: 4 }}>{booking.load_size || 'Standard'}</div>
+        </div>
+        {items.length > 0 && (
+          <div className="dark-card" style={{ padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>Verify items</div>
+            {items.map((it, i) => (
+              <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', padding: '4px 0' }}>
+                {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`}
+              </div>
+            ))}
+          </div>
+        )}
+        <ErrorBanner />
+        <PrimaryBtn onClick={markArrived} disabled={busy}>Mark Arrived</PrimaryBtn>
+        <ConfirmOverlay />
+      </PageShell>
+    );
+  }
+
+  // ===== STEP 2: Payment =====
+  if (!eod && stepIdx === 2 && !checkParam) {
+    return (
+      <PageShell onBack={() => setStepIdx(1)}>
+        <BookingCard />
+        <Headline title="Collect payment" subtitle="How is the customer paying?" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+          {[
+            { key: 'card', label: 'Card', icon: CreditCard },
+            { key: 'cash', label: 'Cash', icon: Banknote },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setPaymentMethod(key)}
+              className="dark-card"
+              style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', border: paymentMethod === key ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.06)', background: paymentMethod === key ? 'rgba(249,115,22,0.05)' : '#161618', borderRadius: 16 }}
+            >
+              <Icon size={28} color={paymentMethod === key ? '#f97316' : 'rgba(255,255,255,0.6)'} />
+              <span style={{ fontSize: 16, fontWeight: 600, color: paymentMethod === key ? '#f97316' : 'rgba(255,255,255,0.9)' }}>{label}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Amount confirmed ($)</label>
+          <input type="number" step="0.01" value={amountConfirmed} onChange={(e) => setAmountConfirmed(e.target.value)} placeholder={Number(booking.total_price || 0).toFixed(2)} className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+        </div>
+        <button onClick={() => { setError(''); fetch('/api/crew/resend-payment-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking_id: bookingId }) }).then(() => showConfirm('Link sent')).catch(() => {}); }} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, padding: '8px 0', marginBottom: 16, cursor: 'pointer' }}>
+          Resend payment link
+        </button>
+        <ErrorBanner />
+        <PrimaryBtn onClick={collectPayment}>Confirm Payment</PrimaryBtn>
+        <ConfirmOverlay />
+      </PageShell>
+    );
+  }
+
+  // ===== STEP 3: Load Truck =====
+  if (!eod && stepIdx === 3 && !checkParam) {
+    return (
+      <PageShell onBack={() => setStepIdx(2)}>
+        <BookingCard />
+        <Headline title="Load the truck" subtitle="Check off items as you load" />
+        {items.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+            {items.map((it, i) => {
+              const label = typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`;
+              const checked = !!checkedItems[i];
+              return (
+                <button
+                  key={i}
+                  onClick={() => setCheckedItems((p) => ({ ...p, [i]: !p[i] }))}
+                  className="dark-card"
+                  style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', border: checked ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.06)', background: checked ? 'rgba(34,197,94,0.05)' : '#161618', borderRadius: 14 }}
+                >
+                  <div style={{ width: 24, height: 24, borderRadius: 6, border: checked ? 'none' : '2px solid rgba(255,255,255,0.2)', background: checked ? '#22C55E' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {checked && <Check size={16} color="white" />}
+                  </div>
+                  <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <ErrorBanner />
+        <PrimaryBtn onClick={markLoaded}>Load Confirmed</PrimaryBtn>
+      </PageShell>
+    );
+  }
+
+  // ===== STEP 4: Route Decision =====
+  if (!eod && stepIdx === 4 && !checkParam) {
+    return (
+      <PageShell onBack={() => setStepIdx(3)}>
+        <BookingCard />
+        <Headline title="Where to next?" subtitle="Choose your drop-off destination" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+          {/* Landfill card */}
+          <div className="dark-card" style={{ padding: 16 }}>
+            <Trash2 size={24} color="#f97316" style={{ marginBottom: 8 }} />
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Landfill</div>
+            {landfill ? (
+              <>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{landfill.name}</div>
+                {landfill.distance_km != null && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }} className="tabular">{landfill.distance_km} km</div>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E' }} />
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Open</span>
+                </div>
+                {landfill.lat && landfill.lng && (
+                  <a href={`https://maps.google.com/?daddr=${landfill.lat},${landfill.lng}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#f97316', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>Directions <ChevronRight size={14} /></a>
+                )}
+              </>
+            ) : <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Loading...</div>}
+          </div>
+          {/* Storage card */}
+          <div className="dark-card" style={{ padding: 16 }}>
+            <Warehouse size={24} color="rgba(255,255,255,0.6)" style={{ marginBottom: 8 }} />
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Storage</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>Drop for donation sorting</div>
+            {storageFacilities.length > 0 && (
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{storageFacilities.length} facilities</div>
+            )}
+          </div>
+        </div>
+        {landfill?.warnings?.map((w, i) => (
+          <div key={i} style={{ fontSize: 12, color: '#F59E0B', background: 'rgba(245,158,11,0.1)', borderRadius: 8, padding: '8px 12px', marginBottom: 8 }}>{w}</div>
+        ))}
+        <ErrorBanner />
+        <PrimaryBtn onClick={() => setStepIdx(5)}>Continue to Drop Flow</PrimaryBtn>
+      </PageShell>
+    );
+  }
+
+  // ===== STEP 5: Drop Flow =====
+  if (!eod && stepIdx === 5 && !checkParam) {
+    return (
+      <PageShell onBack={() => setStepIdx(4)}>
+        <BookingCard />
+        <Headline title="Record your drop" subtitle="Photos and capacity check" />
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Storage facility</label>
+          <select value={selectedFacility} onChange={(e) => setSelectedFacility(e.target.value)} className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}>
+            <option value="">Select facility...</option>
+            {storageFacilities.map((f) => (
+              <option key={f.id} value={f.id}>{f.name} ({f.current_usage_pct ?? '?'}% full)</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Item photos</label>
+          <label style={{ cursor: 'pointer' }}>
+            <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={async (e) => { const files = Array.from(e.target.files || []); const urls = await Promise.all(files.map(fileToDataUrl)); setItemPhotos((prev) => [...prev, ...urls]); }} />
+            <div className="dark-card" style={{ padding: 20, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <Camera size={24} color="#f97316" />
+              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>Take photos</span>
+            </div>
+          </label>
+          {itemPhotos.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {itemPhotos.map((p, i) => (
+                <div key={i} style={{ width: 56, height: 56, borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
+                  <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={10} color="white" /></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Capacity photo</label>
+          <label style={{ cursor: 'pointer' }}>
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => setCapacityPhoto(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)} />
+            <div className="dark-card" style={{ padding: 20, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <Camera size={24} color={capacityPhoto ? '#22C55E' : '#f97316'} />
+              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>{capacityPhoto ? 'Photo taken' : 'Take photo'}</span>
+            </div>
+          </label>
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Capacity estimate (%)</label>
+          <input type="number" min="0" max="100" value={capacityPct} onChange={(e) => setCapacityPct(e.target.value)} placeholder="e.g. 65" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+        </div>
+        <ErrorBanner />
+        <PrimaryBtn onClick={recordDrop} disabled={busy}>Record Drop</PrimaryBtn>
+        <button onClick={skipDrop} className="btn-ghost" style={{ width: '100%', minHeight: 48, fontSize: 14, marginTop: 8 }}>No storage drop — landfill only</button>
+        {landfill && (
+          <div className="dark-card" style={{ padding: 16, marginTop: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Landfill</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{landfill.name} — {landfill.address}</div>
+            {landfill.lat && landfill.lng && (
+              <a href={`https://maps.google.com/?daddr=${landfill.lat},${landfill.lng}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#f97316', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>Directions <ChevronRight size={14} /></a>
+            )}
+          </div>
+        )}
+      </PageShell>
+    );
+  }
+
+  // ===== STEP 6: Signature =====
+  if (!eod && stepIdx === 6 && !checkParam) {
+    return (
+      <PageShell onBack={() => setStepIdx(5)}>
+        <Headline title="Customer signature" subtitle="Have the customer sign below" />
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Customer name</label>
+          <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="Customer full name" className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Crew: {emp?.name || ''}</div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Amount confirmed ($)</label>
+          <input type="number" step="0.01" value={amountConfirmed} onChange={(e) => setAmountConfirmed(e.target.value)} placeholder={Number(booking.total_price || 0).toFixed(2)} className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+        </div>
+        <div style={{ position: 'relative', marginBottom: 8 }}>
+          <canvas
+            ref={sigCanvasRef}
+            width={320}
+            height={160}
+            onTouchStart={startDraw}
+            onTouchMove={draw}
+            onTouchEnd={endDraw}
+            onMouseDown={startDraw}
+            onMouseMove={draw}
+            onMouseUp={endDraw}
+            onMouseLeave={endDraw}
+            style={{ width: '100%', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, touchAction: 'none', aspectRatio: '2 / 1' }}
+          />
+          <button onClick={clearSig} style={{ position: 'absolute', top: 8, right: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 4 }}>
+            <Eraser size={18} />
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Draw signature above</div>
+        <ErrorBanner />
+        <PrimaryBtn onClick={completeJob} disabled={busy}>Complete Job</PrimaryBtn>
+        {jobComplete && (
+          <div className="fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(10,10,11,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+            <div style={{ textAlign: 'center' }}>
+              <CheckCircle size={64} color="#22C55E" className="celebrate" />
+              <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginTop: 16 }}>Job complete!</div>
+            </div>
+          </div>
+        )}
+      </PageShell>
+    );
+  }
+
+  // ===== EOD: Truck Return Check =====
+  if (eod) {
+    return (
+      <PageShell onBack={() => router.push('/portal/schedule')}>
+        <Headline title="End of day check" subtitle="Truck return inspection" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+          {/* Dashboard photo */}
+          <div className="dark-card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Dashboard photo</div>
+            <label style={{ cursor: 'pointer' }}>
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => setDashPhoto(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  {dashPhoto ? <img src={dashPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Camera size={20} color="#f97316" />}
+                </div>
+                <span style={{ fontSize: 14, color: dashPhoto ? '#22C55E' : 'rgba(255,255,255,0.6)' }}>{dashPhoto ? 'Photo taken' : 'Capture'}</span>
+              </div>
+            </label>
+          </div>
+          {/* Odometer */}
+          <div className="dark-card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Odometer (km)</div>
+            <input type="number" value={odometer} onChange={(e) => setOdometer(e.target.value)} placeholder="e.g. 14250" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+          </div>
+          {/* Fuel gauge */}
+          <div className="dark-card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 12 }}>Fuel level</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {FUEL_LEVELS.map((f, i) => (
+                <button
+                  key={f}
+                  onClick={() => setFuelLevel(f)}
+                  style={{
+                    flex: 1, height: 48, borderRadius: 8, border: 'none',
+                    background: fuelLevel === f ? '#f97316' : i < FUEL_LEVELS.indexOf(fuelLevel) ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.06)',
+                    color: fuelLevel === f ? 'white' : 'rgba(255,255,255,0.6)',
+                    fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Gas receipt + amount */}
+          <div className="dark-card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Gas receipt</div>
+            <label style={{ cursor: 'pointer' }}>
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => setGasReceipt(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  {gasReceipt ? <img src={gasReceipt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Camera size={20} color="#f97316" />}
+                </div>
+                <span style={{ fontSize: 14, color: gasReceipt ? '#22C55E' : 'rgba(255,255,255,0.6)' }}>{gasReceipt ? 'Photo taken' : 'Capture'}</span>
+              </div>
+            </label>
+            <input type="number" step="0.01" value={gasAmount} onChange={(e) => setGasAmount(e.target.value)} placeholder="Gas amount $" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+          </div>
+          {/* Dump receipt + amount */}
+          <div className="dark-card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Dump receipt (optional)</div>
+            <label style={{ cursor: 'pointer' }}>
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => setDumpReceipt(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  {dumpReceipt ? <img src={dumpReceipt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Camera size={20} color="#f97316" />}
+                </div>
+                <span style={{ fontSize: 14, color: dumpReceipt ? '#22C55E' : 'rgba(255,255,255,0.6)' }}>{dumpReceipt ? 'Photo taken' : 'Capture'}</span>
+              </div>
+            </label>
+            <input type="number" step="0.01" value={dumpAmount} onChange={(e) => setDumpAmount(e.target.value)} placeholder="Dump amount $" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+          </div>
+        </div>
+        <ErrorBanner />
+        <PrimaryBtn onClick={submitReturnCheck} disabled={busy}>Submit Return Check</PrimaryBtn>
+      </PageShell>
+    );
+  }
+
+  return null;
 }

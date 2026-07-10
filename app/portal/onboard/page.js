@@ -2,18 +2,23 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  ArrowLeft, Share, Plus, Check, CheckCircle, X, Lock, Phone, MapPin,
+  Camera, FileText, IdCard, Car, User, Calculator, PenTool, Landmark,
+  AlertTriangle, ChevronRight, Sparkles,
+} from 'lucide-react';
 
 // ============================================================
-// /portal/onboard — multi-step crew onboarding flow.
+// /portal/onboard — multi-step crew onboarding flow (dark theme).
 // Entry via invite link: /portal/onboard?token=XXX
-// Steps 0–7: invite validation → personal info → TD1 Federal →
+// Steps 0–8: install app → account → documents → TD1 Federal →
 // TD1AB → contract e-sign → banking → acknowledgments → complete.
 // ============================================================
 
 const STEP_LABELS = [
   'Install App',
   'Account',
-  'Personal Info',
+  'Documents',
   'TD1 Federal',
   'TD1AB Alberta',
   'Contract',
@@ -22,7 +27,6 @@ const STEP_LABELS = [
   'Complete',
 ];
 
-// Default TD1 claim amounts (2024-ish CRA baselines)
 const TD1_BASIC_PERSONAL = 15705;
 const TD1AB_BASIC_PERSONAL = 22182;
 const SPOUSAL_AMOUNT = 15705;
@@ -46,13 +50,13 @@ function OnboardInner() {
   const [invite, setInvite] = useState(null);
   const [inviteError, setInviteError] = useState('');
 
-  // Step 0 form
+  // Step 1 form
   const [accountForm, setAccountForm] = useState({ password: '', phone: '', address: '' });
   const [pwErrors, setPwErrors] = useState([]);
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [addressFocused, setAddressFocused] = useState(false);
 
-  // Step 1 form
+  // Step 2 form
   const [personal, setPersonal] = useState({ name: '', email: '', address: '' });
   const [sinFile, setSinFile] = useState(null);
   const [licenseFront, setLicenseFront] = useState(null);
@@ -62,49 +66,36 @@ function OnboardInner() {
   const [uploading, setUploading] = useState('');
   const [docStatus, setDocStatus] = useState({ sin_document: 'pending', drivers_license: 'pending' });
 
-  // Step 2/3 TD1 forms
+  // Step 3/4 TD1 forms
   const [td1Federal, setTd1Federal] = useState({
-    total_income_other_employers: '',
-    spousal_amount: '',
-    dependents_count: '',
-    other_deductions: '',
-    total_claim: '',
+    total_income_other_employers: '', spousal_amount: '', dependents_count: '', other_deductions: '', total_claim: '',
   });
   const [td1Ab, setTd1Ab] = useState({
-    total_income_other_employers: '',
-    spousal_amount: '',
-    dependents_count: '',
-    other_deductions: '',
-    total_claim: '',
+    total_income_other_employers: '', spousal_amount: '', dependents_count: '', other_deductions: '', total_claim: '',
   });
 
-  // Step 4 contract
+  // Step 5 contract
   const [contract, setContract] = useState({ signature_typed: '', agreed: false });
 
-  // Step 5 banking
+  // Step 6 banking
   const [banking, setBanking] = useState({
-    bank_name: '',
-    institution_number: '',
-    transit_number: '',
-    account_number: '',
+    bank_name: '', institution_number: '', transit_number: '', account_number: '',
   });
 
-  // Step 6 acknowledgments
+  // Step 7 acknowledgments
   const [acks, setAcks] = useState({ tickets: false, phone: false, data: false, company_card: false });
 
-  // Step 7 complete
+  // Step 8 complete
   const [completeData, setCompleteData] = useState(null);
 
   // ---- Step 0: validate invite ----
   const validateInvite = useCallback(async () => {
-    // Try URL token first, then localStorage (for PWA resume after Add to Home Screen)
     const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('jh-onboard-token') : null);
     if (!effectiveToken) {
       setInviteError('No invite token found in the link. Please use the link from your invite email.');
       setLoading(false);
       return;
     }
-    // Save token so PWA can resume onboarding after Add to Home Screen
     if (token && typeof localStorage !== 'undefined') {
       localStorage.setItem('jh-onboard-token', token);
     }
@@ -124,11 +115,9 @@ function OnboardInner() {
     });
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    validateInvite();
-  }, [validateInvite]);
+  useEffect(() => { validateInvite(); }, [validateInvite]);
 
-  // ---- Step 0: password validation ----
+  // ---- Password validation ----
   const validatePw = (pw) => {
     const errs = [];
     if (pw.length < 8) errs.push('At least 8 characters');
@@ -142,7 +131,7 @@ function OnboardInner() {
     setPwErrors(validatePw(val));
   };
 
-  // ---- Step 0: address autocomplete via Mapbox ----
+  // ---- Address autocomplete via Mapbox ----
   const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   const searchAddress = useCallback(async (query) => {
@@ -162,34 +151,22 @@ function OnboardInner() {
     searchAddress(val);
   };
 
-  // ---- Step 0 submit: create account ----
+  // ---- Step 1 submit: create account ----
   const createAccount = async (e) => {
     e.preventDefault();
     setError('');
-
-    // Validate password
     const pwErrs = validatePw(accountForm.password);
     if (pwErrs.length > 0) { setError('Password: ' + pwErrs.join(', ')); return; }
-
-    // Validate phone
     const phoneClean = accountForm.phone.replace(/[\s\-\(\)]/g, '');
     if (!phoneClean || phoneClean.length < 10) { setError('A valid phone number is required.'); return; }
-
-    // Validate address
     if (!accountForm.address.trim() || accountForm.address.trim().length < 5) {
       setError('Your home address is required.'); return;
     }
-
     setSaving(true);
     const res = await fetch('/api/employee/onboard/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token,
-        password: accountForm.password,
-        phone: accountForm.phone,
-        address: accountForm.address,
-      }),
+      body: JSON.stringify({ token, password: accountForm.password, phone: accountForm.phone, address: accountForm.address }),
     });
     const data = await res.json();
     setSaving(false);
@@ -198,7 +175,7 @@ function OnboardInner() {
     setStep(2);
   };
 
-  // ---- Step 1: document uploads ----
+  // ---- Step 2: document uploads ----
   const handleUpload = async (docType, file, label) => {
     if (!file) return;
     setUploading(docType); setError('');
@@ -212,7 +189,6 @@ function OnboardInner() {
     }
   };
 
-  // ---- Step 1: selfie upload (goes to /api/employee/selfie) ----
   const handleSelfieUpload = async (file) => {
     if (!file) return;
     setUploading('selfie'); setError('');
@@ -229,21 +205,19 @@ function OnboardInner() {
   };
 
   const submitPersonal = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setError('');
     if (docStatus.sin_document === 'pending') { setError('Please upload your SIN document photo.'); return; }
-    if (docStatus.drivers_license === 'pending') { setError('Please upload both sides of your driver\'s license.'); return; }
+    if (docStatus.drivers_license === 'pending') { setError("Please upload both sides of your driver's license."); return; }
     if (!personal.address.trim()) { setError('Please enter your address.'); return; }
     setStep(3);
   };
 
-  // ---- Step 2/3: TD1 save ----
+  // ---- TD1 save ----
   const calcTotal = (form, basic) => {
-    const base = basic;
     const spousal = parseFloat(form.spousal_amount) || 0;
-    const dependents = (parseFloat(form.dependents_count) || 0) * 0; // dependents handled via other unless specified
     const other = parseFloat(form.other_deductions) || 0;
-    return base + spousal + dependents + other;
+    return basic + spousal + other;
   };
 
   const submitTd1 = async (form_type, form, basic, nextStep) => {
@@ -260,7 +234,7 @@ function OnboardInner() {
     setStep(nextStep);
   };
 
-  // ---- Step 4: contract sign ----
+  // ---- Contract sign ----
   const submitContract = async (e) => {
     e.preventDefault();
     setError('');
@@ -278,16 +252,12 @@ function OnboardInner() {
     setStep(6);
   };
 
-  // ---- Step 5: banking ----
+  // ---- Banking ----
   const submitBanking = async (e) => {
     e.preventDefault();
     setError('');
-    if (banking.institution_number && banking.institution_number.length !== 3) {
-      setError('Institution number must be 3 digits.'); return;
-    }
-    if (banking.transit_number && banking.transit_number.length !== 5) {
-      setError('Transit number must be 5 digits.'); return;
-    }
+    if (banking.institution_number && banking.institution_number.length !== 3) { setError('Institution number must be 3 digits.'); return; }
+    if (banking.transit_number && banking.transit_number.length !== 5) { setError('Transit number must be 5 digits.'); return; }
     if (!banking.account_number.trim()) { setError('Account number is required.'); return; }
     setSaving(true);
     const res = await fetch('/api/employee/onboard/banking', {
@@ -301,7 +271,7 @@ function OnboardInner() {
     setStep(7);
   };
 
-  // ---- Step 6: acknowledgments ----
+  // ---- Acknowledgments ----
   const submitAcks = async (e) => {
     e.preventDefault();
     setError('');
@@ -320,95 +290,116 @@ function OnboardInner() {
     setStep(8);
   };
 
-  // ---- Step 7: complete ----
+  // ---- Complete ----
   const completeOnboarding = async () => {
     setSaving(true); setError('');
     const res = await fetch('/api/employee/onboard/complete', { method: 'POST' });
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Onboarding incomplete'); setCompleteData(data); return; }
-    // Clear the onboarding token — onboarding is done
     if (typeof localStorage !== 'undefined') localStorage.removeItem('jh-onboard-token');
     setCompleteData({ ok: true, completed_at: data.completed_at });
   };
 
-  // ============ render helpers ============
-  const inputCls = 'w-full px-4 py-3 rounded-xl border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent';
-  const labelCls = 'block text-sm font-semibold text-gray-700 mb-1.5';
-  const cardCls = 'bg-white rounded-2xl border border-gray-200 p-5 shadow-sm';
+  // ============ Shared UI helpers ============
+  const isStandalone = typeof window !== 'undefined' && (window.navigator?.standalone || window.matchMedia?.('(display-mode: standalone)')?.matches);
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   const ProgressBar = () => (
-    <div className="bg-white border-b border-gray-100 px-5 py-3 sticky top-0 z-10 safe-top">
-      <div className="max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-bold text-gray-700">Step {step} of 8</span>
-          <span className="text-xs text-gray-400">{STEP_LABELS[step]}</span>
-        </div>
-        <div className="flex gap-1">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-            <div
-              key={s}
-              className={`h-2 flex-1 rounded-full transition-colors ${s <= step ? 'bg-orange-500' : 'bg-gray-200'}`}
-            />
-          ))}
-        </div>
+    <div style={{ position: 'sticky', top: 0, zIndex: 10, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="progress-line" style={{ borderRadius: 0 }}>
+        <div className="progress-line-fill" style={{ width: `${(step / 8) * 100}%` }} />
+      </div>
+      <div style={{ padding: '6px 24px 0', background: '#0A0A0B' }}>
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Step {step} of 8 · {STEP_LABELS[step]}</span>
       </div>
     </div>
   );
 
-  const NavButtons = ({ onBack, onNext, nextLabel = 'Next', nextDisabled = false }) => (
-    <div className="flex gap-3 mt-6">
-      {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex-1 py-3.5 rounded-xl bg-gray-100 text-gray-600 font-medium text-sm active:scale-[0.98] transition-transform"
-        >
-          Back
-        </button>
-      )}
-      <button
-        type="submit"
-        disabled={saving || nextDisabled}
-        className="flex-[2] bg-orange-500 text-white font-bold py-3.5 rounded-xl disabled:bg-orange-300 active:scale-[0.98] transition-transform shadow-lg shadow-orange-200 text-sm"
-      >
-        {saving ? '…' : nextLabel}
-      </button>
+  const BackBtn = ({ onBack }) => (
+    <button
+      onClick={onBack}
+      className="glass-btn"
+      style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, zIndex: 20, width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <ArrowLeft size={20} color="rgba(255,255,255,0.7)" />
+    </button>
+  );
+
+  const ContinueBtn = ({ label = 'Continue', disabled = false, onClick }) => (
+    <button
+      type={onClick ? 'button' : 'submit'}
+      onClick={onClick}
+      disabled={saving || disabled}
+      className="btn-primary safe-bottom"
+      style={{ width: '100%', minHeight: 52, fontSize: 16, position: 'sticky', bottom: 0 }}
+    >
+      {saving ? '...' : label}
+    </button>
+  );
+
+  const ErrorBanner = () => error ? (
+    <div className="slide-up" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', fontSize: 14, padding: '10px 16px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.2)', marginBottom: 16 }}>
+      {error}
+    </div>
+  ) : null;
+
+  const StepShell = ({ children, onBack, showProgress = true }) => (
+    <>
+      {showProgress && <ProgressBar />}
+      {onBack && <BackBtn onBack={onBack} />}
+      <div style={{ maxWidth: 448, margin: '0 auto', padding: '24px', paddingBottom: '80px', flex: 1 }}>
+        {children}
+      </div>
+    </>
+  );
+
+  const Headline = ({ title, subtitle }) => (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{subtitle}</div>}
     </div>
   );
 
-  // ============ STEP 0: invite validation + account ============
+  const DarkInput = ({ label, value, onChange, ...props }) => (
+    <div style={{ marginBottom: 16 }}>
+      {label && <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>{label}</label>}
+      <input
+        value={value}
+        onChange={onChange}
+        className="dark-input"
+        style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}
+        {...props}
+      />
+    </div>
+  );
+
   // ============ STEP 0: Save to Home Screen ============
   if (step === 0) {
     if (loading) {
       return (
         <Shell>
-          <div className="flex-1 flex flex-col items-center justify-center px-6">
-            <div className="w-10 h-10 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-4" />
-            <div className="text-gray-400 text-sm">Validating your invite…</div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 40, height: 40, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 16 }} />
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>Validating your invite...</div>
           </div>
         </Shell>
       );
     }
 
-    // If invite is invalid, show error
     if (inviteError && !invite) {
       return (
         <Shell>
-          <div className="flex-1 overflow-y-auto px-5 pt-12 pb-8">
-            <div className="max-w-md mx-auto">
-              <div className="text-center mb-8">
-                <img src="/crew-logo.png" alt="Junk Haul Crew" className="w-20 h-20 rounded-2xl mx-auto mb-3 shadow-lg" />
-                <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
-                <div className="text-sm text-gray-400 mt-0.5">Onboarding Portal</div>
-              </div>
-              <div className="bg-white rounded-2xl border border-red-100 p-6 text-center shadow-sm">
-                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">⚠️</span>
-                </div>
-                <div className="text-red-600 font-semibold text-sm mb-2">Invite problem</div>
-                <div className="text-gray-600 text-sm">{inviteError}</div>
-                <div className="text-xs text-gray-400 mt-4">Contact your manager for a new invite link.</div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <div style={{ textAlign: 'center', maxWidth: 400 }}>
+              <img src="/crew-logo.png" alt="Junk Haul Crew" style={{ width: 72, height: 72, borderRadius: 16, margin: '0 auto 16px' }} />
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>Junk Haul Crew</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 24 }}>Onboarding Portal</div>
+              <div className="dark-card" style={{ padding: 24, textAlign: 'center', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <AlertTriangle size={32} color="#EF4444" style={{ margin: '0 auto 12px' }} />
+                <div style={{ color: '#EF4444', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Invite problem</div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>{inviteError}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 16 }}>Contact your manager for a new invite link.</div>
               </div>
             </div>
           </div>
@@ -416,642 +407,345 @@ function OnboardInner() {
       );
     }
 
-    if (inviteError && invite) {
-      return (
-        <Shell>
-          <div className="flex-1 overflow-y-auto px-5 pt-12 pb-8">
-            <div className="max-w-md mx-auto">
-              <div className="text-center mb-8">
-                <img src="/crew-logo.png" alt="Junk Haul Crew" className="w-20 h-20 rounded-2xl mx-auto mb-3 shadow-lg" />
-                <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
-              </div>
-              <div className="bg-white rounded-2xl border border-red-100 p-5 mb-4 shadow-sm">
-                <div className="text-red-600 font-medium text-sm mb-1">{inviteError}</div>
-                <div className="text-gray-400 text-xs">Invite for {invite.email}</div>
-              </div>
-            </div>
-          </div>
-        </Shell>
-      );
-    }
-
-    const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
-    const isStandalone = typeof window !== 'undefined' && (window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches);
-    const isAndroid = typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent);
+    const carouselFrames = isIOS
+      ? [
+          { icon: Share, title: 'Tap the Share button', sub: 'In Safari, tap the share icon at the bottom' },
+          { icon: Plus, title: 'Add to Home Screen', sub: 'Scroll down and tap "Add to Home Screen"' },
+          { icon: Check, title: 'Tap Add', sub: 'Confirm by tapping "Add" in the top right' },
+        ]
+      : [
+          { icon: Plus, title: 'Open browser menu', sub: 'Tap the three dots menu icon' },
+          { icon: Plus, title: 'Add to Home screen', sub: 'Select "Add to Home screen"' },
+          { icon: Check, title: 'Tap Add', sub: 'Confirm the installation' },
+        ];
 
     return (
       <Shell>
-        <div className="flex-1 overflow-y-auto px-5 pt-10 pb-8">
-          <div className="max-w-md mx-auto">
-            {/* Logo */}
-            <div className="text-center mb-8">
-              <img src="/crew-logo.png" alt="Junk Haul Crew" className="w-24 h-24 rounded-2xl mx-auto mb-4 shadow-xl" />
-              <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
-              <div className="text-sm text-gray-400 mt-0.5">You&apos;re invited to join the team</div>
-            </div>
-
-            {/* Invite details */}
-            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-5 mb-5">
-              <div className="text-xs font-medium text-orange-600 uppercase tracking-wide mb-2">Welcome</div>
-              <div className="text-xl font-bold text-gray-900">
-                {invite?.first_name} {invite?.last_name}
-              </div>
-              <div className="text-sm text-gray-600 mt-0.5">{invite?.email}</div>
-              {invite?.pay_rate != null && (
-                <div className="mt-3 inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 text-sm shadow-sm">
-                  <span className="text-gray-500">Pay rate</span>
-                  <span className="font-bold text-gray-900">${Number(invite.pay_rate).toFixed(2)}</span>
-                  <span className="text-gray-400 text-xs">/hr</span>
-                </div>
-              )}
-            </div>
-
-            {/* Install instructions */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-              <div className="font-bold text-gray-900 mb-1 text-lg">Install the App</div>
-              <div className="text-sm text-gray-400 mb-5">
-                Add Junk Haul Crew to your home screen for the full app experience with push notifications.
-              </div>
-
-              {isIOS && !isStandalone && (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">1</div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">Tap the Share button</div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          Tap the <span className="font-bold text-blue-600">Share</span>{' '}
-                          <span className="text-lg">⎙</span> icon at the bottom of Safari.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">Add to Home Screen</div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          Scroll down and tap <span className="font-bold text-blue-600">Add to Home Screen</span>{' '}
-                          <span className="text-lg">＋</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">3</div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">Tap Add</div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          Tap <span className="font-bold text-blue-600">Add</span> in the top right corner.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isAndroid && (
-                <div className="space-y-4">
-                  <div className="bg-green-50 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">1</div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">Tap the menu</div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          Tap the three dots <span className="text-lg">⋮</span> in the top right of Chrome.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-green-50 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">Add to Home screen</div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          Tap <span className="font-bold text-green-600">Add to Home screen</span>.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!isIOS && !isAndroid && (
-                <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600">
-                  On mobile, tap your browser menu and select <strong>Add to Home Screen</strong> to install the app.
-                </div>
-              )}
-
-              {isStandalone && (
-                <div className="bg-green-50 rounded-xl p-4 text-center">
-                  <div className="text-2xl mb-2">✅</div>
-                  <div className="font-semibold text-green-700 text-sm">App is installed!</div>
-                  <div className="text-xs text-green-600 mt-0.5">You&apos;re running in app mode.</div>
-                </div>
-              )}
-
-              <button
-                onClick={() => setStep(1)}
-                className="w-full bg-orange-500 text-white font-bold py-4 rounded-xl mt-6 text-base active:scale-[0.98] transition-transform shadow-lg shadow-orange-200"
-              >
-                {isStandalone ? 'Continue →' : 'I\'ve added it — Continue →'}
-              </button>
-              {!isStandalone && (
-                <button
-                  onClick={() => setStep(1)}
-                  className="w-full text-gray-400 font-medium py-3 mt-2 text-sm"
-                >
-                  Skip for now
-                </button>
-              )}
-            </div>
-
-            <div className="text-center mt-5">
-              <div className="text-xs text-gray-400">
-                🔒 Your data is encrypted and stored securely.
-              </div>
-            </div>
+        <StepShell showProgress={false}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <img src="/crew-logo.png" alt="Junk Haul Crew" style={{ width: 72, height: 72, borderRadius: 16, margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>Welcome to the crew</div>
           </div>
-        </div>
+
+          {/* Invite card */}
+          {invite && (
+            <div className="dark-card" style={{ padding: 16, marginBottom: 24, border: '1px solid rgba(249,115,22,0.2)' }}>
+              <div style={{ fontSize: 12, color: '#f97316', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>You&apos;re invited to join</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{invite.first_name} {invite.last_name}</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>{invite.email}</div>
+              {invite.pay_rate != null && (
+                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: '4px 12px', fontSize: 14 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>Pay rate</span>
+                  <span className="tabular" style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>${Number(invite.pay_rate).toFixed(2)}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>/hr</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isStandalone ? (
+            <div className="dark-card" style={{ padding: 24, textAlign: 'center', marginBottom: 16 }}>
+              <CheckCircle size={40} color="#22C55E" style={{ margin: '0 auto 12px' }} />
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>App installed!</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>You&apos;re ready to continue.</div>
+            </div>
+          ) : (
+            <>
+              <Headline title="Save to your Home Screen" subtitle="Install the app for the best experience — works offline, push notifications, and full-screen." />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {carouselFrames.map((frame, i) => {
+                  const Icon = frame.icon;
+                  return (
+                    <div key={i} className="dark-card" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Icon size={24} color="#f97316" />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Step {i + 1}</div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{frame.title}</div>
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{frame.sub}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          <ErrorBanner />
+          <div style={{ marginTop: 24 }}>
+            <ContinueBtn label="Continue" onClick={() => setStep(1)} />
+            {!isStandalone && (
+              <button onClick={() => setStep(1)} style={{ width: '100%', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 14, padding: '12px 0', marginTop: 8 }}>Skip for now</button>
+            )}
+          </div>
+        </StepShell>
       </Shell>
     );
   }
 
-  // ============ STEP 1: invite validation + account ============
+  // ============ STEP 1: Account Creation ============
   if (step === 1) {
     return (
       <Shell>
-        <div className="flex-1 overflow-y-auto px-5 pt-8 pb-8">
-          <div className="max-w-md mx-auto">
-            {/* Logo header */}
-            <div className="text-center mb-8">
-              <img src="/crew-logo.png" alt="Junk Haul Crew" className="w-20 h-20 rounded-2xl mx-auto mb-3 shadow-lg" />
-              <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
-              <div className="text-sm text-gray-400 mt-0.5">Onboarding Portal</div>
+        <StepShell onBack={() => setStep(0)}>
+          <Headline title="Set up your account" subtitle="Create your password and contact info" />
+
+          {invite && (
+            <div className="dark-card" style={{ padding: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <User size={20} color="#f97316" />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{invite.first_name} {invite.last_name}</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{invite.email}</div>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={createAccount}>
+            <DarkInput label="Password" type="password" value={accountForm.password} onChange={(e) => onPwChange(e.target.value)} placeholder="Create a strong password" required autoComplete="new-password" />
+
+            {accountForm.password && (
+              <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { check: accountForm.password.length >= 8, label: '8+ characters' },
+                  { check: /[0-9]/.test(accountForm.password), label: '1 number' },
+                  { check: /[^A-Za-z0-9]/.test(accountForm.password), label: '1 special character' },
+                ].map((req, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    {req.check ? <Check size={14} color="#22C55E" /> : <X size={14} color="rgba(255,255,255,0.3)" />}
+                    <span style={{ color: req.check ? '#22C55E' : 'rgba(255,255,255,0.4)' }}>{req.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <DarkInput label="Mobile phone" type="tel" value={accountForm.phone} onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })} placeholder="(587) 555-0123" required autoComplete="tel" />
+
+            <div style={{ marginBottom: 16, position: 'relative' }}>
+              <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Home address</label>
+              <input
+                value={accountForm.address}
+                onChange={(e) => onAddressChange(e.target.value)}
+                onFocus={() => setAddressFocused(true)}
+                onBlur={() => setTimeout(() => setAddressFocused(false), 200)}
+                placeholder="Start typing your address..."
+                required
+                autoComplete="street-address"
+                className="dark-input"
+                style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}
+              />
+              {addressFocused && addressSuggestions.length > 0 && (
+                <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, marginTop: 4, background: '#161618', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', maxHeight: 240, overflowY: 'auto' }}>
+                  {addressSuggestions.map((s, i) => (
+                    <button key={i} type="button" onClick={() => { setAccountForm({ ...accountForm, address: s }); setAddressSuggestions([]); setAddressFocused(false); }} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', fontSize: 14, color: 'rgba(255,255,255,0.7)', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <MapPin size={14} color="#f97316" /> {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {inviteError && !invite && (
-              <div className="bg-white rounded-2xl border border-red-100 p-6 text-center shadow-sm">
-                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">⚠️</span>
-                </div>
-                <div className="text-red-600 font-semibold text-sm mb-2">Invite problem</div>
-                <div className="text-gray-600 text-sm">{inviteError}</div>
-                <div className="text-xs text-gray-400 mt-4">
-                  Contact your manager for a new invite link.
-                </div>
-              </div>
-            )}
+            <ErrorBanner />
+            <ContinueBtn label="Create account & continue" />
+          </form>
 
-            {inviteError && invite && (
-              <div className="bg-white rounded-2xl border border-red-100 p-5 mb-4 shadow-sm">
-                <div className="text-red-600 font-medium text-sm mb-1">{inviteError}</div>
-                <div className="text-gray-400 text-xs">Invite for {invite.email}</div>
-              </div>
-            )}
-
-            {invite && !inviteError && (
-            <>
-              {/* Invite card */}
-              <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-5 mb-5">
-                <div className="text-xs font-medium text-orange-600 uppercase tracking-wide mb-2">You&apos;re invited to join</div>
-                <div className="text-xl font-bold text-gray-900">
-                  {invite.first_name} {invite.last_name}
-                </div>
-                <div className="text-sm text-gray-600 mt-0.5">{invite.email}</div>
-                {invite.pay_rate != null && (
-                  <div className="mt-3 inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 text-sm shadow-sm">
-                    <span className="text-gray-500">Pay rate</span>
-                    <span className="font-bold text-gray-900">${Number(invite.pay_rate).toFixed(2)}</span>
-                    <span className="text-gray-400 text-xs">/hr</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Account form */}
-              <form onSubmit={createAccount} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-                <div className="font-bold text-gray-900 mb-1 text-lg">Create your account</div>
-                <div className="text-sm text-gray-400 mb-5">Set up your password and contact info to get started.</div>
-
-                <div className="space-y-4">
-                  {/* Password */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Password <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      value={accountForm.password}
-                      onChange={(e) => onPwChange(e.target.value)}
-                      placeholder="Create a strong password"
-                      required
-                      autoComplete="new-password"
-                      className={`w-full px-4 py-3 rounded-xl border text-base ${
-                        accountForm.password && pwErrors.length > 0
-                          ? 'border-amber-300 bg-amber-50'
-                          : accountForm.password && pwErrors.length === 0
-                            ? 'border-green-300 bg-green-50'
-                            : 'border-gray-200'
-                      } focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent`}
-                    />
-                    {/* Password requirements */}
-                    {accountForm.password && (
-                      <div className="mt-2 space-y-1">
-                        {[
-                          { check: accountForm.password.length >= 8, label: '8+ characters' },
-                          { check: /[0-9]/.test(accountForm.password), label: '1 number' },
-                          { check: /[^A-Za-z0-9]/.test(accountForm.password), label: '1 special character' },
-                        ].map((req, i) => (
-                          <div key={i} className="flex items-center gap-1.5 text-xs">
-                            <span className={req.check ? 'text-green-600' : 'text-gray-400'}>
-                              {req.check ? '✓' : '○'}
-                            </span>
-                            <span className={req.check ? 'text-green-600 font-medium' : 'text-gray-400'}>
-                              {req.label}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Phone */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Mobile phone <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={accountForm.phone}
-                      onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })}
-                      placeholder="(587) 555-0123"
-                      required
-                      autoComplete="tel"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                    />
-                    <div className="text-xs text-gray-400 mt-1">We use this to contact you about shifts and jobs.</div>
-                  </div>
-
-                  {/* Address with autocomplete */}
-                  <div className="relative">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Home address <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      value={accountForm.address}
-                      onChange={(e) => onAddressChange(e.target.value)}
-                      onFocus={() => setAddressFocused(true)}
-                      onBlur={() => setTimeout(() => setAddressFocused(false), 200)}
-                      placeholder="Start typing your address…"
-                      required
-                      autoComplete="street-address"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                    />
-                    {/* Autocomplete dropdown */}
-                    {addressFocused && addressSuggestions.length > 0 && (
-                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                        {addressSuggestions.map((s, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => {
-                              setAccountForm({ ...accountForm, address: s });
-                              setAddressSuggestions([]);
-                              setAddressFocused(false);
-                            }}
-                            className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 border-b border-gray-50 last:border-0 flex items-center gap-2"
-                          >
-                            <span className="text-orange-400 flex-shrink-0">📍</span>
-                            <span className="truncate">{s}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div className="text-xs text-gray-400 mt-1">Type your address and select from the list.</div>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="mt-4 bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 font-medium">
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full bg-orange-500 text-white font-bold py-4 rounded-xl disabled:bg-orange-300 mt-6 text-base active:scale-[0.98] transition-transform shadow-lg shadow-orange-200"
-                >
-                  {saving ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Creating account…
-                    </span>
-                  ) : (
-                    'Create account & continue →'
-                  )}
-                </button>
-              </form>
-
-              <div className="text-center mt-5">
-                <div className="text-xs text-gray-400">
-                  🔒 Your data is encrypted and stored securely.
-                </div>
-              </div>
-            </>
-            )}
+          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <Lock size={12} /> Your data is encrypted and stored securely.
           </div>
-        </div>
+        </StepShell>
       </Shell>
     );
   }
 
-  // ============ STEP 2: personal info / SIN / license ============
+  // ============ STEP 2: Personal Info + Documents ============
   if (step === 2) {
-    const FilePicker = ({ file, setFile, docType, label, hint }) => (
-      <div>
-        <label className={labelCls}>{label}</label>
-        <label className="block">
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              setFile(f);
-              if (f) handleUpload(docType, f, label);
-            }}
-            disabled={uploading === docType}
-          />
-          <span className={`inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-gray-200 cursor-pointer ${
-            file ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-700'
-          } ${uploading === docType ? 'opacity-50' : ''}`}>
-            {uploading === docType ? 'Uploading…' : file ? `✓ ${file.name}` : 'Choose file'}
-          </span>
-        </label>
-        {hint && <div className="text-xs text-gray-400 mt-1">{hint}</div>}
-      </div>
-    );
+    const CaptureCard = ({ file, setFile, docType, label, icon: Icon, onUpload, uploadKey }) => {
+      const isUploading = uploading === uploadKey;
+      const isDone = file && (docType ? docStatus[docType] === 'uploaded' : selfieUrl);
+      return (
+        <div className="dark-card" style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ width: 64, height: 64, borderRadius: 14, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+            {isDone ? (
+              <>
+                {selfieUrl && uploadKey === 'selfie' ? (
+                  <img src={selfieUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <Icon size={24} color="#22C55E" />
+                )}
+                <div style={{ position: 'absolute', top: 2, right: 2, width: 20, height: 20, borderRadius: '50%', background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Check size={12} color="white" />
+                </div>
+              </>
+            ) : isUploading ? (
+              <div style={{ width: 24, height: 24, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <Icon size={24} color="rgba(255,255,255,0.3)" />
+            )}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{label}</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+              {isDone ? 'Uploaded' : isUploading ? 'Uploading...' : 'Tap to capture'}
+            </div>
+          </div>
+          <label style={{ cursor: 'pointer', flexShrink: 0 }}>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) { setFile(f); if (onUpload) onUpload(f); else if (docType) handleUpload(docType, f, label); }
+              }}
+              disabled={isUploading}
+            />
+            <div className="glass-btn" style={{ minHeight: 40, padding: '8px 16px', borderRadius: 12, fontSize: 14, fontWeight: 600, color: isDone ? 'rgba(255,255,255,0.6)' : '#f97316', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {isDone ? 'Retake' : 'Capture'}
+            </div>
+          </label>
+        </div>
+      );
+    };
 
     return (
       <Shell>
-        <ProgressBar />
-        <div className="max-w-md mx-auto px-5 py-6">
-          <form onSubmit={submitPersonal} className={cardCls}>
-            <div className="font-semibold text-gray-900 mb-1">Personal Information</div>
-            <div className="text-xs text-gray-400 mb-4">Pre-filled from your invite. Upload your documents below.</div>
+        <StepShell onBack={() => setStep(1)}>
+          <Headline title="Your documents" subtitle="We need your photo ID and a selfie" />
 
-            {/* Selfie upload — shown to customers on the tracking page */}
-            <div className="mb-5">
-              <label className={labelCls}>Crew selfie</label>
-              <div className="flex items-center gap-4">
-                <div className="flex-shrink-0">
-                  {selfieUrl ? (
-                    <img src={selfieUrl} alt="Selfie" className="w-20 h-20 rounded-2xl object-cover border-2 border-orange-200 shadow-sm" />
-                  ) : (
-                    <div className="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center text-3xl text-gray-300">
-                      {uploading === 'selfie' ? (
-                        <span className="w-6 h-6 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-                      ) : '🤳'}
-                    </div>
-                  )}
-                </div>
-                <label className="flex-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      setSelfieFile(f);
-                      if (f) handleSelfieUpload(f);
-                    }}
-                    disabled={uploading === 'selfie'}
-                  />
-                  <span className={`inline-flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl border cursor-pointer ${
-                    selfieUrl ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'
-                  } ${uploading === 'selfie' ? 'opacity-50' : ''}`}>
-                    {uploading === 'selfie' ? 'Uploading…' : selfieUrl ? '✓ Selfie uploaded' : 'Take / upload selfie'}
-                  </span>
-                </label>
-              </div>
-              <div className="text-xs text-gray-400 mt-1.5">Customers see this photo when tracking their crew. A friendly face goes a long way!</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+            <CaptureCard file={selfieFile} setFile={setSelfieFile} label="Crew selfie" icon={Camera} onUpload={handleSelfieUpload} uploadKey="selfie" />
+            <CaptureCard file={sinFile} setFile={setSinFile} docType="sin_document" label="SIN document" icon={FileText} uploadKey="sin_document" />
+            <CaptureCard file={licenseFront} setFile={setLicenseFront} docType="drivers_license" label="Driver's license — front" icon={IdCard} uploadKey="license_front" />
+            <CaptureCard file={licenseBack} setFile={setLicenseBack} docType="drivers_license" label="Driver's license — back" icon={Car} uploadKey="license_back" />
+          </div>
+
+          <div className="dark-card" style={{ padding: 16, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <User size={16} color="rgba(255,255,255,0.6)" />
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Personal Info</span>
             </div>
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>{personal.name}</div>
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>{personal.email}</div>
+            <DarkInput label="Address" value={personal.address} onChange={(e) => setPersonal({ ...personal, address: e.target.value })} placeholder="Street, city, province, postal code" />
+          </div>
 
-            <div className="border-t border-gray-100 my-4" />
-
-            <div className="space-y-3">
-              <div>
-                <label className={labelCls}>Full legal name</label>
-                <input value={personal.name} readOnly className={inputCls + ' bg-gray-50 text-gray-500'} />
-              </div>
-              <div>
-                <label className={labelCls}>Email</label>
-                <input value={personal.email} readOnly className={inputCls + ' bg-gray-50 text-gray-500'} />
-              </div>
-              <div>
-                <label className={labelCls}>Address</label>
-                <input
-                  value={personal.address}
-                  onChange={(e) => setPersonal({ ...personal, address: e.target.value })}
-                  placeholder="Street, city, province, postal code"
-                  className={inputCls}
-                />
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 my-4" />
-
-            <div className="space-y-4">
-              <FilePicker
-                file={sinFile}
-                setFile={setSinFile}
-                docType="sin_document"
-                label="SIN document photo"
-                hint="A clear photo of your Social Insurance Number document."
-              />
-              <FilePicker
-                file={licenseFront}
-                setFile={setLicenseFront}
-                docType="drivers_license"
-                label="Driver's license — front"
-                hint="Photo of the front of your license."
-              />
-              <FilePicker
-                file={licenseBack}
-                setFile={setLicenseBack}
-                docType="drivers_license"
-                label="Driver's license — back"
-                hint="Photo of the back of your license."
-              />
-            </div>
-
-            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onNext={submitPersonal} nextLabel="Continue" />
-          </form>
-        </div>
+          <ErrorBanner />
+          <ContinueBtn label="Continue" onClick={submitPersonal} />
+        </StepShell>
       </Shell>
     );
   }
 
-  // ============ STEP 2: TD1 Federal ============
+  // ============ STEP 3: TD1 Federal ============
   if (step === 3) {
     return (
       <Shell>
-        <ProgressBar />
-        <div className="max-w-md mx-auto px-5 py-6">
-          <form onSubmit={(e) => { e.preventDefault(); submitTd1('federal', td1Federal, TD1_BASIC_PERSONAL, 4); }} className={cardCls}>
-            <div className="font-semibold text-gray-900 mb-1">TD1 — Federal Tax Form</div>
-            <div className="text-xs text-gray-400 mb-4">
-              Basic personal amount: <span className="font-medium text-gray-600">${TD1_BASIC_PERSONAL.toLocaleString()}</span>
-            </div>
-
-            <Td1Fields form={td1Federal} setForm={setTd1Federal} basic={TD1_BASIC_PERSONAL} spousalDefault={SPOUSAL_AMOUNT} />
-
-            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(2)} nextLabel="Save & continue" />
+        <StepShell onBack={() => setStep(2)}>
+          <Headline title="Tax info — Federal" subtitle="Let's get your TD1 sorted" />
+          <form onSubmit={(e) => { e.preventDefault(); submitTd1('federal', td1Federal, TD1_BASIC_PERSONAL, 4); }}>
+            <Td1FieldsDark form={td1Federal} setForm={setTd1Federal} basic={TD1_BASIC_PERSONAL} spousalDefault={SPOUSAL_AMOUNT} />
+            <ErrorBanner />
+            <ContinueBtn label="Save & continue" />
           </form>
-        </div>
+        </StepShell>
       </Shell>
     );
   }
 
-  // ============ STEP 3: TD1AB ============
+  // ============ STEP 4: TD1AB Alberta ============
   if (step === 4) {
     return (
       <Shell>
-        <ProgressBar />
-        <div className="max-w-md mx-auto px-5 py-6">
-          <form onSubmit={(e) => { e.preventDefault(); submitTd1('ab', td1Ab, TD1AB_BASIC_PERSONAL, 5); }} className={cardCls}>
-            <div className="font-semibold text-gray-900 mb-1">TD1AB — Alberta Provincial Tax Form</div>
-            <div className="text-xs text-gray-400 mb-4">
-              Basic personal amount: <span className="font-medium text-gray-600">${TD1AB_BASIC_PERSONAL.toLocaleString()}</span>
-            </div>
-
-            <Td1Fields form={td1Ab} setForm={setTd1Ab} basic={TD1AB_BASIC_PERSONAL} spousalDefault={SPOUSAL_AMOUNT} />
-
-            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(3)} nextLabel="Save & continue" />
+        <StepShell onBack={() => setStep(3)}>
+          <Headline title="Tax info — Alberta" subtitle="Provincial tax form" />
+          <form onSubmit={(e) => { e.preventDefault(); submitTd1('ab', td1Ab, TD1AB_BASIC_PERSONAL, 5); }}>
+            <Td1FieldsDark form={td1Ab} setForm={setTd1Ab} basic={TD1AB_BASIC_PERSONAL} spousalDefault={SPOUSAL_AMOUNT} />
+            <ErrorBanner />
+            <ContinueBtn label="Save & continue" />
           </form>
-        </div>
+        </StepShell>
       </Shell>
     );
   }
 
-  // ============ STEP 5: contract e-sign ============
+  // ============ STEP 5: Contract E-Sign ============
   if (step === 5) {
     return (
       <Shell>
-        <ProgressBar />
-        <div className="max-w-md mx-auto px-5 py-6">
-          <form onSubmit={submitContract} className={cardCls}>
-            <div className="font-semibold text-gray-900 mb-3">Employment Contract</div>
-            <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600 max-h-64 overflow-y-auto space-y-2">
-              <p><strong>Junk Haul Crew — Employment Agreement (v1.0)</strong></p>
-              <p>This agreement is between Junk Haul (&ldquo;the Company&rdquo;) and the undersigned employee (&ldquo;you&rdquo;).</p>
-              <p>1. <strong>Role.</strong> You are hired as a crew member responsible for junk removal services, including driving, loading, and customer interaction.</p>
-              <p>2. <strong>Pay.</strong> You will be paid at the agreed hourly rate. Overtime applies per provincial employment standards.</p>
-              <p>3. <strong>Schedule.</strong> Shifts are assigned via the crew portal. You are responsible for clocking in and out accurately.</p>
-              <p>4. <strong>Conduct.</strong> You agree to perform duties safely, courteously, and in compliance with all laws and Company policies.</p>
-              <p>5. <strong>Termination.</strong> Either party may end employment with notice as required by law.</p>
-              <p>6. <strong>Confidentiality.</strong> Customer and Company information must be kept confidential.</p>
+        <StepShell onBack={() => setStep(4)}>
+          <Headline title="Sign your contract" subtitle="Read and sign below" />
+          <form onSubmit={submitContract}>
+            <div className="dark-card" style={{ padding: 16, marginBottom: 20, maxHeight: 260, overflowY: 'auto', fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+              <p style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Junk Haul Crew — Employment Agreement (v1.0)</p>
+              <p style={{ marginBottom: 8 }}>This agreement is between Junk Haul (&ldquo;the Company&rdquo;) and the undersigned employee (&ldquo;you&rdquo;).</p>
+              <p style={{ marginBottom: 8 }}><strong>1. Role.</strong> You are hired as a crew member responsible for junk removal services, including driving, loading, and customer interaction.</p>
+              <p style={{ marginBottom: 8 }}><strong>2. Pay.</strong> You will be paid at the agreed hourly rate. Overtime applies per provincial employment standards.</p>
+              <p style={{ marginBottom: 8 }}><strong>3. Schedule.</strong> Shifts are assigned via the crew portal. You are responsible for clocking in and out accurately.</p>
+              <p style={{ marginBottom: 8 }}><strong>4. Conduct.</strong> You agree to perform duties safely, courteously, and in compliance with all laws and Company policies.</p>
+              <p style={{ marginBottom: 8 }}><strong>5. Termination.</strong> Either party may end employment with notice as required by law.</p>
+              <p style={{ marginBottom: 8 }}><strong>6. Confidentiality.</strong> Customer and Company information must be kept confidential.</p>
               <p>By typing your name below, you acknowledge you have read and agree to this contract.</p>
             </div>
 
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className={labelCls}>Type your full legal name as your signature</label>
-                <input
-                  value={contract.signature_typed}
-                  onChange={(e) => setContract({ ...contract, signature_typed: e.target.value })}
-                  placeholder="Full legal name"
-                  className={inputCls}
-                />
-              </div>
-              <label className="flex items-start gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={contract.agreed}
-                  onChange={(e) => setContract({ ...contract, agreed: e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300"
-                />
-                <span>I have read and agree to the employment contract above.</span>
-              </label>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Type your full legal name as your signature</label>
+              <input
+                value={contract.signature_typed}
+                onChange={(e) => setContract({ ...contract, signature_typed: e.target.value })}
+                placeholder="Sign here"
+                className="dark-input"
+                style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 18, fontStyle: 'italic', color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, borderBottom: '2px solid rgba(255,255,255,0.2)' }}
+              />
             </div>
 
-            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(4)} nextLabel="Sign & continue" nextDisabled={!contract.agreed || !contract.signature_typed.trim()} />
+            <button
+              type="button"
+              onClick={() => setContract({ ...contract, agreed: !contract.agreed })}
+              className="dark-card"
+              style={{ width: '100%', padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', border: contract.agreed ? '1px solid rgba(249,115,22,0.3)' : '1px solid rgba(255,255,255,0.06)', background: contract.agreed ? 'rgba(249,115,22,0.08)' : '#161618', borderRadius: 14, marginBottom: 16 }}
+            >
+              <div style={{ width: 24, height: 24, borderRadius: 6, border: contract.agreed ? 'none' : '2px solid rgba(255,255,255,0.2)', background: contract.agreed ? '#f97316' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {contract.agreed && <Check size={16} color="white" />}
+              </div>
+              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>I have read and agree to the employment contract above.</span>
+            </button>
+
+            <ErrorBanner />
+            <ContinueBtn label="Sign & continue" disabled={!contract.agreed || !contract.signature_typed.trim()} />
           </form>
-        </div>
+        </StepShell>
       </Shell>
     );
   }
 
-  // ============ STEP 6: banking ============
+  // ============ STEP 6: Banking ============
   if (step === 6) {
     return (
       <Shell>
-        <ProgressBar />
-        <div className="max-w-md mx-auto px-5 py-6">
-          <form onSubmit={submitBanking} className={cardCls}>
-            <div className="font-semibold text-gray-900 mb-1">Direct Deposit — Banking Info</div>
-            <div className="text-xs text-gray-400 mb-4">Your account details are encrypted at rest.</div>
+        <StepShell onBack={() => setStep(5)}>
+          <Headline title="Direct deposit" subtitle="Where should we send your pay?" />
+          <form onSubmit={submitBanking}>
+            <DarkInput label="Bank name" value={banking.bank_name} onChange={(e) => setBanking({ ...banking, bank_name: e.target.value })} placeholder="e.g. RBC, TD, Scotiabank" />
+            <DarkInput label="Institution number (3 digits)" value={banking.institution_number} onChange={(e) => setBanking({ ...banking, institution_number: e.target.value.replace(/\D/g, '').slice(0, 3) })} placeholder="e.g. 003" inputMode="numeric" />
+            <DarkInput label="Transit number (5 digits)" value={banking.transit_number} onChange={(e) => setBanking({ ...banking, transit_number: e.target.value.replace(/\D/g, '').slice(0, 5) })} placeholder="e.g. 01234" inputMode="numeric" />
+            <DarkInput label="Account number" value={banking.account_number} onChange={(e) => setBanking({ ...banking, account_number: e.target.value.replace(/\s/g, '') })} placeholder="Your bank account number" inputMode="numeric" />
 
-            <div className="space-y-3">
-              <div>
-                <label className={labelCls}>Bank name</label>
-                <input
-                  value={banking.bank_name}
-                  onChange={(e) => setBanking({ ...banking, bank_name: e.target.value })}
-                  placeholder="e.g. RBC, TD, Scotiabank"
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Institution number (3 digits)</label>
-                <input
-                  value={banking.institution_number}
-                  onChange={(e) => setBanking({ ...banking, institution_number: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                  placeholder="e.g. 003"
-                  inputMode="numeric"
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Transit number (5 digits)</label>
-                <input
-                  value={banking.transit_number}
-                  onChange={(e) => setBanking({ ...banking, transit_number: e.target.value.replace(/\D/g, '').slice(0, 5) })}
-                  placeholder="e.g. 01234"
-                  inputMode="numeric"
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Account number</label>
-                <input
-                  value={banking.account_number}
-                  onChange={(e) => setBanking({ ...banking, account_number: e.target.value.replace(/\s/g, '') })}
-                  placeholder="Your bank account number"
-                  inputMode="numeric"
-                  className={inputCls}
-                />
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>
+              <Lock size={12} /> Your account details are encrypted at rest.
             </div>
 
-            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(5)} nextLabel="Save & continue" />
+            <ErrorBanner />
+            <ContinueBtn label="Save & continue" />
           </form>
-        </div>
+        </StepShell>
       </Shell>
     );
   }
 
-  // ============ STEP 7: acknowledgments ============
+  // ============ STEP 7: Acknowledgments ============
   if (step === 7) {
     const items = [
       { key: 'tickets', text: 'I acknowledge that any traffic tickets received while driving for work are my responsibility.' },
@@ -1061,90 +755,77 @@ function OnboardInner() {
     ];
     return (
       <Shell>
-        <ProgressBar />
-        <div className="max-w-md mx-auto px-5 py-6">
-          <form onSubmit={submitAcks} className={cardCls}>
-            <div className="font-semibold text-gray-900 mb-4">Acknowledgments</div>
-            <div className="space-y-3">
+        <StepShell onBack={() => setStep(6)}>
+          <Headline title="Quick acknowledgments" subtitle="Tap each one to confirm" />
+          <form onSubmit={submitAcks}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
               {items.map((it) => (
-                <label key={it.key} className="flex items-start gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={acks[it.key]}
-                    onChange={(e) => setAcks({ ...acks, [it.key]: e.target.checked })}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300"
-                  />
-                  <span>{it.text}</span>
-                </label>
+                <button
+                  key={it.key}
+                  type="button"
+                  onClick={() => setAcks({ ...acks, [it.key]: !acks[it.key] })}
+                  className="dark-card"
+                  style={{ width: '100%', padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', border: acks[it.key] ? '1px solid rgba(249,115,22,0.3)' : '1px solid rgba(255,255,255,0.06)', background: acks[it.key] ? 'rgba(249,115,22,0.08)' : '#161618', borderRadius: 14 }}
+                >
+                  <div style={{ width: 24, height: 24, borderRadius: 6, border: acks[it.key] ? 'none' : '2px solid rgba(255,255,255,0.2)', background: acks[it.key] ? '#f97316' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {acks[it.key] && <Check size={16} color="white" />}
+                  </div>
+                  <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', flex: 1 }}>{it.text}</span>
+                </button>
               ))}
             </div>
-            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(6)} nextLabel="Continue" nextDisabled={!acks.tickets || !acks.phone || !acks.data || !acks.company_card} />
+            <ErrorBanner />
+            <ContinueBtn label="Continue" disabled={!acks.tickets || !acks.phone || !acks.data || !acks.company_card} />
           </form>
-        </div>
+        </StepShell>
       </Shell>
     );
   }
 
-  // ============ STEP 8: complete ============
+  // ============ STEP 8: Complete ============
   if (step === 8) {
     const done = completeData?.ok;
     return (
       <Shell>
-        <ProgressBar />
-        <div className="max-w-md mx-auto px-5 py-6">
-          <div className={cardCls + ' text-center'}>
-            {!done && !completeData?.missing && (
-              <>
-                <div className="text-lg font-bold text-gray-900 mb-2">Final step</div>
-                <div className="text-sm text-gray-500 mb-4">
-                  Click below to verify everything and finish your onboarding.
-                </div>
-                <button
-                  onClick={completeOnboarding}
-                  disabled={saving}
-                  className="w-full bg-orange-500 text-white font-semibold py-3 rounded-lg disabled:bg-orange-300"
-                >
-                  {saving ? 'Verifying…' : 'Complete onboarding'}
-                </button>
-              </>
-            )}
+        <StepShell onBack={!done && !completeData?.missing ? () => setStep(7) : undefined}>
+          <Headline title="Final step" subtitle="Verify everything and finish your onboarding" />
 
-            {!done && completeData?.missing && (
-              <>
-                <div className="text-lg font-bold text-red-500 mb-2">Not quite done</div>
-                <div className="text-sm text-gray-600 mb-3">Some items still need attention:</div>
-                <ul className="text-left text-sm text-gray-700 list-disc list-inside space-y-1 mb-4">
-                  {completeData.missing.map((m, i) => <li key={i}>{m}</li>)}
-                </ul>
-                <button
-                  onClick={() => setError('')}
-                  className="text-sm text-gray-500 underline"
-                >
-                  Go back to fix
-                </button>
-              </>
-            )}
+          {!done && !completeData?.missing && (
+            <>
+              <div className="dark-card" style={{ padding: 24, textAlign: 'center', marginBottom: 16 }}>
+                <CheckCircle size={40} color="#22C55E" style={{ margin: '0 auto 12px' }} />
+                <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)' }}>Everything looks good. Click below to finish.</div>
+              </div>
+              <ErrorBanner />
+              <ContinueBtn label="Complete onboarding" onClick={completeOnboarding} />
+            </>
+          )}
 
-            {done && (
-              <>
-                <div className="text-4xl mb-3">✅</div>
-                <div className="text-lg font-bold text-gray-900 mb-1">You&apos;re all set!</div>
-                <div className="text-sm text-gray-500 mb-5">
-                  Onboarding complete. You can now view your schedule and clock in.
-                </div>
-                <button
-                  onClick={() => router.push('/portal/schedule')}
-                  className="w-full bg-orange-500 text-white font-semibold py-3 rounded-lg"
-                >
-                  Go to schedule →
-                </button>
-              </>
-            )}
+          {!done && completeData?.missing && (
+            <div className="dark-card" style={{ padding: 24, border: '1px solid rgba(239,68,68,0.2)' }}>
+              <AlertTriangle size={32} color="#EF4444" style={{ margin: '0 auto 12px' }} />
+              <div style={{ fontSize: 18, fontWeight: 600, color: '#EF4444', textAlign: 'center', marginBottom: 8 }}>Not quite done</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>Some items still need attention:</div>
+              <ul style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', listStyle: 'disc', paddingLeft: 20, marginBottom: 16 }}>
+                {completeData.missing.map((m, i) => <li key={i} style={{ marginBottom: 4 }}>{m}</li>)}
+              </ul>
+              <button onClick={() => { setCompleteData(null); setError(''); }} className="btn-ghost" style={{ width: '100%', minHeight: 48 }}>Go back to fix</button>
+            </div>
+          )}
 
-            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-          </div>
-        </div>
+          {done && (
+            <div style={{ textAlign: 'center', paddingTop: 40 }}>
+              <div className="celebrate" style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                <CheckCircle size={48} color="#22C55E" />
+              </div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>You&apos;re all set, {invite?.first_name || 'Crew'}!</div>
+              <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)', marginBottom: 32 }}>Welcome to the crew</div>
+              <button onClick={() => router.push('/portal/schedule')} className="btn-primary safe-bottom" style={{ width: '100%', minHeight: 52, fontSize: 16 }}>
+                Continue to app
+              </button>
+            </div>
+          )}
+        </StepShell>
       </Shell>
     );
   }
@@ -1152,67 +833,49 @@ function OnboardInner() {
   return null;
 }
 
-// ============ TD1 shared fields ============
-function Td1Fields({ form, setForm, basic, spousalDefault }) {
+// ============ TD1 shared fields (dark theme) ============
+function Td1FieldsDark({ form, setForm, basic, spousalDefault }) {
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const autoTotal = (Number(form.spousal_amount) || 0) + (Number(form.other_deductions) || 0) + basic;
-  const inputCls = 'w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm';
-  const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
+
+  const inputStyle = {
+    width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16,
+    color: 'rgba(255,255,255,0.9)', background: '#1A1A1E',
+    border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12,
+  };
+  const labelStyle = { fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 };
 
   return (
-    <div className="space-y-3">
-      <div>
-        <label className={labelCls}>Total income from all employers this year (if more than one)</label>
-        <input
-          value={form.total_income_other_employers}
-          onChange={set('total_income_other_employers')}
-          placeholder="0"
-          inputMode="numeric"
-          className={inputCls}
-        />
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>Total income from all employers this year</label>
+        <input value={form.total_income_other_employers} onChange={set('total_income_other_employers')} placeholder="0" inputMode="numeric" className="dark-input" style={inputStyle} />
       </div>
-      <div>
-        <label className={labelCls}>Spousal amount (if applicable)</label>
-        <input
-          value={form.spousal_amount}
-          onChange={set('spousal_amount')}
-          placeholder={`e.g. ${spousalDefault.toLocaleString()}`}
-          inputMode="numeric"
-          className={inputCls}
-        />
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>Spousal amount (if applicable)</label>
+        <input value={form.spousal_amount} onChange={set('spousal_amount')} placeholder={`e.g. ${spousalDefault.toLocaleString()}`} inputMode="numeric" className="dark-input" style={inputStyle} />
       </div>
-      <div>
-        <label className={labelCls}>Number of dependents</label>
-        <input
-          value={form.dependents_count}
-          onChange={set('dependents_count')}
-          placeholder="0"
-          inputMode="numeric"
-          className={inputCls}
-        />
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>Number of dependents</label>
+        <input value={form.dependents_count} onChange={set('dependents_count')} placeholder="0" inputMode="numeric" className="dark-input" style={inputStyle} />
       </div>
-      <div>
-        <label className={labelCls}>Other deductions</label>
-        <input
-          value={form.other_deductions}
-          onChange={set('other_deductions')}
-          placeholder="0"
-          inputMode="numeric"
-          className={inputCls}
-        />
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>Other deductions</label>
+        <input value={form.other_deductions} onChange={set('other_deductions')} placeholder="0" inputMode="numeric" className="dark-input" style={inputStyle} />
       </div>
-      <div>
-        <label className={labelCls}>Total claim amount</label>
-        <input
-          value={form.total_claim}
-          onChange={set('total_claim')}
-          placeholder={`Auto: $${autoTotal.toLocaleString()}`}
-          inputMode="numeric"
-          className={inputCls}
-        />
-        <div className="text-xs text-gray-400 mt-1">
-          Leave blank to auto-calculate (${autoTotal.toLocaleString()}) or enter a custom amount.
+
+      {/* Live-updating total claim card */}
+      <div className="dark-card" style={{ padding: 20, marginBottom: 16, border: '1px solid rgba(249,115,22,0.3)', textAlign: 'center' }}>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Total claim amount (auto-calculated)</div>
+        <div className="tabular" style={{ fontSize: 34, fontWeight: 700, color: '#f97316' }}>
+          ${autoTotal.toLocaleString()}
         </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>Override total claim (optional)</label>
+        <input value={form.total_claim} onChange={set('total_claim')} placeholder={`Auto: $${autoTotal.toLocaleString()}`} inputMode="numeric" className="dark-input" style={inputStyle} />
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Leave blank to use auto-calculated amount.</div>
       </div>
     </div>
   );
@@ -1220,12 +883,12 @@ function Td1Fields({ form, setForm, basic, spousalDefault }) {
 
 // ============ shell wrapper ============
 function Shell({ children }) {
-  return <main className="min-h-dvh bg-gray-50 flex flex-col safe-top safe-bottom">{children}</main>;
+  return <main className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#0A0A0B' }}>{children}</main>;
 }
 
 export default function OnboardPage() {
   return (
-    <Suspense fallback={<Shell><div className="text-center text-gray-400 py-12">Loading…</div></Shell>}>
+    <Suspense fallback={<Shell><div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: 48 }}>Loading...</div></Shell>}>
       <OnboardInner />
     </Suspense>
   );

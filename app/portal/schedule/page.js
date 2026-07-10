@@ -2,19 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { Clock, FileText, Wallet, LogOut, MapPin, Navigation, Phone, Truck, Calendar, CheckCircle, ChevronDown, StickyNote, MapPinOff, Bell, AlertTriangle } from 'lucide-react';
 
 // ============================================================
 // /portal/schedule — Uber Driver-style map-first schedule.
-// Top half: live Mapbox map with route + ETA.
-// Bottom half: scrollable job cards.
+// Dark theme. Draggable bottom sheet. Floating glass header.
 // Keeps all existing API calls and job-clock logic.
 // ============================================================
 
-const STATUS_STYLES = {
-  confirmed: 'bg-blue-100 text-blue-700',
-  scheduled: 'bg-blue-100 text-blue-700',
-  in_progress: 'bg-amber-100 text-amber-700',
-  completed: 'bg-green-100 text-green-700',
+const STATUS_COLORS = {
+  confirmed: { bg: 'rgba(59,130,246,0.15)', text: '#60A5FA', border: 'rgba(59,130,246,0.3)' },
+  scheduled: { bg: 'rgba(59,130,246,0.15)', text: '#60A5FA', border: 'rgba(59,130,246,0.3)' },
+  in_progress: { bg: 'rgba(245,158,11,0.15)', text: '#F59E0B', border: 'rgba(245,158,11,0.3)' },
+  completed: { bg: 'rgba(34,197,94,0.15)', text: '#22C55E', border: 'rgba(34,197,94,0.3)' },
 };
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -25,16 +25,38 @@ export default function SchedulePage() {
   const [emp, setEmp] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(null); // booking_id being toggled
+  const [busy, setBusy] = useState(null);
   const [now, setNow] = useState(Date.now());
 
   // Map state
   const [mapReady, setMapReady] = useState(false);
-  const [crewPos, setCrewPos] = useState(null); // {lat, lng}
-  const [jobCoords, setJobCoords] = useState({}); // booking_id -> [lng, lat]
-  const [routeInfo, setRouteInfo] = useState(null); // {eta, distance, geometry}
-  const [locPerm, setLocPerm] = useState('default'); // 'default' | 'granted' | 'denied'
+  const [crewPos, setCrewPos] = useState(null);
+  const [jobCoords, setJobCoords] = useState({});
+  const [routeInfo, setRouteInfo] = useState(null);
+  const [locPerm, setLocPerm] = useState('default');
   const [showLocPrompt, setShowLocPrompt] = useState(false);
+
+  // Bottom sheet state
+  const [sheetState, setSheetState] = useState('collapsed'); // 'collapsed' | 'half' | 'full'
+  const [dragY, setDragY] = useState(null);
+  const sheetStartY = useRef(0);
+
+  // Expanded items/notes
+  const [expandedItems, setExpandedItems] = useState({});
+  const [expandedNotes, setExpandedNotes] = useState({});
+
+  // End of day celebration
+  const [showEOD, setShowEOD] = useState(false);
+
+  // Notification badge count
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  // Weekly view
+  const [showWeekly, setShowWeekly] = useState(false);
+  const [weekData, setWeekData] = useState(null);
+
+  // Online status
+  const [isOnline, setIsOnline] = useState(true);
 
   // Refs
   const mapRef = useRef(null);
@@ -60,7 +82,6 @@ export default function SchedulePage() {
     } else if (stored === 'false') {
       setLocPerm('denied');
     } else {
-      // Check actual permission state if available
       if (navigator.permissions && navigator.permissions.query) {
         navigator.permissions
           .query({ name: 'geolocation' })
@@ -92,7 +113,6 @@ export default function SchedulePage() {
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCrewPos(p);
-        // Throttled POST to /api/employee/location
         const ts = Date.now();
         if (ts - lastSentRef.current >= 30000) {
           lastSentRef.current = ts;
@@ -169,8 +189,8 @@ export default function SchedulePage() {
     window.mapboxgl.accessToken = MAPBOX_TOKEN;
     const map = new window.mapboxgl.Map({
       container: mapRef.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [-114.0719, 51.0447], // Calgary
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [-114.0719, 51.0447],
       zoom: 11,
     });
     mapInstanceRef.current = map;
@@ -189,7 +209,7 @@ export default function SchedulePage() {
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`
       );
       const d = await res.json();
-      if (d.features && d.features[0]) return d.features[0].center; // [lng, lat]
+      if (d.features && d.features[0]) return d.features[0].center;
     } catch {}
     return null;
   };
@@ -213,43 +233,52 @@ export default function SchedulePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady, JSON.stringify(bookings.map((b) => b.id + b.address))]);
 
-  // ---------- Update markers on map ----------
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !mapReady || !window.mapboxgl) return;
-
-    // Clear old markers
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    // Job markers
-    bookings.forEach((b, idx) => {
-      const c = jobCoords[b.id];
-      if (!c) return;
-      const el = document.createElement('div');
-      const isActive = idx === currentJobIndex;
-      el.innerHTML = `<div style="width:${isActive ? 38 : 32}px;height:${isActive ? 38 : 32}px;background:#f97316;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:white;font-weight:700;font-size:14px;">${idx + 1}</span></div>`;
-      const marker = new window.mapboxgl.Marker(el).setLngLat(c).addTo(map);
-      markersRef.current.push(marker);
-    });
-
-    // Crew marker
-    if (crewPos) {
-      if (crewMarkerRef.current) crewMarkerRef.current.remove();
-      const el = document.createElement('div');
-      el.innerHTML = `<div style="width:20px;height:20px;background:#1f2937;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`;
-      crewMarkerRef.current = new window.mapboxgl.Marker(el)
-        .setLngLat([crewPos.lng, crewPos.lat])
-        .addTo(map);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, jobCoords, crewPos]);
-
   // ---------- Compute current/next job ----------
   const currentJobIndex = bookings.findIndex(
     (b) => b.status === 'in_progress' || b.status === 'confirmed' || b.status === 'scheduled'
   );
   const nextJob = currentJobIndex >= 0 ? bookings[currentJobIndex] : null;
+
+  // ---------- Update markers on map ----------
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !mapReady || !window.mapboxgl) return;
+
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    bookings.forEach((b, idx) => {
+      const c = jobCoords[b.id];
+      if (!c) return;
+      const el = document.createElement('div');
+      const isActive = idx === currentJobIndex;
+      const size = isActive ? 38 : 32;
+      el.innerHTML = `<div style="width:${size}px;height:${size}px;background:#f97316;border-radius:50% 50% 50% 0;transform:rotate(-45deg);${isActive ? 'animation:gentle-bounce 2s ease-in-out infinite;' : ''}border:3px solid white;box-shadow:0 2px 8px rgba(249,115,22,0.4);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:white;font-weight:700;font-size:14px;">${idx + 1}</span></div>`;
+      const marker = new window.mapboxgl.Marker(el).setLngLat(c).addTo(map);
+      markersRef.current.push(marker);
+    });
+
+    if (crewPos) {
+      if (crewMarkerRef.current) crewMarkerRef.current.remove();
+      const el = document.createElement('div');
+      el.innerHTML = `<div style="position:relative;width:20px;height:20px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 12px rgba(59,130,246,0.6);"><div style="position:absolute;top:-4px;left:-4px;right:-4px;bottom:-4px;border-radius:50%;background:rgba(59,130,246,0.3);animation:pulse-ring 2s ease-out infinite;"></div></div>`;
+      crewMarkerRef.current = new window.mapboxgl.Marker(el)
+        .setLngLat([crewPos.lng, crewPos.lat])
+        .addTo(map);
+    }
+
+    // Auto-fit bounds
+    if (crewPos && bookings.length > 0) {
+      const bounds = new window.mapboxgl.LngLatBounds();
+      bounds.extend([crewPos.lng, crewPos.lat]);
+      bookings.forEach((b) => {
+        const c = jobCoords[b.id];
+        if (c) bounds.extend(c);
+      });
+      if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 60, maxZoom: 14 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, jobCoords, crewPos]);
 
   // ---------- Draw route + ETA ----------
   const drawRoute = useCallback(
@@ -282,7 +311,7 @@ export default function SchedulePage() {
               id: 'route',
               type: 'line',
               source: 'route',
-              paint: { 'line-color': '#f97316', 'line-width': 5 },
+              paint: { 'line-color': '#f97316', 'line-width': 5, 'line-opacity': 0.8 },
             });
           }
         }
@@ -323,7 +352,6 @@ export default function SchedulePage() {
     if (res.status === 401) { router.push('/portal'); return null; }
     const d = await res.json();
     setEmp(d.employee);
-    // Gate: if onboarding is not complete, redirect to onboarding
     if (d.employee && !d.employee.onboarded) {
       router.push('/portal/onboard');
       return null;
@@ -340,6 +368,41 @@ export default function SchedulePage() {
   }, [router]);
 
   useEffect(() => { loadMe(); loadSchedule(); }, [loadMe, loadSchedule]);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchNotifs = async () => {
+      try {
+        const res = await fetch('/api/employee/notifications');
+        if (res.ok) { const d = await res.json(); setUnreadNotifs(d.unread || 0); }
+      } catch {}
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch weekly data when toggled
+  useEffect(() => {
+    if (!showWeekly) return;
+    const fetchWeek = async () => {
+      try {
+        const res = await fetch('/api/employee/schedule?weekly=true');
+        if (res.ok) { const d = await res.json(); setWeekData(d.week || []); }
+      } catch {}
+    };
+    fetchWeek();
+  }, [showWeekly]);
+
+  // Track online/offline status
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    setIsOnline(navigator.onLine);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
 
   const logout = async () => {
     await fetch('/api/employee/logout', { method: 'POST' });
@@ -360,11 +423,35 @@ export default function SchedulePage() {
     loadSchedule();
   };
 
+  // ---------- Bottom sheet drag handlers ----------
+  const onTouchStart = (e) => {
+    sheetStartY.current = e.touches[0].clientY;
+    setDragY(sheetStartY.current);
+  };
+
+  const onTouchMove = (e) => {
+    setDragY(e.touches[0].clientY);
+  };
+
+  const onTouchEnd = (e) => {
+    const deltaY = sheetStartY.current - (dragY || sheetStartY.current);
+    if (deltaY > 50) {
+      // Dragged up
+      if (sheetState === 'collapsed') setSheetState('half');
+      else if (sheetState === 'half') setSheetState('full');
+    } else if (deltaY < -50) {
+      // Dragged down
+      if (sheetState === 'full') setSheetState('half');
+      else if (sheetState === 'half') setSheetState('collapsed');
+    }
+    setDragY(null);
+  };
+
   // ---------- Loading state ----------
   if (loading) {
     return (
-      <main className="min-h-dvh bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-400">Loading…</div>
+      <main className="min-h-dvh flex items-center justify-center" style={{ background: '#0A0A0B' }}>
+        <div style={{ color: 'rgba(255,255,255,0.4)' }}>Loading...</div>
       </main>
     );
   }
@@ -372,25 +459,20 @@ export default function SchedulePage() {
   // ---------- Location required gate ----------
   if (locPerm === 'denied') {
     return (
-      <main className="min-h-dvh bg-gray-50 flex flex-col items-center justify-center px-6 safe-top">
+      <main className="min-h-dvh flex flex-col items-center justify-center px-6 safe-top safe-bottom" style={{ background: '#0A0A0B' }}>
         <div className="max-w-sm w-full text-center">
-          <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-5">
-            <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
-              <line x1="8" y1="8" x2="16" y2="16" stroke="currentColor" strokeWidth={2} />
-              <line x1="16" y1="8" x2="8" y2="16" stroke="currentColor" strokeWidth={2} />
-            </svg>
+          <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <MapPinOff size={40} color="#EF4444" />
           </div>
-          <div className="text-xl font-bold text-gray-900 mb-2">Location Required</div>
-          <div className="text-sm text-gray-500 mb-6">
-            Junk Haul Crew needs your location to track jobs, navigate to customers, and share ETA with clients.
-            Without location access, the app cannot function.
+          <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Location Required</div>
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 24, lineHeight: 1.5 }}>
+            Junk Haul Crew needs your location to track jobs, navigate to customers, and share ETA with clients. Without location access, the app cannot function.
           </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 text-left space-y-3">
-            <div className="text-sm font-semibold text-gray-900">To enable location:</div>
-            <div className="text-xs text-gray-500 space-y-2">
-              <div><strong className="text-gray-700">iPhone:</strong> Settings → JunkHaul → Location → Allow</div>
-              <div><strong className="text-gray-700">Android:</strong> Settings → Apps → JunkHaul → Permissions → Location → Allow</div>
+          <div className="dark-card p-5 text-left space-y-3">
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>To enable location:</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div><strong style={{ color: 'rgba(255,255,255,0.8)' }}>iPhone:</strong> Settings &rarr; JunkHaul &rarr; Location &rarr; Allow</div>
+              <div><strong style={{ color: 'rgba(255,255,255,0.8)' }}>Android:</strong> Settings &rarr; Apps &rarr; JunkHaul &rarr; Permissions &rarr; Location &rarr; Allow</div>
             </div>
             <button
               onClick={() => {
@@ -398,13 +480,14 @@ export default function SchedulePage() {
                 setLocPerm('default');
                 setShowLocPrompt(true);
               }}
-              className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition mt-2"
+              className="btn-primary w-full"
+              style={{ minHeight: 48, marginTop: 8 }}
             >
               Try Again
             </button>
             <button
               onClick={logout}
-              className="w-full text-gray-400 font-medium py-2 text-sm"
+              style={{ width: '100%', color: 'rgba(255,255,255,0.4)', fontWeight: 500, padding: '8px 0', fontSize: 14, background: 'transparent', border: 'none' }}
             >
               Log out
             </button>
@@ -426,13 +509,12 @@ export default function SchedulePage() {
     weekday: 'long', month: 'long', day: 'numeric',
   });
 
-  // End of day stats
   const jobsCompleted = bookings.filter((b) => b.status === 'completed').length;
+  const allDone = assignment && bookings.length > 0 && jobsCompleted === bookings.length;
   const totalMinutes = completedSessions.reduce(
     (sum, s) => sum + (s.duration_minutes || 0), 0
   );
   const totalHours = (totalMinutes / 60).toFixed(1);
-  const receiptsTotal = 0;
 
   const fmtDuration = (ms) => {
     const totalSec = Math.floor(ms / 1000);
@@ -444,310 +526,447 @@ export default function SchedulePage() {
 
   const clockedIn = !!(data?.open_shift);
 
+  // Sheet height based on state
+  const sheetHeights = { collapsed: 130, half: '50%', full: '85%' };
+  const sheetHeight = sheetHeights[sheetState];
+
   return (
-    <main className="min-h-dvh bg-gray-50 flex flex-col">
-      {/* Header with safe-top */}
-      <header className="safe-top bg-white border-b border-gray-200 px-4 pb-3 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-2">
-          <span className={`w-2.5 h-2.5 rounded-full ${clockedIn ? 'bg-green-500' : 'bg-gray-300'}`} />
-          <div>
-            <div className="font-bold text-gray-900 text-sm leading-tight">{emp?.name || 'Crew'}</div>
-            <div className="text-[11px] text-gray-400 leading-tight">{today}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => router.push('/portal/clock')} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 active:scale-95 transition" aria-label="Shift status">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg>
-          </button>
-          <button onClick={() => router.push('/portal/documents')} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 active:scale-95 transition" aria-label="Docs">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 001 1h4" /><path d="M5 3h9l5 5v11a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" strokeLinejoin="round" /><path d="M9 13h6M9 17h6" strokeLinecap="round" /></svg>
-          </button>
-          <button onClick={() => router.push('/portal/paystubs')} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 active:scale-95 transition" aria-label="Pay">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" strokeLinecap="round" /></svg>
-          </button>
-          <button onClick={logout} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 active:scale-95 transition" aria-label="Logout">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M15 12H3M11 8l-4 4 4 4" strokeLinecap="round" strokeLinejoin="round" /><path d="M11 4h6a2 2 0 012 2v12a2 2 0 01-2 2h-6" strokeLinecap="round" /></svg>
-          </button>
-        </div>
-      </header>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 text-sm px-4 py-2">{error}</div>
-      )}
-
-      {/* ===== Map (top 45vh) ===== */}
-      <div className="relative" style={{ height: '45vh', minHeight: 280 }}>
+    <main className="min-h-dvh flex flex-col" style={{ background: '#0A0A0B' }}>
+      {/* ===== Map (top ~55%) ===== */}
+      <div className="relative" style={{ height: '55vh', minHeight: 300 }}>
         {MAPBOX_TOKEN && mapReady ? (
           <>
             <div ref={mapRef} className="w-full h-full" />
-            {/* Floating ETA card */}
+            {/* Floating ETA pill on map */}
             {routeInfo && nextJob && (
-              <div className="absolute top-3 left-3 right-3 bg-white rounded-2xl shadow-lg px-4 py-2.5 flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-gray-400">Next: {nextJob.name}</div>
-                  <div className="font-bold text-gray-900 text-sm">
-                    {routeInfo.eta} min · {routeInfo.distance} km
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigateToJob(nextJob)}
-                  className="bg-orange-500 text-white text-sm font-semibold px-4 py-2 rounded-xl active:scale-95 transition"
-                >
-                  Navigate
-                </button>
-              </div>
+              <button
+                onClick={() => navigateToJob(nextJob)}
+                className="fade-in"
+                style={{
+                  position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)',
+                  background: 'rgba(22,22,24,0.9)', backdropFilter: 'blur(20px)',
+                  borderRadius: 999, padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10,
+                  border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Next: {nextJob.name}</span>
+                <span className="tabular" style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>
+                  {routeInfo.eta} min · {routeInfo.distance} km
+                </span>
+                <Navigation size={18} color="#f97316" />
+              </button>
             )}
           </>
         ) : (
-          <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center text-gray-500">
+          <div className="w-full h-full flex flex-col items-center justify-center" style={{ background: '#161618' }}>
             {showLocPrompt ? (
               <div className="text-center px-6">
-                <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" /><circle cx="12" cy="9" r="2.5" /></svg>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                  <MapPin size={28} color="#f97316" />
                 </div>
-                <div className="text-base font-bold text-gray-900 mb-1">Location Required</div>
-                <div className="text-xs text-gray-400 mb-4">Enable location to see your route and navigate to jobs.</div>
-                <button
-                  onClick={enableLocation}
-                  className="bg-orange-500 text-white font-semibold px-6 py-3 rounded-xl active:scale-95 transition shadow-lg shadow-orange-200"
-                >
+                <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>Enable Location</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>See your route and navigate to jobs.</div>
+                <button onClick={enableLocation} className="btn-primary" style={{ minHeight: 48, padding: '12px 24px' }}>
                   Enable Location
                 </button>
               </div>
             ) : (
-              <div className="text-sm text-gray-400">Loading map…</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>Loading map...</div>
             )}
           </div>
         )}
+
+        {/* ===== Floating glass header over map ===== */}
+        <header className="glass-bar safe-top" style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="status-dot" style={{ background: clockedIn ? '#22C55E' : '#6B7280' }} />
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {emp?.name || 'Crew'}
+                {!isOnline && <span style={{ fontSize: 10, fontWeight: 600, color: '#F59E0B', background: 'rgba(245,158,11,0.15)', padding: '2px 6px', borderRadius: 4 }}>OFFLINE</span>}
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.2 }}>{today}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => router.push('/portal/notifications')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }} aria-label="Notifications">
+              <Bell size={20} color="rgba(255,255,255,0.7)" />
+              {unreadNotifs > 0 && (
+                <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, borderRadius: 8, background: '#f97316', color: 'white', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</span>
+              )}
+            </button>
+            <button onClick={() => router.push('/portal/clock')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Shift status">
+              <Clock size={20} color="rgba(255,255,255,0.7)" />
+            </button>
+            <button onClick={() => router.push('/portal/documents')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Docs">
+              <FileText size={20} color="rgba(255,255,255,0.7)" />
+            </button>
+            <button onClick={() => router.push('/portal/paystubs')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Pay">
+              <Wallet size={20} color="rgba(255,255,255,0.7)" />
+            </button>
+            <button onClick={() => router.push('/portal/incidents')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Incidents">
+              <AlertTriangle size={20} color="rgba(255,255,255,0.5)" />
+            </button>
+            <button onClick={logout} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Logout">
+              <LogOut size={20} color="rgba(255,255,255,0.5)" />
+            </button>
+          </div>
+        </header>
       </div>
 
-      {/* ===== Job cards (scrollable bottom) ===== */}
-      <div className="flex-1 overflow-y-auto pb-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5rem)' }}>
-        <div className="max-w-md mx-auto px-4 pt-4 space-y-3">
+      {/* ===== Draggable bottom sheet ===== */}
+      <div
+        style={{
+          flex: 1,
+          position: 'relative',
+          marginTop: -20,
+          zIndex: 20,
+          background: '#0A0A0B',
+          borderRadius: '20px 20px 0 0',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          maxHeight: sheetHeight,
+          transition: dragY !== null ? 'none' : 'max-height 0.3s cubic-bezier(0.16,1,0.3,1)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Drag handle */}
+        <div
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          style={{ padding: '8px 0', cursor: 'grab', touchAction: 'none' }}
+        >
+          <div className="sheet-handle" />
+        </div>
 
-          {/* No assignment */}
-          {!assignment && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
-              <div className="text-gray-400 text-sm">No assignment scheduled for today.</div>
-              <div className="text-xs text-gray-400 mt-2">Your shift starts automatically when you begin a job.</div>
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto no-scrollbar safe-bottom" style={{ paddingBottom: 24 }}>
+          <div className="max-w-md mx-auto px-6 space-y-3">
+
+            {/* View toggle: Today / Week */}
+            <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <button onClick={() => setShowWeekly(false)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: !showWeekly ? '#f97316' : 'transparent', color: !showWeekly ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer' }}>Today</button>
+              <button onClick={() => setShowWeekly(true)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: showWeekly ? '#f97316' : 'transparent', color: showWeekly ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer' }}>This Week</button>
             </div>
-          )}
 
-          {/* Assignment + Partner compact card */}
-          {assignment && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wide">Today&apos;s Assignment</div>
-                  <div className="font-bold text-gray-900 text-sm mt-0.5">{today}</div>
-                </div>
-                <div className="text-right text-xs">
-                  <div className="text-gray-400">Pickup</div>
-                  <div className="text-gray-700 font-medium">{assignment.uhaul_location || assignment.pickup_location || '—'}</div>
-                </div>
-              </div>
-              {partner && (
-                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                  <div>
-                    <div className="text-xs text-gray-400">Partner</div>
-                    <div className="font-semibold text-gray-900 text-sm">
-                      {partner.name || `${partner.first_name || ''} ${partner.last_name || ''}`.trim()}
-                    </div>
-                  </div>
-                  {partner.phone && (
-                    <a
-                      href={`tel:${partner.phone}`}
-                      className="bg-orange-500 text-white text-sm font-semibold px-4 py-2 rounded-xl active:scale-95 transition"
-                    >
-                      Call
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Truck check section */}
-          {assignment && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-              <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Truck Check</div>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => router.push(`/portal/job?booking_id=${bookings[0]?.id || ''}&check=pickup`)}
-                  disabled={bookings.length === 0}
-                  className="bg-orange-500 text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-40 active:scale-95 transition"
-                >
-                  Truck Pickup
-                </button>
-                <button
-                  onClick={() => router.push(`/portal/job?booking_id=${bookings[0]?.id || ''}&check=return`)}
-                  disabled={bookings.length === 0}
-                  className="bg-gray-900 text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-40 active:scale-95 transition"
-                >
-                  Truck Return
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Job cards */}
-          {assignment && (
-            <div>
-              <div className="text-xs text-gray-400 uppercase tracking-wide mb-2 px-1">
-                Jobs ({bookings.length})
-              </div>
-              <div className="space-y-3">
-                {bookings.length === 0 && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center text-gray-400 text-sm">
-                    No jobs scheduled today.
-                  </div>
-                )}
-                {bookings.map((b, idx) => {
-                  const open = openSessionFor(b.id);
-                  const inProgress = !!open || b.status === 'in_progress';
-                  const completed = b.status === 'completed';
-                  const isNext = idx === currentJobIndex;
-                  const items = Array.isArray(b.itemized_items)
-                    ? b.itemized_items
-                    : (typeof b.itemized_items === 'string'
-                        ? (() => { try { return JSON.parse(b.itemized_items); } catch { return []; } })()
-                        : []);
+            {/* Weekly view */}
+            {showWeekly && weekData && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {weekData.map((day) => {
+                  const hasJobs = day.bookings.length > 0;
+                  const hasAssignment = !!day.assignment;
                   return (
-                    <div
-                      key={b.id}
-                      className={`bg-white rounded-2xl shadow-sm border-2 p-4 transition ${
-                        isNext && !completed ? 'border-orange-500' : 'border-gray-200'
-                      }`}
-                    >
-                      {/* Status + time */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-600 text-xs font-bold flex items-center justify-center">{idx + 1}</span>
-                          <span className="text-sm font-medium text-gray-500">{b.time_slot || 'Time TBD'}</span>
-                        </div>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[b.status] || 'bg-gray-100 text-gray-600'}`}>
-                          {b.status}
-                        </span>
-                      </div>
-
-                      {/* Customer */}
-                      <div className="font-bold text-gray-900">{b.name}</div>
-                      <div className="mt-1 space-y-1 text-sm">
-                        {b.phone && (
-                          <a href={`tel:${b.phone}`} className="block text-orange-600 font-medium">
-                            {b.phone}
-                          </a>
-                        )}
-                        {b.address && (
-                          <div className="text-gray-700">{b.address}</div>
-                        )}
-                      </div>
-
-                      {/* Price + load size */}
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <div className="text-xs text-gray-400">Total</div>
-                          <div className="font-bold text-gray-900">${Number(b.total_price || 0).toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-400">Load size</div>
-                          <div className="font-medium text-gray-900">{b.load_size || '—'}</div>
-                        </div>
-                      </div>
-
-                      {/* Itemized items */}
-                      {items.length > 0 && (
-                        <div className="mt-3">
-                          <div className="text-xs text-gray-400 mb-1">Items</div>
-                          <ul className="text-sm text-gray-700 list-disc list-inside space-y-0.5">
-                            {items.map((it, i) => (
-                              <li key={i}>
-                                {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}× ${it.name || it.item || it.description || ''}`}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Notes */}
-                      {b.notes && (
-                        <div className="mt-3 bg-amber-50 rounded-lg p-2 text-sm text-amber-800">
-                          <span className="font-medium">Notes: </span>{b.notes}
-                        </div>
-                      )}
-
-                      {/* Live timer */}
-                      {inProgress && open && (
-                        <div className="mt-3 text-center">
-                          <div className="text-2xl font-mono font-bold text-amber-600 tabular-nums">
-                            {fmtDuration(now - new Date(open.clock_in_at).getTime())}
+                    <div key={day.date} className="dark-card" style={{ padding: 12, opacity: day.date < new Date().toISOString().slice(0, 10) && !hasJobs ? 0.5 : 1, borderLeft: day.isToday ? '3px solid #f97316' : '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasJobs ? 8 : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: day.isToday ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{day.dayName}</span>
+                            <span className="tabular" style={{ fontSize: 14, fontWeight: 700, color: day.isToday ? '#f97316' : 'rgba(255,255,255,0.9)' }}>{day.dayNum}</span>
                           </div>
-                          <div className="text-xs text-gray-400">job in progress</div>
+                          <div>
+                            {hasAssignment && <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{day.assignment.uhaul_location || 'Assigned'}</div>}
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{hasJobs ? `${day.bookings.length} job${day.bookings.length > 1 ? 's' : ''}` : hasAssignment ? 'No jobs' : 'Off'}</div>
+                          </div>
+                        </div>
+                        {hasJobs && (
+                          <span className="tabular" style={{ fontSize: 14, fontWeight: 600, color: '#f97316' }}>${day.bookings.reduce((s, b) => s + Number(b.total_price || 0), 0).toFixed(0)}</span>
+                        )}
+                      </div>
+                      {hasJobs && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {day.bookings.map((b) => (
+                            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                              <span style={{ color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{b.time_slot || ''} {b.name}</span>
+                              <span style={{ color: b.status === 'completed' ? '#22C55E' : 'rgba(255,255,255,0.4)', fontSize: 11, marginLeft: 8, flexShrink: 0 }}>{b.status}</span>
+                            </div>
+                          ))}
                         </div>
                       )}
-
-                      {/* Action buttons */}
-                      <div className="mt-4 flex gap-2">
-                        {!completed && !inProgress && (
-                          <button
-                            onClick={() => jobClock(b.id, 'in')}
-                            disabled={busy === b.id}
-                            className="flex-1 bg-orange-500 text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-50 active:scale-[0.98] transition"
-                          >
-                            {busy === b.id ? '…' : 'Start Job'}
-                          </button>
-                        )}
-                        {inProgress && (
-                          <button
-                            onClick={() => jobClock(b.id, 'out')}
-                            disabled={busy === b.id}
-                            className="flex-1 bg-gray-900 text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-50 active:scale-[0.98] transition"
-                          >
-                            {busy === b.id ? '…' : 'End Job'}
-                          </button>
-                        )}
-                        {b.address && (
-                          <button
-                            onClick={() => navigateToJob(b)}
-                            className="flex-1 bg-white border border-orange-300 text-orange-600 font-semibold py-3 rounded-xl text-sm active:scale-[0.98] transition"
-                          >
-                            Navigate
-                          </button>
-                        )}
-                        <button
-                          onClick={() => router.push(`/portal/job?booking_id=${b.id}`)}
-                          className="flex-1 bg-white border border-gray-300 text-gray-700 font-semibold py-3 rounded-xl text-sm active:scale-[0.98] transition"
-                        >
-                          Job Flow ›
-                        </button>
-                      </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* End of day summary */}
-          {assignment && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-              <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">End of Day</div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">{jobsCompleted}</div>
-                  <div className="text-xs text-gray-400">jobs done</div>
+            {error && (
+              <div className="slide-up" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', fontSize: 14, padding: '10px 16px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.2)' }}>
+                {error}
+              </div>
+            )}
+
+            {/* No assignment */}
+            {!assignment && !showWeekly && (
+              <div style={{ textAlign: 'center', padding: '40px 24px' }}>
+                <Calendar size={64} color="rgba(255,255,255,0.4)" style={{ margin: '0 auto 16px' }} />
+                <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>No assignment scheduled for today</div>
+                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>Your shift starts automatically when you begin a job.</div>
+              </div>
+            )}
+
+            {/* Assignment + Partner card */}
+            {assignment && !showWeekly && (
+              <div className="dark-card p-4">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Today&apos;s Pickup</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>{assignment.uhaul_location || assignment.pickup_location || '—'}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">{totalHours}</div>
-                  <div className="text-xs text-gray-400">hours</div>
+                {partner && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Partner</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>
+                        {partner.name || `${partner.first_name || ''} ${partner.last_name || ''}`.trim()}
+                      </div>
+                    </div>
+                    {partner.phone && (
+                      <a href={`tel:${partner.phone}`} className="glass-btn" style={{ minHeight: 40, padding: '8px 16px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', textDecoration: 'none' }}>
+                        <Phone size={16} color="#f97316" /> Call
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Truck check section */}
+            {assignment && !showWeekly && (
+              <div className="dark-card p-4">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <Truck size={18} color="rgba(255,255,255,0.6)" />
+                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Truck Check</span>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">${receiptsTotal.toFixed(2)}</div>
-                  <div className="text-xs text-gray-400">receipts</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <button
+                    onClick={() => router.push(`/portal/job?booking_id=${bookings[0]?.id || ''}&check=pickup`)}
+                    disabled={bookings.length === 0}
+                    className="btn-primary"
+                    style={{ minHeight: 48, fontSize: 14 }}
+                  >
+                    Pickup
+                  </button>
+                  <button
+                    onClick={() => router.push(`/portal/job?booking_id=${bookings[0]?.id || ''}&check=return`)}
+                    disabled={bookings.length === 0}
+                    className="btn-ghost"
+                    style={{ minHeight: 48, fontSize: 14 }}
+                  >
+                    Return
+                  </button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Job cards */}
+            {assignment && bookings.length > 0 && !showWeekly && (
+              <div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, paddingLeft: 4 }}>
+                  Jobs ({bookings.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {bookings.map((b, idx) => {
+                    const open = openSessionFor(b.id);
+                    const inProgress = !!open || b.status === 'in_progress';
+                    const completed = b.status === 'completed';
+                    const isNext = idx === currentJobIndex;
+                    const items = Array.isArray(b.itemized_items)
+                      ? b.itemized_items
+                      : (typeof b.itemized_items === 'string'
+                          ? (() => { try { return JSON.parse(b.itemized_items); } catch { return []; } })()
+                          : []);
+                    const sc = STATUS_COLORS[b.status] || STATUS_COLORS.scheduled;
+                    const itemsExpanded = expandedItems[b.id];
+                    const notesExpanded = expandedNotes[b.id];
+                    return (
+                      <div
+                        key={b.id}
+                        className="dark-card p-4"
+                        style={{
+                          borderLeft: isNext && !completed ? '3px solid #f97316' : '1px solid rgba(255,255,255,0.06)',
+                        }}
+                      >
+                        {/* Top row: number badge + customer + status pill */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid #f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#f97316', flexShrink: 0 }}>
+                            {idx + 1}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</div>
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 999, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
+                            {b.status}
+                          </span>
+                        </div>
+
+                        {/* Second row: address + price */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                            {b.address || '—'}
+                          </div>
+                          <div className="tabular" style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', flexShrink: 0 }}>
+                            ${Number(b.total_price || 0).toFixed(2)}
+                          </div>
+                        </div>
+
+                        {/* Time slot */}
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+                          {b.time_slot || 'Time TBD'} · {b.load_size || '—'}
+                        </div>
+
+                        {/* Items collapsible */}
+                        {items.length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <button
+                              onClick={() => setExpandedItems((p) => ({ ...p, [b.id]: !p[b.id] }))}
+                              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: 0 }}
+                            >
+                              {items.length} items <ChevronDown size={14} style={{ transform: itemsExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                            </button>
+                            {itemsExpanded && (
+                              <ul style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 8, paddingLeft: 16, listStyle: 'disc' }}>
+                                {items.map((it, i) => (
+                                  <li key={i} style={{ marginBottom: 2 }}>
+                                    {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Notes as sticky-note tag */}
+                        {b.notes && (
+                          <div style={{ marginBottom: 8 }}>
+                            <button
+                              onClick={() => setExpandedNotes((p) => ({ ...p, [b.id]: !p[b.id] }))}
+                              style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#F59E0B', cursor: 'pointer' }}
+                            >
+                              <StickyNote size={14} /> Notes
+                              <ChevronDown size={14} style={{ transform: notesExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                            </button>
+                            {notesExpanded && (
+                              <div style={{ marginTop: 8, padding: 12, background: 'rgba(245,158,11,0.05)', borderRadius: 8, fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+                                {b.notes}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Live timer */}
+                        {inProgress && open && (
+                          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                            <div className="tabular" style={{ fontSize: 28, fontWeight: 700, color: '#F59E0B', letterSpacing: 1 }}>
+                              {fmtDuration(now - new Date(open.clock_in_at).getTime())}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>job in progress</div>
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          {!completed && !inProgress && (
+                            <button
+                              onClick={() => jobClock(b.id, 'in')}
+                              disabled={busy === b.id}
+                              className="btn-primary"
+                              style={{ flex: 1, minHeight: 48, fontSize: 15 }}
+                            >
+                              {busy === b.id ? '...' : 'Start Job'}
+                            </button>
+                          )}
+                          {inProgress && (
+                            <button
+                              onClick={() => jobClock(b.id, 'out')}
+                              disabled={busy === b.id}
+                              className="btn-primary"
+                              style={{ flex: 1, minHeight: 48, fontSize: 15, background: '#1E1E22', color: 'rgba(255,255,255,0.9)' }}
+                            >
+                              {busy === b.id ? '...' : 'End Job'}
+                            </button>
+                          )}
+                          {completed && (
+                            <button
+                              onClick={() => router.push(`/portal/job?booking_id=${b.id}`)}
+                              className="btn-ghost"
+                              style={{ flex: 1, minHeight: 48, fontSize: 15 }}
+                            >
+                              View Details
+                            </button>
+                          )}
+                          {b.address && !completed && (
+                            <button
+                              onClick={() => navigateToJob(b)}
+                              className="btn-ghost"
+                              style={{ minHeight: 48, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}
+                            >
+                              <Navigation size={16} /> Go
+                            </button>
+                          )}
+                          {!completed && (
+                            <button
+                              onClick={() => router.push(`/portal/job?booking_id=${b.id}`)}
+                              className="btn-ghost"
+                              style={{ minHeight: 48, fontSize: 14 }}
+                            >
+                              Flow
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* End of day summary */}
+            {allDone && !showWeekly && (
+              <div className="dark-card slide-up p-6" style={{ textAlign: 'center', border: '1px solid rgba(34,197,94,0.2)' }}>
+                <CheckCircle size={48} color="#22C55E" className="celebrate" style={{ margin: '0 auto 12px' }} />
+                <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>Great work today!</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+                  <div>
+                    <div className="tabular" style={{ fontSize: 34, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{jobsCompleted}</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>jobs done</div>
+                  </div>
+                  <div>
+                    <div className="tabular" style={{ fontSize: 34, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{totalHours}</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>hours</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Earnings estimator */}
+            {assignment && !showWeekly && (
+              <div className="dark-card" style={{ padding: 16, marginTop: 12 }}>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Estimated Earnings</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, textAlign: 'center' }}>
+                  <div>
+                    <div className="tabular" style={{ fontSize: 22, fontWeight: 700, color: '#f97316' }}>${(totalMinutes / 60 * (emp?.pay_rate || 18)).toFixed(0)}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Today</div>
+                  </div>
+                  <div>
+                    <div className="tabular" style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{totalHours}h</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Worked</div>
+                  </div>
+                  <div>
+                    <div className="tabular" style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>${emp?.pay_rate || 18}/hr</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Rate</div>
+                  </div>
+                </div>
+                {clockedIn && data?.open_shift?.clock_in_at && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Current shift</span>
+                    <span className="tabular" style={{ fontSize: 16, fontWeight: 600, color: '#22C55E' }}>{fmtDuration(now - new Date(data.open_shift.clock_in_at).getTime())}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>
