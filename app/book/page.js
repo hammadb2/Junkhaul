@@ -17,6 +17,7 @@ import Confirmation from '@/components/booking/Confirmation';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { calculatePrice, PRICING, LOAD_LABELS } from '@/lib/pricingConstants';
 import { buildItemizedQuote, recalcWithDisposal } from '@/lib/itemPricing';
+import AddItemPicker from '@/components/booking/AddItemPicker';
 
 const LOADS = [
   { key: 'single_item', title: '1–2 items', desc: 'Couch, mattress, single appliance', price: 99 },
@@ -923,6 +924,16 @@ function ItemsStep({ state, update, onNext }) {
         ))}
       </div>
 
+      {/* Add item */}
+      <AddItemPicker onAdd={(newItem) => {
+        const newItems = [...items, newItem];
+        const recalced = recalcWithDisposal(newItems, {
+          stairs: state.stairs,
+          same_day: state.same_day,
+        });
+        update({ itemized: recalced });
+      }} />
+
       {/* Running total */}
       <div className="bg-gray-50 rounded-xl p-3 space-y-1">
         <div className="flex justify-between text-sm">
@@ -1011,6 +1022,54 @@ function LoadStep({ state, update, price, onNext }) {
             <div className="font-bold text-orange-500 mt-1">${l.price}</div>
           </LoadCard>
         ))}
+      </div>
+
+      {/* Add items to donate (works even without photo analysis) */}
+      <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm font-medium text-green-800">Items to donate</span>
+          {state.itemized && state.itemized.items && state.itemized.items.filter((i) => i.disposal === 'donate').length > 0 && (
+            <span className="text-xs text-green-600">
+              {state.itemized.items.filter((i) => i.disposal === 'donate').length} item(s) marked
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-green-600 mb-2">
+          Got furniture, clothes, or electronics in good shape? Mark them for donation and we&apos;ll drop them at charity for free.
+        </p>
+        {state.itemized && state.itemized.items && state.itemized.items.filter((i) => i.disposal === 'donate').length > 0 && (
+          <div className="space-y-1 mb-2">
+            {state.itemized.items.filter((i) => i.disposal === 'donate').map((item, idx) => (
+              <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-2 py-1.5">
+                <span className="text-sm text-gray-700">
+                  {item.quantity > 1 ? `${item.quantity}x ` : ''}{item.name}
+                </span>
+                <button
+                  onClick={() => {
+                    const newItems = state.itemized.items.filter((_, i) => i !== idx);
+                    if (newItems.length === 0) {
+                      update({ itemized: null });
+                    } else {
+                      const recalced = recalcWithDisposal(newItems, { stairs: state.stairs, same_day: state.same_day });
+                      update({ itemized: recalced });
+                    }
+                  }}
+                  className="text-gray-300 hover:text-red-500 text-sm"
+                >✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <AddItemPicker
+          compact
+          onAdd={(newItem) => {
+            newItem.disposal = 'donate';
+            const existing = state.itemized?.items || [];
+            const newItems = [...existing, newItem];
+            const recalced = recalcWithDisposal(newItems, { stairs: state.stairs, same_day: state.same_day });
+            update({ itemized: recalced });
+          }}
+        />
       </div>
 
       <div className="space-y-3 mt-2">

@@ -54,6 +54,7 @@ function JobFlowInner() {
   const [amountConfirmed, setAmountConfirmed] = useState('');
   const [loadConfirmed, setLoadConfirmed] = useState(false);
   const [checkedItems, setCheckedItems] = useState({});
+  const [itemConditions, setItemConditions] = useState({}); // { idx: 'good' | 'damaged' | 'missing' }
   const [custName, setCustName] = useState('');
   const [sigDataUrl, setSigDataUrl] = useState(null);
   const [jobComplete, setJobComplete] = useState(false);
@@ -202,6 +203,21 @@ function JobFlowInner() {
     setBusy(true); setError('');
     const g = await getGPS();
     setGps(g);
+    // Save item conditions if any were checked
+    if (items.length > 0 && Object.keys(itemConditions).length > 0) {
+      try {
+        await fetch('/api/crew/item-conditions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            booking_id: bookingId,
+            conditions: itemConditions,
+          }),
+        });
+      } catch (e) {
+        console.error('Failed to save item conditions:', e);
+      }
+    }
     setBusy(false);
     showConfirm('Customer notified');
     setTimeout(() => setStepIdx(2), 1200);
@@ -460,11 +476,20 @@ function JobFlowInner() {
         {items.length > 0 && (
           <div className="dark-card" style={{ padding: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 8 }}>Items to pick up ({items.length})</div>
-            {items.map((it, i) => (
-              <div key={i} style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', padding: '4px 0' }}>
-                {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`}
-              </div>
-            ))}
+            {items.map((it, i) => {
+              const label = typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`;
+              const isDonate = typeof it === 'object' && it.disposal === 'donate';
+              const isFreon = typeof it === 'object' && it.is_freon;
+              return (
+                <div key={i} style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', padding: '4px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>{label}</span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {isDonate && <span style={{ fontSize: 10, background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: 8, fontWeight: 600 }}>DONATE</span>}
+                    {isFreon && <span style={{ fontSize: 10, background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 8, fontWeight: 600 }}>FREON</span>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
         <ErrorBanner />
@@ -476,26 +501,98 @@ function JobFlowInner() {
 
   // ===== STEP 1: Arrived =====
   if (!eod && stepIdx === 1 && !checkParam) {
+    const allItemsChecked = items.length === 0 || items.every((_, i) => itemConditions[i]);
     return (
       <PageShell onBack={() => setStepIdx(0)}>
         <BookingCard />
-        <Headline title="You've arrived" subtitle="Verify the load size" />
+        <Headline title="You've arrived" subtitle="Confirm item conditions" />
         <div className="dark-card" style={{ padding: 20, marginBottom: 20, textAlign: 'center' }}>
           <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Load size</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', marginTop: 4 }}>{booking.load_size || 'Standard'}</div>
         </div>
         {items.length > 0 && (
           <div className="dark-card" style={{ padding: 16, marginBottom: 20 }}>
-            <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 8 }}>Verify items</div>
-            {items.map((it, i) => (
-              <div key={i} style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', padding: '4px 0' }}>
-                {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`}
-              </div>
-            ))}
+            <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 12, fontWeight: 600 }}>
+              Verify each item ({items.length})
+            </div>
+            {items.map((it, i) => {
+              const label = typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`;
+              const isDonate = typeof it === 'object' && it.disposal === 'donate';
+              const cond = itemConditions[i];
+              return (
+                <div key={i} style={{ padding: '10px 0', borderBottom: i < items.length - 1 ? '1px solid rgba(0,0,0,.06)' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 15, color: '#1a1a1a', fontWeight: 500 }}>{label}</span>
+                    {isDonate && (
+                      <span style={{ fontSize: 11, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                        DONATE
+                      </span>
+                    )}
+                    {typeof it === 'object' && it.is_freon && (
+                      <span style={{ fontSize: 11, background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                        FREON
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[
+                      { key: 'good', label: 'Good', color: '#16a34a', bg: '#dcfce7' },
+                      { key: 'damaged', label: 'Damaged', color: '#ea580c', bg: '#fed7aa' },
+                      { key: 'missing', label: 'Missing', color: '#dc2626', bg: '#fecaca' },
+                    ].map(({ key, label, color, bg }) => (
+                      <button
+                        key={key}
+                        onClick={() => setItemConditions((p) => ({ ...p, [i]: key }))}
+                        style={{
+                          flex: 1,
+                          padding: '8px 0',
+                          borderRadius: 8,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          border: cond === key ? `2px solid ${color}` : '1px solid rgba(0,0,0,.08)',
+                          background: cond === key ? bg : '#F0F0F2',
+                          color: cond === key ? color : 'rgba(0,0,0,.5)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {cond === 'damaged' && (
+                    <input
+                      type="text"
+                      placeholder="What's damaged?"
+                      style={{
+                        width: '100%',
+                        marginTop: 6,
+                        padding: '6px 10px',
+                        fontSize: 13,
+                        borderRadius: 6,
+                        border: '1px solid rgba(0,0,0,.1)',
+                        background: '#F0F0F2',
+                        color: '#1a1a1a',
+                      }}
+                      onChange={(e) => setItemConditions((p) => ({ ...p, [`${i}_note`]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {items.length > 0 && !allItemsChecked && (
+          <div style={{ fontSize: 13, color: '#ea580c', textAlign: 'center', marginBottom: 12 }}>
+            Confirm condition of all items before continuing
           </div>
         )}
         <ErrorBanner />
-        <PrimaryBtn onClick={markArrived} disabled={busy}>Mark Arrived</PrimaryBtn>
+        <PrimaryBtn
+          onClick={markArrived}
+          disabled={busy || (items.length > 0 && !allItemsChecked)}
+        >
+          {items.length > 0 ? 'Confirm & Continue' : 'Mark Arrived'}
+        </PrimaryBtn>
         <ConfirmOverlay />
       </PageShell>
     );
@@ -548,6 +645,10 @@ function JobFlowInner() {
             {items.map((it, i) => {
               const label = typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`;
               const checked = !!checkedItems[i];
+              const isDonate = typeof it === 'object' && it.disposal === 'donate';
+              const isFreon = typeof it === 'object' && it.is_freon;
+              const cond = typeof it === 'object' ? it.crew_condition : null;
+              const condNote = typeof it === 'object' ? it.crew_condition_note : null;
               return (
                 <button
                   key={i}
@@ -558,7 +659,15 @@ function JobFlowInner() {
                   <div style={{ width: 24, height: 24, borderRadius: 6, border: checked ? 'none' : '2px solid rgba(0,0,0,.15)', background: checked ? '#22C55E' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     {checked && <Check size={16} color="white" />}
                   </div>
-                  <span style={{ fontSize: 14, color: '#1a1a1a' }}>{label}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14, color: '#1a1a1a' }}>{label}</span>
+                      {isDonate && <span style={{ fontSize: 10, background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: 8, fontWeight: 600 }}>DONATE</span>}
+                      {isFreon && <span style={{ fontSize: 10, background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 8, fontWeight: 600 }}>FREON</span>}
+                    </div>
+                    {cond === 'damaged' && <div style={{ fontSize: 12, color: '#ea580c', marginTop: 2 }}>Damaged{condNote ? `: ${condNote}` : ''}</div>}
+                    {cond === 'missing' && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 2 }}>Missing</div>}
+                  </div>
                 </button>
               );
             })}
