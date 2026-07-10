@@ -77,8 +77,9 @@ ${bodyHTML}
 }
 
 // POST /api/admin/crew/[id]/resend-invite
-// Resends onboarding invite. If the employee started but didn't finish onboarding,
-// deletes the incomplete employee record so they can start fresh with the new invite.
+// Resends onboarding invite with a fresh token.
+// Does NOT delete the employee record — if they already started onboarding
+// (have a password), they can continue where they left off.
 export async function POST(req, { params }) {
   if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -87,7 +88,7 @@ export async function POST(req, { params }) {
   // Get employee
   const { data: employee, error: empErr } = await supabaseAdmin
     .from('employees')
-    .select('id, email, first_name, last_name, phone, pay_rate, status, invite_id, onboarding_completed_at')
+    .select('id, email, first_name, last_name, phone, pay_rate, status, invite_id, onboarding_completed_at, password_hash')
     .eq('id', id)
     .maybeSingle();
 
@@ -96,26 +97,6 @@ export async function POST(req, { params }) {
 
   if (employee.onboarding_completed_at) {
     return NextResponse.json({ error: 'This employee has already completed onboarding' }, { status: 400 });
-  }
-
-  // Delete the incomplete employee record so they can sign up fresh with the new invite.
-  // This clears the "account already exists" error when they try to accept the new invite.
-  // We keep the invite record but reset it to pending.
-  await supabaseAdmin.from('employee_documents').delete().eq('employee_id', id);
-  await supabaseAdmin.from('employee_sessions').delete().eq('employee_id', id);
-  await supabaseAdmin.from('job_clock_sessions').delete().eq('employee_id', id);
-  await supabaseAdmin.from('employees').delete().eq('id', id);
-
-  // Also check for any OTHER employee records with the same email (partial signups via /api/employee/signup)
-  const { data: dupes } = await supabaseAdmin
-    .from('employees')
-    .select('id')
-    .eq('email', employee.email);
-  for (const d of dupes || []) {
-    await supabaseAdmin.from('employee_documents').delete().eq('employee_id', d.id);
-    await supabaseAdmin.from('employee_sessions').delete().eq('employee_id', d.id);
-    await supabaseAdmin.from('job_clock_sessions').delete().eq('employee_id', d.id);
-    await supabaseAdmin.from('employees').delete().eq('id', d.id);
   }
 
   const token = randomBytes(32).toString('hex');
@@ -150,6 +131,12 @@ export async function POST(req, { params }) {
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     invite = data;
+
+    // Link the invite to the employee record
+    await supabaseAdmin
+      .from('employees')
+      .update({ invite_id: invite.id })
+      .eq('id', id);
   }
 
   // Send the email

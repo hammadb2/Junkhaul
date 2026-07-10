@@ -91,7 +91,35 @@ function OnboardInner() {
   // ---- Step 0: validate invite ----
   const validateInvite = useCallback(async () => {
     const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('jh-onboard-token') : null);
+
+    // First, check if the user is already logged in (has a valid session).
+    // If so, they may have started onboarding but not finished — let them
+    // continue without needing the invite token.
     if (!effectiveToken) {
+      try {
+        const meRes = await fetch('/api/employee/me');
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData.employee && !meData.employee.onboarded) {
+            // Already logged in, onboarding not complete — skip to step 2
+            setInvite({
+              email: meData.employee.email,
+              first_name: meData.employee.name?.split(' ')[0] || '',
+              last_name: meData.employee.name?.split(' ').slice(1).join(' ') || '',
+            });
+            setPersonal({
+              name: meData.employee.name || '',
+              email: meData.employee.email || '',
+              address: '',
+            });
+            setLoading(false);
+            // Skip password creation step — they already have an account
+            setStep(2);
+            return;
+          }
+        }
+      } catch { /* ignore — fall through to token check */ }
+
       setInviteError('No invite token found in the link. Please use the link from your invite email.');
       setLoading(false);
       return;
@@ -103,6 +131,29 @@ function OnboardInner() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) {
+      // Token invalid/expired — check if user is already logged in
+      try {
+        const meRes = await fetch('/api/employee/me');
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData.employee && !meData.employee.onboarded) {
+            setInvite({
+              email: meData.employee.email,
+              first_name: meData.employee.name?.split(' ')[0] || '',
+              last_name: meData.employee.name?.split(' ').slice(1).join(' ') || '',
+            });
+            setPersonal({
+              name: meData.employee.name || '',
+              email: meData.employee.email || '',
+              address: '',
+            });
+            // Skip password creation — they already have an account
+            setStep(2);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+
       setInviteError(data.error || 'This invite is invalid or expired.');
       if (data.invite) setInvite(data.invite);
       return;

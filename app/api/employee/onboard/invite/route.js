@@ -59,47 +59,75 @@ export async function POST(req) {
   if (new Date(invite.expires_at) < new Date()) return NextResponse.json({ error: 'This invite has expired' }, { status: 410 });
 
   // Check if employee with this email already exists
+  // If they do (started onboarding but didn't finish), update their record
+  // instead of rejecting — this lets them continue where they left off.
   const { data: existing } = await supabaseAdmin
     .from('employees')
-    .select('id')
+    .select('id, onboarding_completed_at')
     .eq('email', invite.email)
     .maybeSingle();
-  if (existing) return NextResponse.json({ error: 'An account with that email already exists' }, { status: 409 });
 
-  // Hash password
   const { hashPassword, createSession, sessionCookieHeader } = await import('@/lib/employeeAuth');
   const name = `${invite.first_name} ${invite.last_name}`.trim();
 
-  const { data: emp, error: empErr } = await supabaseAdmin
-    .from('employees')
-    .insert({
-      email: invite.email,
-      password_hash: hashPassword(password),
-      name,
-      first_name: invite.first_name,
-      last_name: invite.last_name,
-      phone: phone || invite.phone || null,
-      address: address || null,
-      pay_rate: invite.pay_rate || 18,
-      status: 'pending',
-      hire_date: new Date().toISOString().slice(0, 10),
-      invite_id: invite.id,
-      onboarded_at: new Date().toISOString(),
-    })
-    .select('id, email, name, status')
-    .single();
-  if (empErr) return NextResponse.json({ error: empErr.message }, { status: 500 });
+  let emp;
+  if (existing) {
+    if (existing.onboarding_completed_at) {
+      return NextResponse.json({ error: 'This account has already completed onboarding. Try logging in.' }, { status: 409 });
+    }
+    // Update existing employee with new password and info
+    const { data: updated, error: updErr } = await supabaseAdmin
+      .from('employees')
+      .update({
+        password_hash: hashPassword(password),
+        name,
+        first_name: invite.first_name,
+        last_name: invite.last_name,
+        phone: phone || invite.phone || null,
+        address: address || null,
+        pay_rate: invite.pay_rate || 18,
+        invite_id: invite.id,
+        onboarded_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+      .select('id, email, name, status')
+      .single();
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+    emp = updated;
+  } else {
+    // Create new employee
+    const { data: newEmp, error: empErr } = await supabaseAdmin
+      .from('employees')
+      .insert({
+        email: invite.email,
+        password_hash: hashPassword(password),
+        name,
+        first_name: invite.first_name,
+        last_name: invite.last_name,
+        phone: phone || invite.phone || null,
+        address: address || null,
+        pay_rate: invite.pay_rate || 18,
+        status: 'pending',
+        hire_date: new Date().toISOString().slice(0, 10),
+        invite_id: invite.id,
+        onboarded_at: new Date().toISOString(),
+      })
+      .select('id, email, name, status')
+      .single();
+    if (empErr) return NextResponse.json({ error: empErr.message }, { status: 500 });
+    emp = newEmp;
+
+    // Seed required document rows (only for new employees)
+    const docTypes = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'sin_document', 'drivers_license'];
+    await supabaseAdmin.from('employee_documents')
+      .insert(docTypes.map((doc_type) => ({ employee_id: emp.id, doc_type, status: 'pending' })));
+  }
 
   // Mark invite as accepted
   await supabaseAdmin
     .from('employee_invites')
     .update({ status: 'accepted', accepted_at: new Date().toISOString() })
     .eq('id', invite.id);
-
-  // Seed required document rows
-  const docTypes = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'sin_document', 'drivers_license'];
-  await supabaseAdmin.from('employee_documents')
-    .insert(docTypes.map((doc_type) => ({ employee_id: emp.id, doc_type, status: 'pending' })));
 
   // Auto-login
   const sess = await createSession(emp.id);
