@@ -13,7 +13,7 @@ export async function POST(req) {
 
   const { data: emp } = await supabaseAdmin
     .from('employees')
-    .select('id, email, name, password_hash, status, onboarding_completed_at')
+    .select('id, email, name, password_hash, status, onboarding_completed_at, verification_notes')
     .eq('email', email.toLowerCase())
     .maybeSingle();
   if (!emp || !verifyPassword(password, emp.password_hash)) {
@@ -21,6 +21,13 @@ export async function POST(req) {
   }
   if (emp.status === 'terminated') {
     return NextResponse.json({ error: 'Account inactive. Contact your manager.' }, { status: 403 });
+  }
+  if (emp.status === 'rejected') {
+    return NextResponse.json({
+      error: emp.verification_notes
+        ? `Your application was not approved: ${emp.verification_notes}. Call (587) 325-0751 if you have questions.`
+        : 'Your application was not approved. Call (587) 325-0751 if you have questions.',
+    }, { status: 403 });
   }
 
   const sess = await createSession(emp.id);
@@ -33,6 +40,7 @@ export async function POST(req) {
       name: emp.name,
       status: emp.status,
       onboarding_complete: !!emp.onboarding_completed_at,
+      pending_verification: emp.status === 'pending_verification',
     },
   });
   res.headers.set('Set-Cookie', sessionCookieHeader(sess.token, sess.expiresAt));

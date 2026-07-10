@@ -80,14 +80,15 @@ export async function POST(req) {
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Check if all required docs are now uploaded -> flag onboarded
+  // Check if all required docs are now uploaded -> flag pending verification
+  // Admin must approve before employee is fully onboarded
   const required = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'sin_document', 'drivers_license'];
   const { data: allDocs } = await supabaseAdmin
     .from('employee_documents').select('doc_type, status').eq('employee_id', emp.id);
   const complete = required.every((t) => (allDocs || []).find((d) => d.doc_type === t && (d.status === 'uploaded' || d.status === 'verified')));
   if (complete && emp.status === 'pending') {
     await supabaseAdmin.from('employees')
-      .update({ status: 'onboarded', onboarded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ status: 'pending_verification', updated_at: new Date().toISOString() })
       .eq('id', emp.id);
   }
 

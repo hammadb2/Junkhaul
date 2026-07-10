@@ -352,6 +352,10 @@ export default function SchedulePage() {
     if (res.status === 401) { router.push('/portal'); return null; }
     const d = await res.json();
     setEmp(d.employee);
+    if (d.employee && d.employee.pending_verification) {
+      router.push('/portal/verification');
+      return null;
+    }
     if (d.employee && !d.employee.onboarded) {
       router.push('/portal/onboard');
       return null;

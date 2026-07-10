@@ -847,13 +847,18 @@ function OnboardInner() {
 
           {done && (
             <div style={{ textAlign: 'center', paddingTop: 40 }}>
-              <div className="celebrate" style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-                <CheckCircle size={48} color="#22C55E" />
+              <div className="celebrate" style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                <CheckCircle size={48} color="#3B82F6" />
               </div>
-              <div style={{ fontSize: 34, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>You&apos;re all set, {invite?.first_name || 'Crew'}!</div>
-              <div style={{ fontSize: 16, color: 'rgba(0,0,0,.6)', marginBottom: 32 }}>Welcome to the crew</div>
-              <button onClick={() => router.push('/portal/schedule')} className="btn-primary safe-bottom" style={{ width: '100%', minHeight: 52, fontSize: 16 }}>
-                Continue to app
+              <div style={{ fontSize: 28, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>Onboarding complete!</div>
+              <div style={{ fontSize: 15, color: 'rgba(0,0,0,.5)', marginBottom: 8, lineHeight: 1.6 }}>
+                Our team is reviewing your documents now.
+              </div>
+              <div style={{ fontSize: 15, color: 'rgba(0,0,0,.5)', marginBottom: 32, lineHeight: 1.6 }}>
+                You&apos;ll get a text message as soon as you&apos;re approved.
+              </div>
+              <button onClick={() => router.push('/portal/verification')} className="btn-primary safe-bottom" style={{ width: '100%', minHeight: 52, fontSize: 16, background: '#3B82F6' }}>
+                Continue
               </button>
             </div>
           )}

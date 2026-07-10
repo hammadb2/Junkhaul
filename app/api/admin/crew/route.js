@@ -196,6 +196,7 @@ export async function GET(req) {
       total: list.length,
       onboarded: list.filter((e) => e.status === 'onboarded' || e.status === 'active').length,
       pending: list.filter((e) => e.status === 'pending').length,
+      pending_verification: list.filter((e) => e.status === 'pending_verification').length,
       clocked_in_now: list.filter((e) => e.clocked_in).length,
       pending_invites: (invites || []).length,
     },

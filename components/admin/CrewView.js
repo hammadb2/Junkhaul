@@ -20,11 +20,14 @@ const STATUS_STYLES = {
   active: 'bg-[#22C55E]/15 text-[#22C55E]',
   onboarded: 'bg-[#22C55E]/15 text-[#22C55E]',
   pending: 'bg-[#F59E0B]/15 text-[#F59E0B]',
+  pending_verification: 'bg-[#3B82F6]/15 text-[#3B82F6]',
+  rejected: 'bg-[#EF4444]/15 text-[#EF4444]',
   terminated: 'bg-[#EF4444]/15 text-[#EF4444]',
 };
 
 function statusLabel(status) {
   if (status === 'onboarded') return 'Active';
+  if (status === 'pending_verification') return 'Pending Verification';
   return (status || 'pending').charAt(0).toUpperCase() + (status || 'pending').slice(1);
 }
 
@@ -134,11 +137,25 @@ export default function CrewView() {
 
       {/* Stat cards with ring indicators */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <StatCard label="Total" value={summary.total} icon={<Circle size={16} className="text-black/40" />} />
           <StatCard label="Active" value={summary.onboarded} icon={<Check size={16} className="text-[#22C55E]" />} ringValue={summary.onboarded} ringMax={summary.total} ringColor="#22C55E" />
           <StatCard label="Pending" value={summary.pending} icon={<AlertTriangle size={16} className="text-[#F59E0B]" />} accent={summary.pending > 0} />
+          <StatCard label="Verify" value={summary.pending_verification || 0} icon={<Check size={16} className="text-[#3B82F6]" />} accent={(summary.pending_verification || 0) > 0} />
           <StatCard label="Clocked In" value={summary.clocked_in_now} icon={<Clock size={16} className="text-[#f97316]" />} accent={summary.clocked_in_now > 0} ringValue={summary.clocked_in_now} ringMax={summary.onboarded || 1} ringColor="#f97316" />
+        </div>
+      )}
+
+      {/* Pending verification alert */}
+      {summary && (summary.pending_verification || 0) > 0 && (
+        <div className="bg-[#3B82F6]/5 border border-[#3B82F6]/20 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/15 flex items-center justify-center flex-shrink-0">
+            <Check size={20} className="text-[#3B82F6]" />
+          </div>
+          <div className="flex-1">
+            <div className="font-semibold text-[#1a1a1a] text-sm">{summary.pending_verification} crew member{summary.pending_verification > 1 ? 's' : ''} waiting for verification</div>
+            <div className="text-xs text-black/40">Tap an employee below to review their documents and approve or reject.</div>
+          </div>
         </div>
       )}
 
@@ -364,6 +381,13 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
   const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState('');
+  const [showRejectBox, setShowRejectBox] = useState(false);
+  const [docs, setDocs] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [docAction, setDocAction] = useState({});
 
   useEffect(() => {
     let mounted = true;
@@ -439,10 +463,88 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
     try {
       const res = await fetch(`/api/admin/crew/${id}/resend-invite`, { method: 'POST' });
       const d = await res.json();
-      if (res.ok) { flash('success', `Invite resent to ${detail.employee.email} — old account cleared`); onSaved(); onClose(); }
+      if (res.ok) { flash('success', `Invite resent to ${detail.employee.email}`); onSaved(); onClose(); }
       else { flash('error', d.error || 'Resend failed'); }
     } catch { flash('error', 'Resend failed'); }
     setResending(false);
+  };
+
+  // Fetch documents with storage URLs
+  const fetchDocs = useCallback(async () => {
+    if (!id) return;
+    setLoadingDocs(true);
+    try {
+      const res = await fetch(`/api/admin/employee-docs?employee_id=${id}`);
+      const d = await res.json();
+      if (res.ok) setDocs(d.documents || []);
+    } catch { /* ignore */ }
+    setLoadingDocs(false);
+  }, [id]);
+
+  useEffect(() => {
+    if (detail?.employee) fetchDocs();
+  }, [detail, fetchDocs]);
+
+  // Approve employee
+  const approveEmployee = async () => {
+    setApproving(true);
+    try {
+      const res = await fetch(`/api/admin/crew/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        flash('success', `${detail.employee.first_name} approved — SMS sent`);
+        onSaved();
+        onClose();
+      } else {
+        flash('error', d.error || 'Approval failed');
+      }
+    } catch { flash('error', 'Approval failed'); }
+    setApproving(false);
+  };
+
+  // Reject employee
+  const rejectEmployee = async () => {
+    setRejecting(true);
+    try {
+      const res = await fetch(`/api/admin/crew/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', notes: rejectNotes }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        flash('success', `${detail.employee.first_name} rejected — SMS sent`);
+        onSaved();
+        onClose();
+      } else {
+        flash('error', d.error || 'Rejection failed');
+      }
+    } catch { flash('error', 'Rejection failed'); }
+    setRejecting(false);
+  };
+
+  // Verify/reject individual document
+  const verifyDoc = async (docId, status) => {
+    setDocAction((p) => ({ ...p, [docId]: status }));
+    try {
+      const res = await fetch('/api/admin/employee-docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_id: docId, status }),
+      });
+      if (res.ok) {
+        flash('success', status === 'verified' ? 'Document verified' : 'Document rejected');
+        fetchDocs();
+      } else {
+        const d = await res.json();
+        flash('error', d.error || 'Failed');
+      }
+    } catch { flash('error', 'Failed'); }
+    setDocAction((p) => { const n = { ...p }; delete n[docId]; return n; });
   };
 
   return (
@@ -525,8 +627,10 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
                 <Field label="Status">
                   <select value={editForm.status ?? ''} onChange={(e) => setField('status', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT}>
                     <option value="pending">Pending</option>
+                    <option value="pending_verification">Pending Verification</option>
                     <option value="active">Active</option>
                     <option value="onboarded">Onboarded</option>
+                    <option value="rejected">Rejected</option>
                     <option value="terminated">Terminated</option>
                   </select>
                 </Field>
@@ -568,23 +672,134 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
               )}
             </Section>
 
-            {/* Documents */}
-            <Section title={`Documents (${detail.documents.length})`}>
-              {detail.documents.length === 0 ? (
+            {/* Verification banner — shows when employee is pending_verification */}
+            {detail.employee.status === 'pending_verification' && (
+              <div className="bg-[#3B82F6]/5 border border-[#3B82F6]/20 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#3B82F6]/15 flex items-center justify-center">
+                    <Check size={16} className="text-[#3B82F6]" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-[#1a1a1a] text-sm">Pending Verification</div>
+                    <div className="text-xs text-black/40">Review the documents below, then approve or reject.</div>
+                  </div>
+                </div>
+                {!showRejectBox ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={approveEmployee}
+                      disabled={approving}
+                      className="flex-1 bg-[#22C55E] text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 active:scale-95 transition-transform flex items-center justify-center gap-1.5"
+                    >
+                      <Check size={16} />
+                      {approving ? 'Approving...' : 'Approve'}
+                    </button>
+                    <button
+                      onClick={() => setShowRejectBox(true)}
+                      disabled={rejecting}
+                      className="flex-1 bg-[#EF4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 active:scale-95 transition-transform flex items-center justify-center gap-1.5"
+                    >
+                      <X size={16} />
+                      Reject
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <textarea
+                      value={rejectNotes}
+                      onChange={(e) => setRejectNotes(e.target.value)}
+                      placeholder="Reason for rejection (sent via SMS to crew member)..."
+                      className={'w-full px-3 py-2 text-sm ' + INPUT}
+                      rows={3}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setShowRejectBox(false); setRejectNotes(''); }}
+                        className="px-4 py-2.5 rounded-lg text-sm font-semibold border border-black/[0.10] text-[#1a1a1a] active:scale-95 transition-transform"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={rejectEmployee}
+                        disabled={rejecting}
+                        className="flex-1 bg-[#EF4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 active:scale-95 transition-transform"
+                      >
+                        {rejecting ? 'Sending rejection...' : 'Confirm Rejection'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Rejected banner */}
+            {detail.employee.status === 'rejected' && (
+              <div className="bg-[#EF4444]/5 border border-[#EF4444]/20 rounded-2xl p-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#EF4444]/15 flex items-center justify-center">
+                    <X size={16} className="text-[#EF4444]" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-[#1a1a1a] text-sm">Rejected</div>
+                    {detail.employee.verification_notes && (
+                      <div className="text-xs text-black/40 mt-1">{detail.employee.verification_notes}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Documents with images and per-doc verify/reject */}
+            <Section title={`Documents (${docs.length})`}>
+              {loadingDocs ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-6 h-6 border-2 border-[#f97316]/20 border-t-[#f97316] rounded-full animate-spin" />
+                </div>
+              ) : docs.length === 0 ? (
                 <p className="text-sm text-black/30">No documents uploaded.</p>
               ) : (
-                <div className="divide-y divide-black/[0.04]">
-                  {detail.documents.map((doc) => (
-                    <div key={doc.id} className="py-2 flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <FileText size={14} className="text-black/30" />
-                        <div>
-                          <div className="font-medium text-black/80">{doc.doc_type}</div>
-                          <div className="text-xs text-black/30">Uploaded {fmtDate(doc.created_at)}</div>
+                <div className="space-y-3">
+                  {docs.map((doc) => (
+                    <div key={doc.id} className="border border-black/[0.06] rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <FileText size={14} className="text-black/30" />
+                          <span className="text-sm font-medium text-black/80">{doc.doc_type.replace(/_/g, ' ')}</span>
                         </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          doc.status === 'verified' ? 'bg-[#22C55E]/15 text-[#22C55E]' :
+                          doc.status === 'rejected' ? 'bg-[#EF4444]/15 text-[#EF4444]' :
+                          doc.status === 'uploaded' ? 'bg-[#F59E0B]/15 text-[#F59E0B]' :
+                          'bg-black/5 text-black/40'
+                        }`}>
+                          {doc.status}
+                        </span>
                       </div>
-                      {doc.file_url && (
-                        <a href={doc.file_url} target="_blank" rel="noreferrer" className="text-[#f97316] text-xs font-semibold">View →</a>
+                      {doc.storage_url && (
+                        <a href={doc.storage_url} target="_blank" rel="noreferrer" className="block mb-2">
+                          <img src={doc.storage_url} alt={doc.doc_type} className="w-full max-h-40 object-cover rounded-lg border border-black/[0.06]" />
+                        </a>
+                      )}
+                      {doc.status === 'uploaded' && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => verifyDoc(doc.id, 'verified')}
+                            disabled={!!docAction[doc.id]}
+                            className="flex-1 bg-[#22C55E] text-white px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 active:scale-95 transition-transform"
+                          >
+                            {docAction[doc.id] === 'verified' ? 'Verifying...' : 'Verify'}
+                          </button>
+                          <button
+                            onClick={() => verifyDoc(doc.id, 'rejected')}
+                            disabled={!!docAction[doc.id]}
+                            className="flex-1 bg-[#EF4444]/10 text-[#EF4444] px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 active:scale-95 transition-transform border border-[#EF4444]/20"
+                          >
+                            {docAction[doc.id] === 'rejected' ? 'Rejecting...' : 'Reject'}
+                          </button>
+                        </div>
+                      )}
+                      {doc.notes && (
+                        <p className="text-xs text-black/40 mt-2">{doc.notes}</p>
                       )}
                     </div>
                   ))}

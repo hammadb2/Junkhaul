@@ -45,11 +45,11 @@ export async function POST(req) {
   const now = new Date().toISOString();
   const { error } = await supabaseAdmin
     .from('employees')
-    .update({ onboarding_completed_at: now, status: 'active', updated_at: now })
+    .update({ onboarding_completed_at: now, status: 'pending_verification', updated_at: now })
     .eq('id', emp.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, completed_at: now });
+  return NextResponse.json({ ok: true, completed_at: now, status: 'pending_verification' });
 }
 
 // GET — check onboarding status

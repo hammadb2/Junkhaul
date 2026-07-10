@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getAuthedEmployee, decryptField } from '@/lib/employeeAuth';
-import { isDriveConfigured } from '@/lib/googleDrive';
 
 export const runtime = 'nodejs';
 
@@ -32,6 +31,7 @@ export async function GET(req) {
       hire_date: full.hire_date,
       pay_rate: full.pay_rate,
       onboarded: full.status === 'onboarded' || full.status === 'active',
+      pending_verification: full.status === 'pending_verification',
       has_banking: !!full.bank_account_enc,
       has_sin: !!full.sin_enc,
       td1_federal_claim: full.td1_federal_claim,
@@ -44,7 +44,7 @@ export async function GET(req) {
       uploaded: (docs || []).filter((d) => d.status === 'uploaded' || d.status === 'verified').map((d) => d.doc_type),
       missing: requiredDocs.filter((t) => !((docs || []).find((d) => d.doc_type === t && (d.status === 'uploaded' || d.status === 'verified')))),
     },
-    drive_configured: isDriveConfigured(),
+    drive_configured: false,
   });
 }
 
