@@ -111,6 +111,7 @@ export default function SchedulePage() {
         <div className="flex gap-3 text-xs">
           <button onClick={() => router.push('/portal/clock')} className="text-gray-500 underline">Clock</button>
           <button onClick={() => router.push('/portal/documents')} className="text-gray-500 underline">Docs</button>
+          <button onClick={() => router.push('/portal/paystubs')} className="text-gray-500 underline">Pay</button>
           <button onClick={logout} className="text-gray-400 underline">Out</button>
         </div>
       </header>
