@@ -25,10 +25,11 @@ export default function PWARegister() {
       window.navigator.standalone === true ||
       window.matchMedia('(display-mode: standalone)').matches;
 
-    // Don't show the prompt on the onboarding page — it has its own Step 0
+    // Only show the "Add to Home Screen" prompt on crew portal pages
+    const isPortal = window.location.pathname.startsWith('/portal');
     const isOnboarding = window.location.pathname.includes('/portal/onboard');
 
-    if (isIOS && !isStandalone && !isOnboarding) {
+    if (isIOS && !isStandalone && isPortal && !isOnboarding) {
       // Check if user previously dismissed
       const dismissed = localStorage.getItem('jh-ios-prompt-dismissed');
       if (!dismissed) {
@@ -39,7 +40,6 @@ export default function PWARegister() {
     }
 
     // Auto-subscribe to push after login (if on portal pages)
-    const isPortal = window.location.pathname.startsWith('/portal');
     if (isPortal && !isOnboarding) {
       // Wait for SW to be ready, then request permission and subscribe
       const timer = setTimeout(async () => {
