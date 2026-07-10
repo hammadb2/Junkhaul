@@ -96,6 +96,24 @@ export async function POST(req) {
   }).catch(() => ({ error: 'rpc not available' }));
   results.push({ step: 'employees reset columns', error: e5 });
 
+  // 6. Create push_subscriptions table if not exists
+  const { error: e6 } = await supabaseAdmin.rpc('exec_sql', {
+    query: `
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+        employee_id uuid NOT NULL,
+        endpoint text NOT NULL,
+        p256dh text,
+        auth text,
+        created_at timestamptz DEFAULT now(),
+        UNIQUE(employee_id, endpoint)
+      );
+      ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+      CREATE POLICY IF NOT EXISTS "Service role push_subs" ON push_subscriptions FOR ALL USING (true);
+    `
+  }).catch(() => ({ error: 'rpc not available' }));
+  results.push({ step: 'push_subscriptions table', error: e6 });
+
   // If exec_sql doesn't exist, try direct table creation via the API
   const hasRpcError = results.some(r => r.error === 'rpc not available');
   if (hasRpcError) {
@@ -160,6 +178,18 @@ CREATE POLICY IF NOT EXISTS "Service role comp" ON compensation_log FOR ALL USIN
 
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_token text;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_expires_at timestamptz;
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  employee_id uuid NOT NULL,
+  endpoint text NOT NULL,
+  p256dh text,
+  auth text,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(employee_id, endpoint)
+);
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Service role push_subs" ON push_subscriptions FOR ALL USING (true);
 `
     });
   }

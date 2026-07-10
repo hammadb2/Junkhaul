@@ -37,7 +37,36 @@ export default function PWARegister() {
         return () => clearTimeout(timer);
       }
     }
+
+    // Auto-subscribe to push after login (if on portal pages)
+    const isPortal = window.location.pathname.startsWith('/portal');
+    if (isPortal && !isOnboarding) {
+      // Wait for SW to be ready, then request permission and subscribe
+      const timer = setTimeout(async () => {
+        await requestPermissionAndSubscribe();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
   }, []);
+
+  const requestPermissionAndSubscribe = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!('Notification' in window)) return;
+
+    try {
+      // Request notification permission if not already granted
+      if (Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+      }
+      if (Notification.permission === 'denied') return;
+
+      // Now subscribe
+      await subscribeToPush();
+    } catch (e) {
+      console.warn('Push permission/subscription failed:', e);
+    }
+  };
 
   const subscribeToPush = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
@@ -49,7 +78,10 @@ export default function PWARegister() {
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (!vapidKey) return;
+        if (!vapidKey) {
+          console.warn('NEXT_PUBLIC_VAPID_PUBLIC_KEY not set');
+          return;
+        }
 
         // Convert VAPID key to Uint8Array
         const convertedKey = urlBase64ToUint8Array(vapidKey);
@@ -60,11 +92,14 @@ export default function PWARegister() {
       }
 
       // Send subscription to server
-      await fetch('/api/employee/push-subscribe', {
+      const res = await fetch('/api/employee/push-subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sub),
       });
+      if (!res.ok) {
+        console.warn('Push subscribe API failed:', res.status);
+      }
     } catch (e) {
       console.warn('Push subscription failed:', e);
     }
@@ -77,9 +112,6 @@ export default function PWARegister() {
 
   return (
     <>
-      {/* Attempt push subscription on mount (silently) */}
-      <PushSubscribeOnMount onReady={subscribeToPush} />
-
       {/* iOS Add to Home Screen prompt */}
       {showIosPrompt && (
         <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 safe-bottom">
@@ -110,30 +142,6 @@ export default function PWARegister() {
       )}
     </>
   );
-}
-
-// Attempt push subscription after service worker is ready
-function PushSubscribeOnMount({ onReady }) {
-  useEffect(() => {
-    // Only attempt if notifications are supported and permission is granted or default
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'denied') return;
-
-    // Request permission after a delay (don't be aggressive)
-    const timer = setTimeout(async () => {
-      if (Notification.permission === 'default') {
-        // Don't auto-prompt — wait for user action
-        return;
-      }
-      if (Notification.permission === 'granted') {
-        onReady();
-      }
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [onReady]);
-
-  return null;
 }
 
 function urlBase64ToUint8Array(base64String) {

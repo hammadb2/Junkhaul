@@ -65,6 +65,8 @@ export async function POST(req) {
   };
 
   let sent = 0;
+  let totalSubs = 0;
+  let errors = [];
 
   if (target === 'all') {
     // Fetch all active employees
@@ -75,12 +77,14 @@ export async function POST(req) {
 
     const ids = (employees || []).map((e) => e.id);
     if (ids.length === 0) {
-      return NextResponse.json({ ok: true, sent: 0 });
+      return NextResponse.json({ ok: true, sent: 0, totalSubs: 0, message: 'No active employees' });
     }
 
     const results = await sendPushToEmployees(ids, payload);
     for (const r of results) {
       if (r && typeof r.sent === 'number') sent += r.sent;
+      if (r && typeof r.total === 'number') totalSubs += r.total;
+      if (r && r.error) errors.push(r.error);
     }
   } else if (target === 'individual') {
     if (!employee_id) {
@@ -88,9 +92,17 @@ export async function POST(req) {
     }
     const result = await sendPushToEmployee(employee_id, payload);
     sent = result?.sent || 0;
+    totalSubs = result?.total || 0;
+    if (result?.error) errors.push(result.error);
   } else {
     return NextResponse.json({ error: 'target must be "all" or "individual"' }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, sent });
+  return NextResponse.json({
+    ok: true,
+    sent,
+    totalSubs,
+    message: totalSubs === 0 ? 'No devices registered — crew members need to open the app and allow notifications first' : undefined,
+    errors: errors.length > 0 ? errors : undefined,
+  });
 }

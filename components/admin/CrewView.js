@@ -905,9 +905,20 @@ function BroadcastSection({ flash }) {
     const res = await fetch('/api/admin/crew/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     const d = await res.json();
     setSending(false);
-    if (res.ok) { flash('success', `Push notification sent to ${d.sent} device(s)`); setForm({ target: 'all', employee_id: '', title: '', body: '' }); }
+    if (res.ok) {
+      if (d.sent > 0) {
+        flash('success', `Push sent to ${d.sent} device(s)`);
+      } else if (d.totalSubs === 0) {
+        flash('error', 'No devices registered. Crew must open the app and allow notifications first.');
+      } else {
+        flash('error', d.message || `Sent to 0 devices (${d.totalSubs} registered)`);
+      }
+      setForm({ target: 'all', employee_id: '', title: '', body: '' });
+    }
     else { flash('error', d.error || 'Send failed'); }
   };
+
+  const totalDevices = employees.reduce((sum, e) => sum + (e.push_subscriptions || 0), 0);
 
   return (
     <div className={CARD + ' p-4'}>
@@ -918,7 +929,11 @@ function BroadcastSection({ flash }) {
 
       {open && (
         <form onSubmit={send} className="mt-4 space-y-3">
-          <div className="text-xs text-black/30">Send a push notification to crew members&apos; phones.</div>
+          <div className="text-xs text-black/30">
+            Send a push notification to crew members&apos; phones.
+            {totalDevices === 0 && <span className="text-[#EF4444] block mt-1">No devices registered yet. Crew members need to open the app and allow notifications.</span>}
+            {totalDevices > 0 && <span className="text-[#22C55E] block mt-1">{totalDevices} device(s) registered.</span>}
+          </div>
           <div>
             <label className="block text-xs font-medium text-black/50 mb-1">Send to</label>
             <select value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })} className={'w-full px-3 py-2 text-sm ' + INPUT}>
