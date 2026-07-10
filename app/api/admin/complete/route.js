@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 async function checkAuth() {
   const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  return token === adminToken;
+  return token === await adminToken();
 }
 
 // Mark a job complete. The review-requests cron will text the customer ~1h later.

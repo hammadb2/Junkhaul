@@ -535,35 +535,39 @@ function EarningsDashboard() {
   useEffect(() => {
     fetch('/api/admin/earnings')
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); });
+      .then((d) => { setData(d); setLoading(false); })
+      .catch(() => { setLoading(false); });
   }, []);
 
   if (loading) return <p className="text-center text-gray-400 py-10">Loading earnings…</p>;
-  if (!data) return null;
+  if (!data || data.error) return <p className="text-center text-gray-400 py-10">Failed to load earnings.</p>;
 
   const sources = Object.entries(data.sourceBreakdown || {}).sort((a, b) => b[1].count - a[1].count);
+  const totalEarned = data.totalEarned || 0;
+  const totalPipeline = data.totalPipeline || 0;
+  const avgJobValue = data.avgJobValue || 0;
 
   return (
     <div className="space-y-4">
       <DepartureCountdown />
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-gray-900">${data.totalEarned.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-gray-900">${totalEarned.toLocaleString()}</div>
           <div className="text-sm text-gray-500 mt-1">Total earned</div>
-          <div className="text-xs text-gray-400">{data.completedJobs} jobs completed</div>
+          <div className="text-xs text-gray-400">{data.completedJobs || 0} jobs completed</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-orange-600">${data.totalPipeline.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-orange-600">${totalPipeline.toLocaleString()}</div>
           <div className="text-sm text-gray-500 mt-1">In pipeline</div>
-          <div className="text-xs text-gray-400">{data.upcomingJobs} confirmed upcoming</div>
+          <div className="text-xs text-gray-400">{data.upcomingJobs || 0} confirmed upcoming</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-gray-900">${data.avgJobValue}</div>
+          <div className="text-2xl font-bold text-gray-900">${avgJobValue}</div>
           <div className="text-sm text-gray-500 mt-1">Avg job value</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-4">
           <div className="text-2xl font-bold text-green-600">
-            ${(data.totalEarned + data.totalPipeline).toLocaleString()}
+            ${(totalEarned + totalPipeline).toLocaleString()}
           </div>
           <div className="text-sm text-gray-500 mt-1">Total + pipeline</div>
         </div>
