@@ -14,6 +14,7 @@ import {
 } from '@/components/motion';
 import PaymentStep from '@/components/booking/PaymentStep';
 import Confirmation from '@/components/booking/Confirmation';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { calculatePrice, PRICING, LOAD_LABELS } from '@/lib/pricingConstants';
 import { buildItemizedQuote, recalcWithDisposal } from '@/lib/itemPricing';
 
@@ -24,7 +25,7 @@ const LOADS = [
   { key: 'full', title: 'Full load', desc: 'Garage / estate cleanout', price: 380 },
 ];
 
-const STEPS = ['phone', 'photos', 'items', 'load', 'schedule', 'email', 'payment', 'done'];
+const STEPS = ['phone', 'address', 'photos', 'items', 'load', 'schedule', 'details', 'payment', 'done'];
 
 const todayEdmonton = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -77,7 +78,7 @@ export default function BookPage() {
     typeof window !== 'undefined' ? localStorage.getItem('jh_phone') || '' : ''
   );
   const [step, setStep] = useState(() =>
-    typeof window !== 'undefined' && localStorage.getItem('jh_phone') ? 'photos' : 'phone'
+    typeof window !== 'undefined' && localStorage.getItem('jh_phone') ? 'address' : 'phone'
   );
   const [state, setState] = useState({
     photos: [],
@@ -130,7 +131,7 @@ export default function BookPage() {
         </Link>
         {step !== 'done' && (
           <div className="flex gap-1">
-            {STEPS.slice(1, 7).map((s, i) => (
+            {STEPS.slice(1, 8).map((s, i) => (
               <div
                 key={s}
                 className={`h-1.5 w-6 rounded-full ${
@@ -158,8 +159,16 @@ export default function BookPage() {
               update={update}
               onNext={(phone) => {
                 setCapturedPhone(phone);
-                setStep('photos');
+                setStep('address');
               }}
+            />
+          )}
+          {step === 'address' && (
+            <AddressStep
+              state={state}
+              update={update}
+              sessionId={sessionId}
+              onNext={() => setStep('photos')}
             />
           )}
           {step === 'photos' && (
@@ -190,11 +199,11 @@ export default function BookPage() {
             <ScheduleStep
               state={state}
               update={update}
-              onNext={() => setStep('email')}
+              onNext={() => setStep('details')}
             />
           )}
-          {step === 'email' && (
-            <EmailStep
+          {step === 'details' && (
+            <DetailsStep
               state={state}
               update={update}
               price={price}
@@ -243,15 +252,15 @@ export default function BookPage() {
   );
 }
 
+
 // ============================================================
-// STEP 0 — PHONE + NAME + ADDRESS CAPTURE
+// STEP 0 — PHONE ONLY
 // ============================================================
 function PhoneStep({ sessionId, state, update, onNext }) {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Format phone as (XXX) XXX-XXXX while typing
   const formatPhone = (raw) => {
     const digits = raw.replace(/\D/g, '').slice(0, 10);
     if (digits.length === 0) return '';
@@ -260,19 +269,14 @@ function PhoneStep({ sessionId, state, update, onNext }) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
   };
 
-  // Strip formatting to get raw digits for storage/sending
   const rawPhone = phone.replace(/\D/g, '');
   const phoneValid = rawPhone.length === 10;
-  const nameValid = state.name.trim().length >= 2;
-  const addressValid = state.address.trim().length >= 5;
-  const valid = phoneValid && nameValid && addressValid;
 
   const submit = async () => {
     setSubmitting(true);
     setError(null);
     const phoneToSend = `+1${rawPhone}`;
     try {
-      // Capture UTM params and click IDs from URL for ad attribution (Step 2)
       const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
       const utm = {
         utm_source: urlParams.get('utm_source') || null,
@@ -288,27 +292,7 @@ function PhoneStep({ sessionId, state, update, onNext }) {
       });
       if (!res.ok) throw new Error('Failed');
       localStorage.setItem('jh_phone', phoneToSend);
-      // Store phone in state for booking creation
       update({ phone: phoneToSend });
-
-      // If out of area, capture the lead with address info and don't proceed
-      if (state.out_of_area) {
-        await fetch('/api/capture-lead', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: phoneToSend,
-            session_id: sessionId,
-            action: 'out_of_area',
-            name: state.name,
-            address: state.address,
-            address_data: state.address_data,
-          }),
-        }).catch(() => {});
-        setSubmitting(false);
-        return; // Stay on this step — the OutOfAreaNotice will show
-      }
-
       onNext(phoneToSend);
     } catch {
       setError('Something went wrong. Try again.');
@@ -321,15 +305,8 @@ function PhoneStep({ sessionId, state, update, onNext }) {
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Get your instant price</h2>
-        <p className="mt-2 text-gray-500 text-sm">Enter your details and we&apos;ll text you your quote. No spam, ever.</p>
+        <p className="mt-2 text-gray-500 text-sm">Enter your mobile number and we&apos;ll text you your quote. No spam, ever.</p>
       </div>
-
-      <Field
-        label="Full name"
-        value={state.name}
-        onChange={(v) => update({ name: v })}
-        placeholder="Jane Doe"
-      />
 
       <input
         type="tel"
@@ -337,50 +314,107 @@ function PhoneStep({ sessionId, state, update, onNext }) {
         placeholder="(587) 000-0000"
         value={phone}
         onChange={(e) => setPhone(formatPhone(e.target.value))}
-        onKeyDown={(e) => e.key === 'Enter' && valid && submit()}
+        onKeyDown={(e) => e.key === 'Enter' && phoneValid && submit()}
         className="w-full border border-gray-300 rounded-2xl px-4 py-4 text-lg font-medium"
+        autoFocus
       />
       <div className="-mt-3">
         <span className="text-xs font-medium text-gray-700">Mobile number</span>
       </div>
 
-      <AddressField
-        label="Pickup address"
-        value={state.address}
-        onChange={(v, data) => {
-          if (data) {
-            const inCalgary = isInCalgary(data);
-            const ctx = (data.context || []).reduce((acc, c) => {
-              const key = c.id.split('.')[0];
-              acc[key] = c.text;
-              return acc;
-            }, {});
-            const isApt = ['apartments', 'residential', 'condominium', 'building'].some(
-              (t) => (data.place_type || []).includes(t)
-            ) || /apt|apartment|condo|unit|suite|tower|building|complex/i.test(data.text || '');
-            update({
-              address: data.place_name,
-              address_data: {
-                full_address: data.place_name,
-                street: data.text,
-                postal_code: ctx.postcode || '',
-                city: ctx.place || 'Calgary',
-                province: ctx.region || 'Alberta',
-                country: ctx.country || 'Canada',
-                lat: data.center?.[1] || null,
-                lng: data.center?.[0] || null,
-                place_id: data.id,
-              },
-              is_apartment: isApt,
-              out_of_area: !inCalgary,
-              stairs: isApt && !state.stairs_confirmed ? Math.max(state.stairs, 1) : state.stairs,
-            });
-          } else {
-            update({ address: v, address_data: null, is_apartment: false, out_of_area: false });
-          }
-        }}
-        placeholder="123 5 Ave NE, Calgary"
-      />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <BookButton disabled={!phoneValid || submitting} onClick={submit}>
+        {submitting ? 'One sec…' : 'Continue →'}
+      </BookButton>
+      <p className="text-center text-xs text-gray-400">
+        By continuing you agree to receive texts about your booking. Standard rates may apply.
+      </p>
+    </div>
+  );
+}
+
+// ============================================================
+// STEP 1 — ADDRESS (with Mapbox autocomplete)
+// ============================================================
+function AddressStep({ state, update, sessionId, onNext }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const addressValid = state.address.trim().length >= 5;
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      if (state.out_of_area) {
+        await fetch('/api/capture-lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: state.phone,
+            session_id: sessionId,
+            action: 'out_of_area',
+            address: state.address,
+            address_data: state.address_data,
+          }),
+        }).catch(() => {});
+        setSubmitting(false);
+        return;
+      }
+      onNext();
+    } catch {
+      setError('Something went wrong. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Where are we picking up?</h2>
+        <p className="mt-2 text-gray-500 text-sm">Start typing your Calgary address and select it from the dropdown.</p>
+      </div>
+
+      <div>
+        <span className="text-sm font-medium text-gray-700">Pickup address</span>
+        <div className="mt-1">
+          <AddressAutocomplete
+            value={state.address}
+            onChange={(v) => update({ address: v, address_data: null, is_apartment: false, out_of_area: false })}
+            onSelect={(data) => {
+              const inCalgary = isInCalgary(data);
+              const ctx = (data.context || []).reduce((acc, c) => {
+                const key = c.id.split('.')[0];
+                acc[key] = c.text;
+                return acc;
+              }, {});
+              const isApt = ['apartments', 'residential', 'condominium', 'building'].some(
+                (t) => (data.place_type || []).includes(t)
+              ) || /apt|apartment|condo|unit|suite|tower|building|complex/i.test(data.text || '');
+              update({
+                address: data.place_name,
+                address_data: {
+                  full_address: data.place_name,
+                  street: data.text,
+                  postal_code: ctx.postcode || '',
+                  city: ctx.place || 'Calgary',
+                  province: ctx.region || 'Alberta',
+                  country: ctx.country || 'Canada',
+                  lat: data.center?.[1] || null,
+                  lng: data.center?.[0] || null,
+                  place_id: data.id,
+                },
+                is_apartment: isApt,
+                out_of_area: !inCalgary,
+                stairs: isApt && !state.stairs_confirmed ? Math.max(state.stairs, 1) : state.stairs,
+              });
+            }}
+            placeholder="123 5 Ave NE, Calgary"
+            style={{ minHeight: 48, fontSize: 16 }}
+          />
+        </div>
+      </div>
 
       {state.out_of_area && (
         <OutOfAreaNotice state={state} sessionId={sessionId} />
@@ -410,7 +444,7 @@ function PhoneStep({ sessionId, state, update, onNext }) {
           </button>
         </div>
       )}
-      {!state.is_apartment && (
+      {!state.is_apartment && addressValid && (
         <Field
           label="Unit / buzzer (optional)"
           value={state.unit}
@@ -420,12 +454,9 @@ function PhoneStep({ sessionId, state, update, onNext }) {
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <BookButton disabled={!valid || submitting} onClick={submit}>
-        {submitting ? 'One sec…' : state.out_of_area ? 'Submit my info →' : 'Get my price →'}
+      <BookButton disabled={!addressValid || submitting} onClick={submit}>
+        {submitting ? 'One sec…' : state.out_of_area ? 'Submit my info →' : 'Continue →'}
       </BookButton>
-      <p className="text-center text-xs text-gray-400">
-        By continuing you agree to receive texts about your booking. Standard rates may apply.
-      </p>
     </div>
   );
 }
@@ -1237,19 +1268,16 @@ function ScheduleStep({ state, update, onNext }) {
 // ============================================================
 // STEP 4 — EMAIL (optional) + CREATE BOOKING
 // ============================================================
-function EmailStep({ state, update, price, onCreated }) {
+function DetailsStep({ state, update, price, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [showAddressPopup, setShowAddressPopup] = useState(!state.address || state.address.trim().length < 5);
+
+  const nameValid = state.name.trim().length >= 2;
+  const valid = nameValid && state.phone && state.address;
 
   const submit = async () => {
-    // Final address check before creating booking
-    if (!state.address || state.address.trim().length < 5) {
-      setShowAddressPopup(true);
-      return;
-    }
-    if (!state.name || !state.phone) {
-      setError('Missing name or phone number. Please go back and fill those in.');
+    if (!nameValid) {
+      setError('Please enter your full name.');
       return;
     }
 
@@ -1299,17 +1327,6 @@ function EmailStep({ state, update, price, onCreated }) {
       setSubmitting(false);
     }
   };
-
-  // Address fallback popup
-  if (showAddressPopup) {
-    return (
-      <AddressPopup
-        state={state}
-        update={update}
-        onClose={() => setShowAddressPopup(false)}
-      />
-    );
-  }
 
   // Use itemized total if available, otherwise standard price
   const displayTotal = state.itemized ? state.itemized.total : price.total;
@@ -1363,6 +1380,10 @@ function EmailStep({ state, update, price, onCreated }) {
           <span className="text-sm text-gray-500">Pickup time</span>
           <span className="font-medium text-gray-900">{state.job_time}</span>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Pickup address</span>
+          <span className="font-medium text-gray-900 text-right text-xs max-w-[60%] truncate">{state.address}</span>
+        </div>
         {price.freon_fee > 0 && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-500">Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span>
@@ -1395,16 +1416,21 @@ function EmailStep({ state, update, price, onCreated }) {
         </div>
       </div>
 
-      <div>
-        <p className="text-sm text-gray-600 mb-3">Want a receipt by email? Add it below (optional).</p>
-        <Field
-          label="Email (optional)"
-          value={state.email}
-          onChange={(v) => update({ email: v })}
-          placeholder="you@email.com"
-          type="email"
-        />
-      </div>
+      {/* Name + email collected here, right before payment */}
+      <Field
+        label="Full name"
+        value={state.name}
+        onChange={(v) => update({ name: v })}
+        placeholder="Jane Doe"
+      />
+
+      <Field
+        label="Email (optional — for your receipt)"
+        value={state.email}
+        onChange={(v) => update({ email: v })}
+        placeholder="you@email.com"
+        type="email"
+      />
 
       <label className="block">
         <span className="text-sm font-medium text-gray-700">Notes for our team (optional)</span>
@@ -1419,111 +1445,9 @@ function EmailStep({ state, update, price, onCreated }) {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <BookButton disabled={submitting} onClick={submit}>
+      <BookButton disabled={!valid || submitting} onClick={submit}>
         {submitting ? 'Creating booking…' : 'Continue to payment →'}
       </BookButton>
-    </div>
-  );
-}
-
-// ============================================================
-// ADDRESS POPUP — fallback if address is missing at quote step
-// ============================================================
-function AddressPopup({ state, update, onClose }) {
-  const [localAddress, setLocalAddress] = useState(state.address || '');
-  const [localUnit, setLocalUnit] = useState(state.unit || '');
-  const [isApt, setIsApt] = useState(state.is_apartment || false);
-  const [error, setError] = useState(null);
-
-  const valid = localAddress.trim().length >= 5;
-
-  const confirm = () => {
-    if (!valid) {
-      setError('Please enter a valid pickup address.');
-      return;
-    }
-    update({
-      address: localAddress,
-      unit: localUnit,
-      is_apartment: isApt,
-      stairs: isApt && !state.stairs_confirmed ? Math.max(state.stairs, 1) : state.stairs,
-    });
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
-        <div>
-          <h3 className="text-xl font-bold text-gray-900">We need your pickup address</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            We need your address to confirm your booking and plan the route.
-          </p>
-        </div>
-
-        <AddressField
-          label="Pickup address"
-          value={localAddress}
-          onChange={(v, data) => {
-            setLocalAddress(v);
-            if (data) {
-              const apt = ['apartments', 'residential', 'condominium', 'building'].some(
-                (t) => (data.place_type || []).includes(t)
-              ) || /apt|apartment|condo|unit|suite|tower|building|complex/i.test(data.text || '');
-              setIsApt(apt);
-              const ctx = (data.context || []).reduce((acc, c) => {
-                const key = c.id.split('.')[0];
-                acc[key] = c.text;
-                return acc;
-              }, {});
-              update({
-                address_data: {
-                  full_address: data.place_name,
-                  street: data.text,
-                  postal_code: ctx.postcode || '',
-                  city: ctx.place || 'Calgary',
-                  province: ctx.region || 'Alberta',
-                  country: ctx.country || 'Canada',
-                  lat: data.center?.[1] || null,
-                  lng: data.center?.[0] || null,
-                  place_id: data.id,
-                },
-              });
-            }
-          }}
-          placeholder="123 5 Ave NE, Calgary"
-        />
-
-        {isApt && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
-            <p className="text-sm font-medium text-orange-700">
-              This looks like an apartment or condo. What&apos;s your unit number?
-            </p>
-            <input
-              type="text"
-              value={localUnit}
-              onChange={(e) => setLocalUnit(e.target.value)}
-              placeholder="Apt 204, Unit 15, Suite 301..."
-              className="w-full border border-orange-300 rounded-lg px-3 py-2.5 text-sm focus:border-orange-500 focus:outline-none"
-            />
-            <p className="text-xs text-orange-600">
-              A stair charge of $25 (1 flight) has been added. If there are no stairs or an elevator, you can adjust later.
-            </p>
-          </div>
-        )}
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <div className="flex gap-2">
-          <button
-            onClick={confirm}
-            disabled={!valid}
-            className="flex-1 bg-orange-500 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
-          >
-            Confirm address
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1539,121 +1463,6 @@ function Field({ label, value, onChange, placeholder, type = 'text' }) {
         placeholder={placeholder}
         className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
       />
-    </label>
-  );
-}
-
-// Address field with Mapbox geocoding autocomplete — very accurate for Calgary
-function AddressField({ label, value, onChange, placeholder }) {
-  const [suggestions, setSuggestions] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [highlighted, setHighlighted] = useState(-1);
-  const debounceRef = useRef(null);
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-
-  const fetchSuggestions = async (query) => {
-    if (query.length < 2 || !token) {
-      setSuggestions([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      // Mapbox geocoding API — biased to Calgary, Alberta, Canada
-      // Include address + poi (points of interest like apartment buildings) for max accuracy
-      const proximity = '-114.0719,51.0447'; // Calgary center
-      const bbox = '-114.3,50.9,-113.9,51.2'; // Calgary bounding box
-      const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-          query
-        )}.json?access_token=${token}&country=ca&proximity=${proximity}&bbox=${bbox}&types=address,poi,neighborhood&limit=6&autocomplete=true`
-      );
-      const data = await res.json();
-      setSuggestions(data.features || []);
-    } catch {
-      setSuggestions([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChange = (val) => {
-    onChange(val); // pass just the string while typing
-    setShowDropdown(true);
-    setHighlighted(-1);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchSuggestions(val), 200);
-  };
-
-  const selectSuggestion = (s) => {
-    // Pass the full feature back so parent can extract postal code, coords, etc.
-    onChange(s.place_name, s);
-    setSuggestions([]);
-    setShowDropdown(false);
-    setHighlighted(-1);
-  };
-
-  const handleKeyDown = (e) => {
-    if (!showDropdown || suggestions.length === 0) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlighted((h) => Math.min(h + 1, suggestions.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlighted((h) => Math.max(h - 1, 0));
-    } else if (e.key === 'Enter' && highlighted >= 0) {
-      e.preventDefault();
-      selectSuggestion(suggestions[highlighted]);
-    } else if (e.key === 'Escape') {
-      setShowDropdown(false);
-    }
-  };
-
-  return (
-    <label className="block relative">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        onFocus={() => value.length >= 2 && setShowDropdown(true)}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        autoComplete="off"
-        className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-3 text-sm focus:border-orange-500 focus:outline-none"
-      />
-      {showDropdown && (suggestions.length > 0 || loading) && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-72 overflow-hidden">
-          {loading && (
-            <div className="px-4 py-3 text-sm text-gray-400 flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
-              Searching addresses...
-            </div>
-          )}
-          {suggestions.map((s, i) => {
-            // Mapbox returns place_name as "123 5 Ave NE, Calgary, Alberta T2E 8N6, Canada"
-            // Split into main address + area for display
-            const parts = (s.place_name || '').split(',');
-            const mainAddr = parts[0] || s.place_name;
-            const area = parts.slice(1).join(',').trim();
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
-                onMouseEnter={() => setHighlighted(i)}
-                className={`w-full text-left px-4 py-3 border-b border-gray-100 last:border-0 transition-all ${
-                  highlighted === i ? 'bg-orange-50' : 'hover:bg-orange-50'
-                } ${i === 0 ? 'rounded-t-2xl' : ''} ${i === suggestions.length - 1 ? 'rounded-b-2xl' : ''}`}
-              >
-                <div className="text-sm font-semibold text-gray-900">{mainAddr}</div>
-                {area && <div className="text-xs text-gray-500 mt-0.5">{area}</div>}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </label>
   );
 }

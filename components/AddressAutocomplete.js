@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MapPin, Search } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 
 // ============================================================
 // AddressAutocomplete — Mapbox-powered address search.
 // Works in both light and dark themes via the `dark` prop.
 // Returns the full Mapbox feature object to the parent.
 // ============================================================
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 export default function AddressAutocomplete({
   value,
@@ -28,13 +26,14 @@ export default function AddressAutocomplete({
   const containerRef = useRef(null);
 
   const fetchSuggestions = async (query) => {
-    if (query.length < 2 || !MAPBOX_TOKEN) { setSuggestions([]); return; }
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    if (query.length < 2 || !token) { setSuggestions([]); return; }
     setLoading(true);
     try {
       const proximity = '-114.0719,51.0447';
       const bbox = '-114.3,50.9,-113.9,51.2';
       const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=ca&proximity=${proximity}&bbox=${bbox}&types=address,poi,neighborhood&limit=6&autocomplete=true`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=ca&proximity=${proximity}&bbox=${bbox}&types=address,poi,neighborhood&limit=6&autocomplete=true`
       );
       const data = await res.json();
       setSuggestions(data.features || []);
@@ -83,7 +82,7 @@ export default function AddressAutocomplete({
   const loadingColor = dark ? 'rgba(255,255,255,0.4)' : '#9ca3af';
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', ...style }}>
+    <div ref={containerRef} style={{ position: 'relative' }}>
       <input
         type="text"
         value={value}
