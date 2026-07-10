@@ -7,6 +7,7 @@ import { createDepositPayment } from '@/lib/stripe';
 import { jobDateTimeUTC, dayType, formatDateLong, formatTime } from '@/lib/dates';
 import { sendSMS } from '@/lib/sms';
 import { sendDepositLink } from '@/lib/messages';
+import { randomBytes } from 'crypto';
 
 export const runtime = 'nodejs';
 
@@ -236,6 +237,16 @@ export async function POST(req) {
       .update({ stripe_payment_intent_id: intent.id })
       .eq('id', booking.id);
 
+    // ── Tracking token (customer portal link) ─────────────
+    // Generate an unguessable token so the customer can track their
+    // job, pay the balance, leave feedback, and tip the crew — all
+    // without logging in. The token IS the auth.
+    const trackingToken = randomBytes(16).toString('hex');
+    await supabaseAdmin
+      .from('bookings')
+      .update({ tracking_token: trackingToken })
+      .eq('id', booking.id);
+
     // ── Referral processing (Step 7) ──────────────────────
     // If a referral code was provided, create a pending referral record.
     // The reward is fulfilled when the booking is completed.
@@ -263,6 +274,8 @@ export async function POST(req) {
       total: priced.total,
       balance_due: priced.balance_due,
       deposit: PRICING.deposit,
+      tracking_token: trackingToken,
+      tracking_url: `https://junkhaul.ca/track/${trackingToken}`,
     });
   } catch (err) {
     console.error('create-booking error:', err);

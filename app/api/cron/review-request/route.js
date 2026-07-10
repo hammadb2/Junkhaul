@@ -43,7 +43,11 @@ export async function GET(req) {
     let sentCount = 0;
     for (const booking of bookings || []) {
       try {
-        const reviewMsg = `Thanks for choosing Junk Haul Calgary, ${booking.name}! We'd love to hear how we did. Leave a quick review: https://junkhaul.ca/review/${booking.id} — it takes 30 seconds and helps us a ton.`;
+        // Prefer the tracking token link so the customer can track
+        // their junk, leave feedback, and tip the crew in one place.
+        const trackingId = booking.tracking_token || booking.id;
+        const trackingUrl = `https://junkhaul.ca/track/${trackingId}`;
+        const reviewMsg = `Your junk removal is complete! Track where your items went, leave feedback, and tip your crew: ${trackingUrl}`;
         await sendSMS(booking.phone, reviewMsg, booking.id, 'review_request');
         await supabaseAdmin
           .from('bookings')

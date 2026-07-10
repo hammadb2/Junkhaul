@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 // ============================================================
 
 const STEP_LABELS = [
+  'Install App',
   'Account',
   'Personal Info',
   'TD1 Federal',
@@ -56,6 +57,8 @@ function OnboardInner() {
   const [sinFile, setSinFile] = useState(null);
   const [licenseFront, setLicenseFront] = useState(null);
   const [licenseBack, setLicenseBack] = useState(null);
+  const [selfieFile, setSelfieFile] = useState(null);
+  const [selfieUrl, setSelfieUrl] = useState(null);
   const [uploading, setUploading] = useState('');
   const [docStatus, setDocStatus] = useState({ sin_document: 'pending', drivers_license: 'pending' });
 
@@ -186,7 +189,7 @@ function OnboardInner() {
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Could not create account'); return; }
     setPersonal((p) => ({ ...p, address: accountForm.address }));
-    setStep(1);
+    setStep(2);
   };
 
   // ---- Step 1: document uploads ----
@@ -203,13 +206,29 @@ function OnboardInner() {
     }
   };
 
+  // ---- Step 1: selfie upload (goes to /api/employee/selfie) ----
+  const handleSelfieUpload = async (file) => {
+    if (!file) return;
+    setUploading('selfie'); setError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/employee/selfie', { method: 'POST', body: fd });
+      const d = await res.json();
+      if (!res.ok) { setError(d.error || 'Selfie upload failed'); return; }
+      setSelfieUrl(d.selfie_url);
+    } finally {
+      setUploading('');
+    }
+  };
+
   const submitPersonal = async (e) => {
     e.preventDefault();
     setError('');
     if (docStatus.sin_document === 'pending') { setError('Please upload your SIN document photo.'); return; }
     if (docStatus.drivers_license === 'pending') { setError('Please upload both sides of your driver\'s license.'); return; }
     if (!personal.address.trim()) { setError('Please enter your address.'); return; }
-    setStep(2);
+    setStep(3);
   };
 
   // ---- Step 2/3: TD1 save ----
@@ -250,7 +269,7 @@ function OnboardInner() {
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Could not sign contract'); return; }
-    setStep(5);
+    setStep(6);
   };
 
   // ---- Step 5: banking ----
@@ -273,7 +292,7 @@ function OnboardInner() {
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Could not save banking info'); return; }
-    setStep(6);
+    setStep(7);
   };
 
   // ---- Step 6: acknowledgments ----
@@ -292,7 +311,7 @@ function OnboardInner() {
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Could not save acknowledgments'); return; }
-    setStep(7);
+    setStep(8);
   };
 
   // ---- Step 7: complete ----
@@ -314,11 +333,11 @@ function OnboardInner() {
     <div className="bg-white border-b border-gray-100 px-5 py-3 sticky top-0 z-10 safe-top">
       <div className="max-w-md mx-auto">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-bold text-gray-700">Step {step} of 7</span>
+          <span className="text-xs font-bold text-gray-700">Step {step} of 8</span>
           <span className="text-xs text-gray-400">{STEP_LABELS[step]}</span>
         </div>
         <div className="flex gap-1">
-          {[1, 2, 3, 4, 5, 6, 7].map((s) => (
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
             <div
               key={s}
               className={`h-2 flex-1 rounded-full transition-colors ${s <= step ? 'bg-orange-500' : 'bg-gray-200'}`}
@@ -351,6 +370,7 @@ function OnboardInner() {
   );
 
   // ============ STEP 0: invite validation + account ============
+  // ============ STEP 0: Save to Home Screen ============
   if (step === 0) {
     if (loading) {
       return (
@@ -362,15 +382,206 @@ function OnboardInner() {
         </Shell>
       );
     }
+
+    // If invite is invalid, show error
+    if (inviteError && !invite) {
+      return (
+        <Shell>
+          <div className="flex-1 overflow-y-auto px-5 pt-12 pb-8">
+            <div className="max-w-md mx-auto">
+              <div className="text-center mb-8">
+                <img src="/crew-logo.png" alt="Junk Haul Crew" className="w-20 h-20 rounded-2xl mx-auto mb-3 shadow-lg" />
+                <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
+                <div className="text-sm text-gray-400 mt-0.5">Onboarding Portal</div>
+              </div>
+              <div className="bg-white rounded-2xl border border-red-100 p-6 text-center shadow-sm">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <div className="text-red-600 font-semibold text-sm mb-2">Invite problem</div>
+                <div className="text-gray-600 text-sm">{inviteError}</div>
+                <div className="text-xs text-gray-400 mt-4">Contact your manager for a new invite link.</div>
+              </div>
+            </div>
+          </div>
+        </Shell>
+      );
+    }
+
+    if (inviteError && invite) {
+      return (
+        <Shell>
+          <div className="flex-1 overflow-y-auto px-5 pt-12 pb-8">
+            <div className="max-w-md mx-auto">
+              <div className="text-center mb-8">
+                <img src="/crew-logo.png" alt="Junk Haul Crew" className="w-20 h-20 rounded-2xl mx-auto mb-3 shadow-lg" />
+                <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
+              </div>
+              <div className="bg-white rounded-2xl border border-red-100 p-5 mb-4 shadow-sm">
+                <div className="text-red-600 font-medium text-sm mb-1">{inviteError}</div>
+                <div className="text-gray-400 text-xs">Invite for {invite.email}</div>
+              </div>
+            </div>
+          </div>
+        </Shell>
+      );
+    }
+
+    const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const isStandalone = typeof window !== 'undefined' && (window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches);
+    const isAndroid = typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent);
+
+    return (
+      <Shell>
+        <div className="flex-1 overflow-y-auto px-5 pt-10 pb-8">
+          <div className="max-w-md mx-auto">
+            {/* Logo */}
+            <div className="text-center mb-8">
+              <img src="/crew-logo.png" alt="Junk Haul Crew" className="w-24 h-24 rounded-2xl mx-auto mb-4 shadow-xl" />
+              <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
+              <div className="text-sm text-gray-400 mt-0.5">You&apos;re invited to join the team</div>
+            </div>
+
+            {/* Invite details */}
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100 p-5 mb-5">
+              <div className="text-xs font-medium text-orange-600 uppercase tracking-wide mb-2">Welcome</div>
+              <div className="text-xl font-bold text-gray-900">
+                {invite?.first_name} {invite?.last_name}
+              </div>
+              <div className="text-sm text-gray-600 mt-0.5">{invite?.email}</div>
+              {invite?.pay_rate != null && (
+                <div className="mt-3 inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 text-sm shadow-sm">
+                  <span className="text-gray-500">Pay rate</span>
+                  <span className="font-bold text-gray-900">${Number(invite.pay_rate).toFixed(2)}</span>
+                  <span className="text-gray-400 text-xs">/hr</span>
+                </div>
+              )}
+            </div>
+
+            {/* Install instructions */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+              <div className="font-bold text-gray-900 mb-1 text-lg">Install the App</div>
+              <div className="text-sm text-gray-400 mb-5">
+                Add Junk Haul Crew to your home screen for the full app experience with push notifications.
+              </div>
+
+              {isIOS && !isStandalone && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">1</div>
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">Tap the Share button</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Tap the <span className="font-bold text-blue-600">Share</span>{' '}
+                          <span className="text-lg">⎙</span> icon at the bottom of Safari.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">Add to Home Screen</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Scroll down and tap <span className="font-bold text-blue-600">Add to Home Screen</span>{' '}
+                          <span className="text-lg">＋</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">3</div>
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">Tap Add</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Tap <span className="font-bold text-blue-600">Add</span> in the top right corner.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isAndroid && (
+                <div className="space-y-4">
+                  <div className="bg-green-50 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">1</div>
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">Tap the menu</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Tap the three dots <span className="text-lg">⋮</span> in the top right of Chrome.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">Add to Home screen</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Tap <span className="font-bold text-green-600">Add to Home screen</span>.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!isIOS && !isAndroid && (
+                <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600">
+                  On mobile, tap your browser menu and select <strong>Add to Home Screen</strong> to install the app.
+                </div>
+              )}
+
+              {isStandalone && (
+                <div className="bg-green-50 rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-2">✅</div>
+                  <div className="font-semibold text-green-700 text-sm">App is installed!</div>
+                  <div className="text-xs text-green-600 mt-0.5">You&apos;re running in app mode.</div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setStep(1)}
+                className="w-full bg-orange-500 text-white font-bold py-4 rounded-xl mt-6 text-base active:scale-[0.98] transition-transform shadow-lg shadow-orange-200"
+              >
+                {isStandalone ? 'Continue →' : 'I\'ve added it — Continue →'}
+              </button>
+              {!isStandalone && (
+                <button
+                  onClick={() => setStep(1)}
+                  className="w-full text-gray-400 font-medium py-3 mt-2 text-sm"
+                >
+                  Skip for now
+                </button>
+              )}
+            </div>
+
+            <div className="text-center mt-5">
+              <div className="text-xs text-gray-400">
+                🔒 Your data is encrypted and stored securely.
+              </div>
+            </div>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ============ STEP 1: invite validation + account ============
+  if (step === 1) {
     return (
       <Shell>
         <div className="flex-1 overflow-y-auto px-5 pt-8 pb-8">
           <div className="max-w-md mx-auto">
             {/* Logo header */}
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 bg-orange-500 rounded-2xl mb-3 shadow-lg shadow-orange-200">
-                <span className="text-white font-black text-xl">JH</span>
-              </div>
+              <img src="/crew-logo.png" alt="Junk Haul Crew" className="w-20 h-20 rounded-2xl mx-auto mb-3 shadow-lg" />
               <div className="text-2xl font-bold text-gray-900 tracking-tight">Junk Haul Crew</div>
               <div className="text-sm text-gray-400 mt-0.5">Onboarding Portal</div>
             </div>
@@ -551,8 +762,8 @@ function OnboardInner() {
     );
   }
 
-  // ============ STEP 1: personal info / SIN / license ============
-  if (step === 1) {
+  // ============ STEP 2: personal info / SIN / license ============
+  if (step === 2) {
     const FilePicker = ({ file, setFile, docType, label, hint }) => (
       <div>
         <label className={labelCls}>{label}</label>
@@ -585,6 +796,45 @@ function OnboardInner() {
           <form onSubmit={submitPersonal} className={cardCls}>
             <div className="font-semibold text-gray-900 mb-1">Personal Information</div>
             <div className="text-xs text-gray-400 mb-4">Pre-filled from your invite. Upload your documents below.</div>
+
+            {/* Selfie upload — shown to customers on the tracking page */}
+            <div className="mb-5">
+              <label className={labelCls}>Crew selfie</label>
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0">
+                  {selfieUrl ? (
+                    <img src={selfieUrl} alt="Selfie" className="w-20 h-20 rounded-2xl object-cover border-2 border-orange-200 shadow-sm" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center text-3xl text-gray-300">
+                      {uploading === 'selfie' ? (
+                        <span className="w-6 h-6 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+                      ) : '🤳'}
+                    </div>
+                  )}
+                </div>
+                <label className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      setSelfieFile(f);
+                      if (f) handleSelfieUpload(f);
+                    }}
+                    disabled={uploading === 'selfie'}
+                  />
+                  <span className={`inline-flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl border cursor-pointer ${
+                    selfieUrl ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'
+                  } ${uploading === 'selfie' ? 'opacity-50' : ''}`}>
+                    {uploading === 'selfie' ? 'Uploading…' : selfieUrl ? '✓ Selfie uploaded' : 'Take / upload selfie'}
+                  </span>
+                </label>
+              </div>
+              <div className="text-xs text-gray-400 mt-1.5">Customers see this photo when tracking their crew. A friendly face goes a long way!</div>
+            </div>
+
+            <div className="border-t border-gray-100 my-4" />
 
             <div className="space-y-3">
               <div>
@@ -641,40 +891,18 @@ function OnboardInner() {
   }
 
   // ============ STEP 2: TD1 Federal ============
-  if (step === 2) {
+  if (step === 3) {
     return (
       <Shell>
         <ProgressBar />
         <div className="max-w-md mx-auto px-5 py-6">
-          <form onSubmit={(e) => { e.preventDefault(); submitTd1('federal', td1Federal, TD1_BASIC_PERSONAL, 3); }} className={cardCls}>
+          <form onSubmit={(e) => { e.preventDefault(); submitTd1('federal', td1Federal, TD1_BASIC_PERSONAL, 4); }} className={cardCls}>
             <div className="font-semibold text-gray-900 mb-1">TD1 — Federal Tax Form</div>
             <div className="text-xs text-gray-400 mb-4">
               Basic personal amount: <span className="font-medium text-gray-600">${TD1_BASIC_PERSONAL.toLocaleString()}</span>
             </div>
 
             <Td1Fields form={td1Federal} setForm={setTd1Federal} basic={TD1_BASIC_PERSONAL} spousalDefault={SPOUSAL_AMOUNT} />
-
-            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(1)} nextLabel="Save & continue" />
-          </form>
-        </div>
-      </Shell>
-    );
-  }
-
-  // ============ STEP 3: TD1AB ============
-  if (step === 3) {
-    return (
-      <Shell>
-        <ProgressBar />
-        <div className="max-w-md mx-auto px-5 py-6">
-          <form onSubmit={(e) => { e.preventDefault(); submitTd1('ab', td1Ab, TD1AB_BASIC_PERSONAL, 4); }} className={cardCls}>
-            <div className="font-semibold text-gray-900 mb-1">TD1AB — Alberta Provincial Tax Form</div>
-            <div className="text-xs text-gray-400 mb-4">
-              Basic personal amount: <span className="font-medium text-gray-600">${TD1AB_BASIC_PERSONAL.toLocaleString()}</span>
-            </div>
-
-            <Td1Fields form={td1Ab} setForm={setTd1Ab} basic={TD1AB_BASIC_PERSONAL} spousalDefault={SPOUSAL_AMOUNT} />
 
             {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
             <NavButtons onBack={() => setStep(2)} nextLabel="Save & continue" />
@@ -684,8 +912,30 @@ function OnboardInner() {
     );
   }
 
-  // ============ STEP 4: contract e-sign ============
+  // ============ STEP 3: TD1AB ============
   if (step === 4) {
+    return (
+      <Shell>
+        <ProgressBar />
+        <div className="max-w-md mx-auto px-5 py-6">
+          <form onSubmit={(e) => { e.preventDefault(); submitTd1('ab', td1Ab, TD1AB_BASIC_PERSONAL, 5); }} className={cardCls}>
+            <div className="font-semibold text-gray-900 mb-1">TD1AB — Alberta Provincial Tax Form</div>
+            <div className="text-xs text-gray-400 mb-4">
+              Basic personal amount: <span className="font-medium text-gray-600">${TD1AB_BASIC_PERSONAL.toLocaleString()}</span>
+            </div>
+
+            <Td1Fields form={td1Ab} setForm={setTd1Ab} basic={TD1AB_BASIC_PERSONAL} spousalDefault={SPOUSAL_AMOUNT} />
+
+            {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
+            <NavButtons onBack={() => setStep(3)} nextLabel="Save & continue" />
+          </form>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ============ STEP 5: contract e-sign ============
+  if (step === 5) {
     return (
       <Shell>
         <ProgressBar />
@@ -726,15 +976,15 @@ function OnboardInner() {
             </div>
 
             {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(3)} nextLabel="Sign & continue" nextDisabled={!contract.agreed || !contract.signature_typed.trim()} />
+            <NavButtons onBack={() => setStep(4)} nextLabel="Sign & continue" nextDisabled={!contract.agreed || !contract.signature_typed.trim()} />
           </form>
         </div>
       </Shell>
     );
   }
 
-  // ============ STEP 5: banking ============
-  if (step === 5) {
+  // ============ STEP 6: banking ============
+  if (step === 6) {
     return (
       <Shell>
         <ProgressBar />
@@ -786,15 +1036,15 @@ function OnboardInner() {
             </div>
 
             {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(4)} nextLabel="Save & continue" />
+            <NavButtons onBack={() => setStep(5)} nextLabel="Save & continue" />
           </form>
         </div>
       </Shell>
     );
   }
 
-  // ============ STEP 6: acknowledgments ============
-  if (step === 6) {
+  // ============ STEP 7: acknowledgments ============
+  if (step === 7) {
     const items = [
       { key: 'tickets', text: 'I acknowledge that any traffic tickets received while driving for work are my responsibility.' },
       { key: 'phone', text: 'I acknowledge that my phone is required for work and I will keep it charged.' },
@@ -821,15 +1071,15 @@ function OnboardInner() {
               ))}
             </div>
             {error && <div className="text-red-500 text-sm mt-3">{error}</div>}
-            <NavButtons onBack={() => setStep(5)} nextLabel="Continue" nextDisabled={!acks.tickets || !acks.phone || !acks.data || !acks.company_card} />
+            <NavButtons onBack={() => setStep(6)} nextLabel="Continue" nextDisabled={!acks.tickets || !acks.phone || !acks.data || !acks.company_card} />
           </form>
         </div>
       </Shell>
     );
   }
 
-  // ============ STEP 7: complete ============
-  if (step === 7) {
+  // ============ STEP 8: complete ============
+  if (step === 8) {
     const done = completeData?.ok;
     return (
       <Shell>

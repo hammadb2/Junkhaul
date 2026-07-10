@@ -30,6 +30,36 @@ export default function SchedulePage() {
     return () => clearInterval(t);
   }, []);
 
+  // Background GPS tracker — posts crew location every ~30s while on
+  // the schedule page so customers can track the crew live.
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    let lastSent = 0;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        // Throttle to at most once every 30 seconds
+        const nowTs = Date.now();
+        if (nowTs - lastSent < 30000) return;
+        lastSent = nowTs;
+        fetch('/api/employee/location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            heading: pos.coords.heading,
+            speed: pos.coords.speed,
+          }),
+        }).catch(() => {});
+      },
+      (err) => {
+        // Geolocation errors are non-fatal (e.g. permission denied)
+      },
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
   const loadMe = useCallback(async () => {
     const res = await fetch('/api/employee/me');
     if (res.status === 401) { router.push('/portal'); return null; }

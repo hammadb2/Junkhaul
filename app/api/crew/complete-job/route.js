@@ -65,7 +65,9 @@ export async function POST(req) {
   // Only send once (guarded by review_requested flag).
   if (isPaid && !booking.review_requested) {
     try {
-      const reviewMsg = `Thanks for choosing Junk Haul Calgary, ${booking.name}! We'd love to hear how we did. Leave a quick review: https://junkhaul.ca/review/${booking_id} — it takes 30 seconds and helps us a ton.`;
+      const trackingId = booking.tracking_token || booking_id;
+      const trackingUrl = `https://junkhaul.ca/track/${trackingId}`;
+      const reviewMsg = `Your junk removal is complete! Track where your items went, leave feedback, and tip your crew: ${trackingUrl}`;
       await sendSMS(booking.phone, reviewMsg, booking_id, 'review_request');
       await supabaseAdmin
         .from('bookings')

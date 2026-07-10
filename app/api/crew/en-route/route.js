@@ -49,8 +49,9 @@ export async function POST(req) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
 
-  // Send customer the tracking link SMS
-  const trackingUrl = `https://junkhaul.ca/track/${booking_id}`;
+  // Send customer the tracking link SMS (prefer tracking_token, fall back to booking id)
+  const trackingId = booking.tracking_token || booking_id;
+  const trackingUrl = `https://junkhaul.ca/track/${trackingId}`;
   const etaMins = 15; // placeholder — could be computed from Mapbox
   const smsBody = `Hi ${booking.name}, the Junk Haul Calgary crew is on the way to you! Track them live: ${trackingUrl} — ETA approximately ${etaMins} minutes.`;
 

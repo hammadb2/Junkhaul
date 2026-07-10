@@ -6,7 +6,7 @@
   "scope": "/portal",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f4f4f5",
+  "background_color": "#f97316",
   "theme_color": "#f97316",
   "icons": [
     {
@@ -20,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/crew-logo.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "screenshots": []

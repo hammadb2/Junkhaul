@@ -124,6 +124,7 @@ export default function CrewView() {
 
       <PendingInvitesSection invites={invites} onResent={fetchAll} flash={flash} />
       <InviteForm onInvited={fetchAll} flash={flash} />
+      <BroadcastSection flash={flash} />
       <EmployeeList employees={employees} onSelect={setSelectedId} />
       <AssignmentsSection
         assignments={assignments}
@@ -979,6 +980,108 @@ function DonationSection({ centers, onSaved, flash }) {
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// BROADCAST SECTION — send push notifications to crew
+// ============================================================
+function BroadcastSection({ flash }) {
+  const [open, setOpen] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [form, setForm] = useState({ target: 'all', employee_id: '', title: '', body: '' });
+  const [sending, setSending] = useState(false);
+
+  const loadEmployees = useCallback(async () => {
+    const res = await fetch('/api/admin/crew/push');
+    if (res.ok) {
+      const d = await res.json();
+      setEmployees(d.employees || []);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) loadEmployees();
+  }, [open, loadEmployees]);
+
+  const send = async (e) => {
+    e.preventDefault();
+    if (!form.title || !form.body) { flash('error', 'Title and message are required'); return; }
+    setSending(true);
+    const res = await fetch('/api/admin/crew/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const d = await res.json();
+    setSending(false);
+    if (res.ok) {
+      flash('success', `Push notification sent to ${d.sent} device(s)`);
+      setForm({ target: 'all', employee_id: '', title: '', body: '' });
+    } else {
+      flash('error', d.error || 'Send failed');
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between"
+      >
+        <span className="font-bold text-gray-900 text-sm">Broadcast Message</span>
+        <span className="text-gray-400 text-xs">{open ? '−' : '+'}</span>
+      </button>
+
+      {open && (
+        <form onSubmit={send} className="mt-4 space-y-3">
+          <div className="text-xs text-gray-400">Send a push notification to crew members&apos; phones.</div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Send to</label>
+            <select
+              value={form.target}
+              onChange={(e) => setForm({ ...form, target: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
+            >
+              <option value="all">All crew members</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name} {emp.push_subscriptions > 0 ? `(${emp.push_subscriptions} device)` : '(no device)'}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Title</label>
+            <input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="e.g. Schedule update"
+              required
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Message</label>
+            <textarea
+              value={form.body}
+              onChange={(e) => setForm({ ...form, body: e.target.value })}
+              placeholder="Type your message…"
+              required
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm resize-none"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={sending}
+            className="w-full bg-orange-500 text-white font-semibold py-2.5 rounded-lg text-sm disabled:bg-orange-300"
+          >
+            {sending ? 'Sending…' : 'Send Push Notification'}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
