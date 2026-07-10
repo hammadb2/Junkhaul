@@ -205,9 +205,11 @@ export default function DocumentScanner({ label, onCapture, uploaded, previewUrl
   // Camera mode — live camera with guide frame
   if (mode === 'camera') {
     const isGoodLight = brightness > 0.15 && brightness < 0.85;
+    const isFront = /front/i.test(label);
+    const helperTitle = isFront ? 'Take a photo of the front of your ID' : 'Take a photo of the back of your ID';
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#000', aspectRatio: '4/5' }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 80, background: '#000' }}>
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           <Webcam
             ref={webcamRef}
             audio={false}
@@ -219,68 +221,83 @@ export default function DocumentScanner({ label, onCapture, uploaded, previewUrl
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
 
-          {/* Guide frame overlay */}
-          {cameraReady && (
-            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{
-                width: '85%',
-                height: '70%',
-                border: `3px solid ${isGoodLight ? 'rgba(34,197,94,0.8)' : 'rgba(255,255,255,0.6)'}`,
-                borderRadius: 12,
-                boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)',
-                transition: 'border-color 0.3s',
-              }}>
-                {/* Corner indicators */}
-                {[
-                  { top: -3, left: -3, borderTop: `4px solid ${isGoodLight ? '#22C55E' : 'white'}`, borderLeft: `4px solid ${isGoodLight ? '#22C55E' : 'white'}`, borderTopLeftRadius: 8 },
-                  { top: -3, right: -3, borderTop: `4px solid ${isGoodLight ? '#22C55E' : 'white'}`, borderRight: `4px solid ${isGoodLight ? '#22C55E' : 'white'}`, borderTopRightRadius: 8 },
-                  { bottom: -3, left: -3, borderBottom: `4px solid ${isGoodLight ? '#22C55E' : 'white'}`, borderLeft: `4px solid ${isGoodLight ? '#22C55E' : 'white'}`, borderBottomLeftRadius: 8 },
-                  { bottom: -3, right: -3, borderBottom: `4px solid ${isGoodLight ? '#22C55E' : 'white'}`, borderRight: `4px solid ${isGoodLight ? '#22C55E' : 'white'}`, borderBottomRightRadius: 8 },
-                ].map((c, i) => (
-                  <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...c }} />
-                ))}
+          {/* Close */}
+          <button
+            onClick={() => setMode('idle')}
+            style={{
+              position: 'absolute',
+              top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+              left: 16,
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'rgba(0,0,0,0.55)',
+              color: '#95D373',
+              fontSize: 30,
+              lineHeight: '44px',
+              cursor: 'pointer',
+            }}
+            aria-label="Close camera"
+          >
+            ×
+          </button>
+
+          {/* Frame + guidance */}
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '82%', maxWidth: 370, aspectRatio: '1.58', borderRadius: 14, border: `2px solid ${isGoodLight ? '#95D373' : 'rgba(255,255,255,0.8)'}`, boxShadow: '0 0 0 9999px rgba(0,0,0,0.48)' }} />
+            <div style={{ marginTop: 26, textAlign: 'center', padding: '0 24px' }}>
+              <div style={{ color: '#95D373', fontWeight: 700, fontSize: 30, lineHeight: 1.1 }}>▦</div>
+              <div style={{ color: '#95D373', fontSize: 31, fontWeight: 700, lineHeight: 1.2 }}>{helperTitle}</div>
+              <div style={{ color: 'rgba(255,255,255,0.84)', fontSize: 23, marginTop: 8 }}>
+                Please make sure your ID fits in the box above.
               </div>
             </div>
-          )}
+          </div>
+
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
 
           {/* Light indicator */}
           {cameraReady && (
-            <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: '4px 10px' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: isGoodLight ? '#22C55E' : '#f59e0b' }} />
-              <span style={{ color: 'white', fontSize: 11, fontWeight: 500 }}>
-                {isGoodLight ? 'Good light' : 'More light needed'}
+            <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 18px)', right: 16, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: '6px 10px' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: isGoodLight ? '#95D373' : '#f59e0b' }} />
+              <span style={{ color: 'white', fontSize: 11, fontWeight: 600 }}>
+                {isGoodLight ? 'Good light' : 'Need light'}
               </span>
             </div>
           )}
 
-          {/* Label */}
-          <div style={{ position: 'absolute', bottom: 12, left: 0, right: 0, textAlign: 'center' }}>
-            <span style={{ background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 13, fontWeight: 500, padding: '4px 12px', borderRadius: 20 }}>
-              Position {label} inside frame
-            </span>
+          {/* Bottom controls */}
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 22px' }}>
+            <button
+              onClick={() => setMode('fallback')}
+              style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 18 }}
+              aria-label="Upload file instead"
+            >
+              ⇪
+            </button>
+            <button
+              onClick={capture}
+              disabled={!cameraReady || capturing}
+              style={{
+                width: 74,
+                height: 74,
+                borderRadius: '50%',
+                border: '4px solid rgba(255,255,255,0.85)',
+                background: capturing ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.92)',
+                boxShadow: '0 0 0 3px rgba(0,0,0,0.35)',
+                cursor: cameraReady ? 'pointer' : 'not-allowed',
+              }}
+              aria-label="Capture image"
+            />
+            <button
+              type="button"
+              style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 18 }}
+              aria-label="Flash not available in browser"
+            >
+              ϟ
+            </button>
           </div>
-
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-        </div>
-
-        {cameraError && (
-          <div style={{ fontSize: 13, color: '#ea580c', textAlign: 'center' }}>{cameraError}</div>
-        )}
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setMode('fallback')}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
-          >
-            Upload File Instead
-          </button>
-          <button
-            onClick={capture}
-            disabled={!cameraReady || capturing}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: 'none', background: cameraReady ? '#f97316' : '#ccc', color: 'white', fontSize: 14, fontWeight: 600, cursor: cameraReady ? 'pointer' : 'not-allowed', minHeight: 48 }}
-          >
-            {capturing ? 'Capturing...' : 'Capture'}
-          </button>
         </div>
       </div>
     );

@@ -18,7 +18,16 @@ export async function GET(req) {
     .eq('employee_id', emp.id);
 
   const onboardingComplete = (docs || []).every((d) => d.status === 'uploaded' || d.status === 'verified');
-  const requiredDocs = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info'];
+  const requiredDocs = [
+    'employment_contract',
+    'td1_federal',
+    'td1_ab',
+    'id',
+    'banking_info',
+    'sin_document',
+    'drivers_license_front',
+    'drivers_license_back',
+  ];
 
   return NextResponse.json({
     employee: {

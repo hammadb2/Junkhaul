@@ -118,7 +118,16 @@ export async function POST(req) {
     emp = newEmp;
 
     // Seed required document rows (only for new employees)
-    const docTypes = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'sin_document', 'drivers_license'];
+    const docTypes = [
+      'employment_contract',
+      'td1_federal',
+      'td1_ab',
+      'id',
+      'banking_info',
+      'sin_document',
+      'drivers_license_front',
+      'drivers_license_back',
+    ];
     await supabaseAdmin.from('employee_documents')
       .insert(docTypes.map((doc_type) => ({ employee_id: emp.id, doc_type, status: 'pending' })));
   }

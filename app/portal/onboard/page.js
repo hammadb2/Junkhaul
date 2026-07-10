@@ -66,7 +66,11 @@ function OnboardInner() {
   const [selfieFile, setSelfieFile] = useState(null);
   const [selfieUrl, setSelfieUrl] = useState(null);
   const [uploading, setUploading] = useState('');
-  const [docStatus, setDocStatus] = useState({ sin_document: 'pending', drivers_license: 'pending' });
+  const [docStatus, setDocStatus] = useState({
+    sin_document: 'pending',
+    drivers_license_front: 'pending',
+    drivers_license_back: 'pending',
+  });
 
   // Step 3/4 TD1 forms
   const [td1Federal, setTd1Federal] = useState({
@@ -216,10 +220,16 @@ function OnboardInner() {
       setError('Your home address is required.'); return;
     }
     setSaving(true);
+    const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('jh-onboard-token') : null);
+    if (!effectiveToken) {
+      setSaving(false);
+      setError('Invite link expired. Please ask admin to resend your invite.');
+      return;
+    }
     const res = await fetch('/api/employee/onboard/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password: accountForm.password, phone: accountForm.phone, address: accountForm.address }),
+      body: JSON.stringify({ token: effectiveToken, password: accountForm.password, phone: accountForm.phone, address: accountForm.address }),
     });
     const data = await res.json();
     setSaving(false);
@@ -260,8 +270,10 @@ function OnboardInner() {
   const submitPersonal = async (e) => {
     e?.preventDefault();
     setError('');
-    if (docStatus.sin_document === 'pending') { setError('Please upload your SIN document photo.'); return; }
-    if (docStatus.drivers_license === 'pending') { setError("Please upload both sides of your driver's license."); return; }
+    if (docStatus.sin_document !== 'uploaded') { setError('Please upload your SIN document photo.'); return; }
+    if (docStatus.drivers_license_front !== 'uploaded') { setError("Please upload the front of your driver's license."); return; }
+    if (docStatus.drivers_license_back !== 'uploaded') { setError("Please upload the back of your driver's license."); return; }
+    if (!selfieUrl) { setError('Please upload your selfie photo.'); return; }
     if (!personal.address.trim()) { setError('Please enter your address.'); return; }
     setStep(3);
   };
@@ -620,15 +632,6 @@ function OnboardInner() {
           <Headline title="Your documents" subtitle="Scan or upload your photo ID and selfie" />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-            <SelfieCapture
-              uploaded={!!selfieUrl}
-              previewUrl={selfieUrl}
-              uploading={uploading === 'selfie'}
-              onCapture={async (file) => {
-                setSelfieFile(file);
-                await handleSelfieUpload(file);
-              }}
-            />
             <DocumentScanner
               label="SIN document"
               uploaded={docStatus.sin_document === 'uploaded'}
@@ -640,20 +643,29 @@ function OnboardInner() {
             />
             <DocumentScanner
               label="Driver's license — front"
-              uploaded={docStatus.drivers_license === 'uploaded'}
-              uploading={uploading === 'sin_document' || uploading === 'drivers_license'}
+              uploaded={docStatus.drivers_license_front === 'uploaded'}
+              uploading={uploading === 'drivers_license_front'}
               onCapture={async (file) => {
                 setLicenseFront(file);
-                await handleUpload('drivers_license', file, "Driver's license — front");
+                await handleUpload('drivers_license_front', file, "Driver's license — front");
               }}
             />
             <DocumentScanner
               label="Driver's license — back"
-              uploaded={docStatus.drivers_license === 'uploaded'}
-              uploading={uploading === 'drivers_license'}
+              uploaded={docStatus.drivers_license_back === 'uploaded'}
+              uploading={uploading === 'drivers_license_back'}
               onCapture={async (file) => {
                 setLicenseBack(file);
-                await handleUpload('drivers_license', file, "Driver's license — back");
+                await handleUpload('drivers_license_back', file, "Driver's license — back");
+              }}
+            />
+            <SelfieCapture
+              uploaded={!!selfieUrl}
+              previewUrl={selfieUrl}
+              uploading={uploading === 'selfie'}
+              onCapture={async (file) => {
+                setSelfieFile(file);
+                await handleSelfieUpload(file);
               }}
             />
           </div>

@@ -12,7 +12,7 @@ export async function POST(req) {
   // Verify all onboarding steps are done
   const { data: employee } = await supabaseAdmin
     .from('employees')
-    .select('contract_signed, td1_federal_data, td1_ab_data, acknowledgments')
+    .select('contract_signed, td1_federal_data, td1_ab_data, acknowledgments, selfie_url')
     .eq('id', emp.id)
     .maybeSingle();
   if (!employee) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
@@ -22,7 +22,16 @@ export async function POST(req) {
     .select('doc_type, status')
     .eq('employee_id', emp.id);
 
-  const requiredDocs = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'sin_document', 'drivers_license'];
+  const requiredDocs = [
+    'employment_contract',
+    'td1_federal',
+    'td1_ab',
+    'id',
+    'banking_info',
+    'sin_document',
+    'drivers_license_front',
+    'drivers_license_back',
+  ];
   const docStatus = {};
   for (const dt of requiredDocs) {
     const d = (docs || []).find((x) => x.doc_type === dt);
@@ -34,8 +43,9 @@ export async function POST(req) {
   if (!employee.td1_federal_data) missing.push('TD1 Federal not completed');
   if (!employee.td1_ab_data) missing.push('TD1AB not completed');
   if (!employee.acknowledgments || !employee.acknowledgments.tickets) missing.push('Acknowledgments not completed');
+  if (!employee.selfie_url) missing.push('Selfie not uploaded');
   for (const [dt, status] of Object.entries(docStatus)) {
-    if (status !== 'completed') missing.push(`${dt} document not uploaded`);
+    if (status !== 'uploaded' && status !== 'verified') missing.push(`${dt} document not uploaded`);
   }
 
   if (missing.length > 0) {
@@ -65,10 +75,19 @@ export async function GET(req) {
 
   const { data: docs } = await supabaseAdmin
     .from('employee_documents')
-    .select('doc_type, status, file_url, uploaded_at')
+    .select('doc_type, status, storage_url, uploaded_at')
     .eq('employee_id', emp.id);
 
-  const requiredDocs = ['employment_contract', 'td1_federal', 'td1_ab', 'id', 'banking_info', 'sin_document', 'drivers_license'];
+  const requiredDocs = [
+    'employment_contract',
+    'td1_federal',
+    'td1_ab',
+    'id',
+    'banking_info',
+    'sin_document',
+    'drivers_license_front',
+    'drivers_license_back',
+  ];
   const docStatus = {};
   for (const dt of requiredDocs) {
     const d = (docs || []).find((x) => x.doc_type === dt);

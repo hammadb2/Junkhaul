@@ -50,8 +50,22 @@ export default function SelfieCapture({ onCapture, uploaded, previewUrl, uploadi
   }, []);
 
   const confirmCapture = async () => {
-    const res = await fetch(capturedImg);
-    const blob = await res.blob();
+    const img = new Image();
+    img.src = capturedImg;
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    // Reverse the front-camera capture so saved selfie has natural orientation.
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, 0, 0);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if (!blob) return;
     const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
     await onCapture(file);
     setMode('idle');
