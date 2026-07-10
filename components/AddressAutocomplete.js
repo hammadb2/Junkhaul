@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MapPin } from 'lucide-react';
+import { MapPin, Search } from 'lucide-react';
 
 // ============================================================
 // AddressAutocomplete — Mapbox-powered address search.
 // Works in both light and dark themes via the `dark` prop.
-// Returns the full Mapbox feature object to the parent.
+// Returns the full Mapbox feature object to the parent via onSelect.
 // ============================================================
 
 export default function AddressAutocomplete({
@@ -22,12 +22,16 @@ export default function AddressAutocomplete({
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
+  const [hasSearched, setHasSearched] = useState(false);
   const debounceRef = useRef(null);
-  const containerRef = useRef(null);
 
   const fetchSuggestions = async (query) => {
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (query.length < 2 || !token) { setSuggestions([]); return; }
+    if (query.length < 2 || !token) {
+      setSuggestions([]);
+      setHasSearched(false);
+      return;
+    }
     setLoading(true);
     try {
       const proximity = '-114.0719,51.0447';
@@ -35,18 +39,26 @@ export default function AddressAutocomplete({
       const res = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=ca&proximity=${proximity}&bbox=${bbox}&types=address,poi,neighborhood&limit=6&autocomplete=true`
       );
+      if (!res.ok) throw new Error(`Mapbox API returned ${res.status}`);
       const data = await res.json();
       setSuggestions(data.features || []);
-    } catch { setSuggestions([]); }
-    finally { setLoading(false); }
+      setHasSearched(true);
+    } catch (err) {
+      console.error('[AddressAutocomplete] Mapbox fetch error:', err);
+      setSuggestions([]);
+      setHasSearched(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (val) => {
     onChange(val);
     setShowDropdown(true);
     setHighlighted(-1);
+    setHasSearched(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchSuggestions(val), 200);
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 250);
   };
 
   const selectSuggestion = (s) => {
@@ -75,46 +87,67 @@ export default function AddressAutocomplete({
   const inputColor = dark ? 'rgba(255,255,255,0.9)' : '#111827';
   const dropdownBg = dark ? '#161618' : '#fff';
   const dropdownBorder = dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
-  const itemHover = dark ? 'rgba(255,255,255,0.04)' : '#fff7ed';
-  const itemActive = dark ? 'rgba(249,115,22,0.08)' : '#fff7ed';
+  const itemActive = dark ? 'rgba(249,115,22,0.12)' : '#fff7ed';
   const mainText = dark ? 'rgba(255,255,255,0.9)' : '#111827';
   const subText = dark ? 'rgba(255,255,255,0.4)' : '#6b7280';
   const loadingColor = dark ? 'rgba(255,255,255,0.4)' : '#9ca3af';
+  const noResultColor = dark ? 'rgba(255,255,255,0.3)' : '#9ca3af';
+
+  const showResults = showDropdown && (loading || suggestions.length > 0 || (hasSearched && suggestions.length === 0));
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', zIndex: 9999 }}>
       <input
         type="text"
         value={value}
         onChange={(e) => handleChange(e.target.value)}
-        onFocus={() => value && value.length >= 2 && setShowDropdown(true)}
+        onFocus={() => { if (value && value.length >= 2) setShowDropdown(true); }}
         onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        autoComplete="street-address"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
         className={className}
         style={{
           width: '100%',
           padding: '12px 16px',
-          fontSize: 14,
+          fontSize: 16,
           color: inputColor,
           background: inputBg,
           border: `1px solid ${inputBorder}`,
           borderRadius: 12,
           outline: 'none',
+          boxSizing: 'border-box',
           ...style,
         }}
       />
-      {showDropdown && (suggestions.length > 0 || loading) && (
+      {showResults && (
         <div style={{
-          position: 'absolute', zIndex: 50, left: 0, right: 0, marginTop: 4,
-          background: dropdownBg, borderRadius: 12, border: `1px solid ${dropdownBorder}`,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)', maxHeight: 288, overflowY: 'auto',
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          marginTop: 4,
+          background: dropdownBg,
+          borderRadius: 12,
+          border: `1px solid ${dropdownBorder}`,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+          maxHeight: 288,
+          overflowY: 'auto',
         }}>
           {loading && (
-            <div style={{ padding: '12px 16px', fontSize: 14, color: loadingColor, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ padding: '14px 16px', fontSize: 14, color: loadingColor, display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 16, height: 16, border: '2px solid rgba(249,115,22,0.3)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
               Searching addresses...
+            </div>
+          )}
+          {!loading && suggestions.length === 0 && hasSearched && (
+            <div style={{ padding: '14px 16px', fontSize: 14, color: noResultColor, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Search size={14} />
+              No addresses found. Try a different search.
             </div>
           )}
           {suggestions.map((s, i) => {
@@ -128,14 +161,20 @@ export default function AddressAutocomplete({
                 onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
                 onMouseEnter={() => setHighlighted(i)}
                 style={{
-                  width: '100%', textAlign: 'left', padding: '12px 16px',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '12px 16px',
                   background: highlighted === i ? itemActive : 'transparent',
-                  border: 'none', borderBottom: i < suggestions.length - 1 ? `1px solid ${dark ? 'rgba(255,255,255,0.04)' : '#f3f4f6'}` : 'none',
-                  display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                  border: 'none',
+                  borderBottom: i < suggestions.length - 1 ? `1px solid ${dark ? 'rgba(255,255,255,0.04)' : '#f3f4f6'}` : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
                 }}
               >
                 <MapPin size={14} color="#f97316" style={{ flexShrink: 0 }} />
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: mainText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mainAddr}</div>
                   {area && <div style={{ fontSize: 12, color: subText, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{area}</div>}
                 </div>
