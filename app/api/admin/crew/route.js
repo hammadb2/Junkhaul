@@ -217,9 +217,17 @@ export async function POST(req) {
 
   // Check if employee already exists
   const { data: existing } = await supabaseAdmin
-    .from('employees').select('id, email').eq('email', emailLower).maybeSingle();
+    .from('employees').select('id, email, onboarding_completed_at').eq('email', emailLower).maybeSingle();
   if (existing) {
-    return NextResponse.json({ error: 'An employee with that email already exists' }, { status: 409 });
+    // If onboarding not complete, delete the incomplete record so a fresh invite can be sent
+    if (!existing.onboarding_completed_at) {
+      await supabaseAdmin.from('employee_documents').delete().eq('employee_id', existing.id);
+      await supabaseAdmin.from('employee_sessions').delete().eq('employee_id', existing.id);
+      await supabaseAdmin.from('job_clock_sessions').delete().eq('employee_id', existing.id);
+      await supabaseAdmin.from('employees').delete().eq('id', existing.id);
+    } else {
+      return NextResponse.json({ error: 'An employee with that email already exists' }, { status: 409 });
+    }
   }
 
   // Check for existing pending invite

@@ -87,6 +87,15 @@ export async function POST(req) {
   }).catch(() => ({ error: 'rpc not available' }));
   results.push({ step: 'compensation_log table', error: e4 });
 
+  // 5. Add password reset columns to employees
+  const { error: e5 } = await supabaseAdmin.rpc('exec_sql', {
+    query: `
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_token text;
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_expires_at timestamptz;
+    `
+  }).catch(() => ({ error: 'rpc not available' }));
+  results.push({ step: 'employees reset columns', error: e5 });
+
   // If exec_sql doesn't exist, try direct table creation via the API
   const hasRpcError = results.some(r => r.error === 'rpc not available');
   if (hasRpcError) {
@@ -148,6 +157,9 @@ CREATE TABLE IF NOT EXISTS compensation_log (
 );
 ALTER TABLE compensation_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS "Service role comp" ON compensation_log FOR ALL USING (true);
+
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_token text;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_expires_at timestamptz;
 `
     });
   }

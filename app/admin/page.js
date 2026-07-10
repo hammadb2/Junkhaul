@@ -87,8 +87,8 @@ export default function AdminDashboard() {
   };
 
   return (
-    <main className="min-h-dvh bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+    <main className="min-h-dvh bg-[#FAFAFA]">
+      <header className="bg-white border-b border-black/[0.06] px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <Logo className="h-7" />
         <div className="flex items-center gap-3">
           <div className="flex gap-1 text-xs overflow-x-auto">
@@ -97,14 +97,14 @@ export default function AdminDashboard() {
                 key={v}
                 onClick={() => setView(v)}
                 className={`px-3 py-1.5 rounded-lg capitalize font-medium whitespace-nowrap ${
-                  view === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                  view === v ? 'bg-[#f97316] text-white' : 'bg-[#F5F5F7] text-black/60'
                 }`}
               >
                 {v}
               </button>
             ))}
           </div>
-          <button onClick={logout} className="text-sm text-gray-400 underline">
+          <button onClick={logout} className="text-sm text-black/40 underline">
             Log out
           </button>
         </div>
@@ -124,9 +124,9 @@ export default function AdminDashboard() {
             )}
 
             {loading ? (
-              <p className="text-gray-500 text-center py-10">Loading…</p>
+              <p className="text-black/50 text-center py-10">Loading…</p>
             ) : dates.length === 0 ? (
-              <p className="text-gray-500 text-center py-10">No upcoming jobs.</p>
+              <p className="text-black/50 text-center py-10">No upcoming jobs.</p>
             ) : (
               <>
                 <div className="flex gap-2 overflow-x-auto no-scrollbar">
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
                         setRouteOrder(null);
                       }}
                       className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap ${
-                        activeDate === d ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-700'
+                        activeDate === d ? 'bg-[#f97316] text-white' : 'bg-white border border-black/[0.06] text-black/70'
                       }`}
                     >
                       {formatDateLong(d)}
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
                 <button
                   onClick={optimise}
                   disabled={optimising}
-                  className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl disabled:bg-orange-300"
+                  className="w-full bg-[#f97316] text-white font-semibold py-3 rounded-xl disabled:bg-[#f97316]/50"
                 >
                   {optimising ? 'Optimising route…' : '🗺️ Optimise route for this day'}
                 </button>
@@ -158,30 +158,30 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <RouteMap stops={routeOrder} />
                     {routeSummary && (
-                      <div className="bg-white rounded-xl border border-gray-200 p-3 grid grid-cols-4 gap-2 text-center text-xs">
-                        <div><div className="font-bold text-gray-900">{routeSummary.jobs}</div><div className="text-gray-400">Jobs</div></div>
-                        <div><div className="font-bold text-gray-900">${routeSummary.total_revenue}</div><div className="text-gray-400">Revenue</div></div>
-                        <div><div className="font-bold text-gray-900">${routeSummary.total_est_profit}</div><div className="text-gray-400">Est. Profit</div></div>
-                        <div><div className="font-bold text-gray-900">{routeSummary.avg_margin}</div><div className="text-gray-400">Margin</div></div>
+                      <div className="bg-white rounded-xl border border-black/[0.06] p-3 grid grid-cols-4 gap-2 text-center text-xs">
+                        <div><div className="font-bold text-[#1a1a1a]">{routeSummary.jobs}</div><div className="text-black/40">Jobs</div></div>
+                        <div><div className="font-bold text-[#1a1a1a]">${routeSummary.total_revenue}</div><div className="text-black/40">Revenue</div></div>
+                        <div><div className="font-bold text-[#1a1a1a]">${routeSummary.total_est_profit}</div><div className="text-black/40">Est. Profit</div></div>
+                        <div><div className="font-bold text-[#1a1a1a]">{routeSummary.avg_margin}</div><div className="text-black/40">Margin</div></div>
                       </div>
                     )}
-                    <ol className="bg-white rounded-xl border border-gray-200 divide-y">
+                    <ol className="bg-white rounded-xl border border-black/[0.06] divide-y">
                       {routeOrder.map((s) => (
                         <li key={s.id} className="px-3 py-2 flex items-center gap-3 text-sm">
-                          <span className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold">
+                          <span className="w-6 h-6 rounded-full bg-[#f97316] text-white flex items-center justify-center text-xs font-bold">
                             {s.position}
                           </span>
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{s.name}</span>
-                              <span className="text-gray-400">{s.quadrant}</span>
+                              <span className="text-black/40">{s.quadrant}</span>
                             </div>
-                            <div className="text-xs text-gray-500">{s.address}</div>
+                            <div className="text-xs text-black/50">{s.address}</div>
                           </div>
                           <div className="text-right">
                             <div className="font-semibold">${s.total_price}</div>
                             {s.est_profit !== undefined && (
-                              <div className="text-xs text-green-600">~${s.est_profit} profit</div>
+                              <div className="text-xs text-[#22C55E]">~${s.est_profit} profit</div>
                             )}
                           </div>
                         </li>
@@ -225,11 +225,11 @@ export default function AdminDashboard() {
 // ============================================================
 function Stat({ label, value, accent }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
-      <div className={`text-xl font-bold ${accent ? 'text-orange-600' : 'text-gray-900'}`}>
+    <div className="bg-white rounded-xl border border-black/[0.06] p-3 text-center">
+      <div className={`text-xl font-bold ${accent ? 'text-[#f97316]' : 'text-[#1a1a1a]'}`}>
         {value}
       </div>
-      <div className="text-xs text-gray-400">{label}</div>
+      <div className="text-xs text-black/40">{label}</div>
     </div>
   );
 }
@@ -261,33 +261,33 @@ function JobCard({ b, act }) {
     <div className={`bg-white rounded-2xl border p-4 ${
       b.flag_for_review ? 'border-orange-300' :
       isNoShow ? 'border-gray-300' :
-      'border-gray-200'
+      'border-black/[0.06]'
     }`}>
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-gray-900">{b.name}</span>
+            <span className="font-semibold text-[#1a1a1a]">{b.name}</span>
             {b.quadrant && <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5">{b.quadrant}</span>}
             {b.source && b.source !== 'web' && (
-              <span className="text-xs bg-blue-50 text-blue-600 rounded px-1.5 py-0.5 capitalize">{b.source}</span>
+              <span className="text-xs bg-[#3B82F6]/10 text-[#3B82F6] rounded px-1.5 py-0.5 capitalize">{b.source}</span>
             )}
             {!b.deposit_paid && (
-              <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5">⚠️ No deposit</span>
+              <span className="text-xs bg-[#EF4444]/10 text-[#EF4444] rounded px-1.5 py-0.5">⚠️ No deposit</span>
             )}
             {done && <span className="text-xs bg-green-100 text-green-700 rounded px-1.5 py-0.5">Done</span>}
-            {isNoShow && <span className="text-xs bg-gray-100 text-gray-500 rounded px-1.5 py-0.5">No-show</span>}
+            {isNoShow && <span className="text-xs bg-gray-100 text-black/50 rounded px-1.5 py-0.5">No-show</span>}
           </div>
-          <a href={`tel:${b.phone}`} className="text-sm text-orange-600">{b.phone}</a>
-          <p className="text-sm text-gray-500">{b.address}</p>
+          <a href={`tel:${b.phone}`} className="text-sm text-[#f97316]">{b.phone}</a>
+          <p className="text-sm text-black/50">{b.address}</p>
         </div>
         <div className="text-right">
           <div className="font-bold">{formatTime(b.job_time)}</div>
-          <div className="text-sm text-gray-500">{LOAD_LABELS[b.load_size]}</div>
+          <div className="text-sm text-black/50">{LOAD_LABELS[b.load_size]}</div>
           <div className="text-sm font-semibold">${b.total_price}</div>
           <button
             onClick={() => setShowTimeline(true)}
-            className="text-xs text-orange-600 underline mt-1"
+            className="text-xs text-[#f97316] underline mt-1"
           >
             History
           </button>
@@ -298,25 +298,25 @@ function JobCard({ b, act }) {
 
       {/* Flags */}
       {b.flag_for_review && (
-        <p className="mt-2 text-xs text-orange-700 bg-orange-50 rounded p-2">
+        <p className="mt-2 text-xs text-orange-700 bg-[#f97316]/10 rounded p-2">
           🚨 {b.flag_reason || 'Flagged for review'}
         </p>
       )}
       {b.has_freon && <p className="mt-1 text-xs text-blue-700">🌡️ Freon appliance ({b.freon_count || 1}), bring straps</p>}
       {(b.no_show_risk_score || 0) >= 50 && (
-        <p className="mt-1 text-xs text-red-600">⚠️ No-show risk {b.no_show_risk_score}%</p>
+        <p className="mt-1 text-xs text-[#EF4444]">⚠️ No-show risk {b.no_show_risk_score}%</p>
       )}
 
       {/* Booking notes (from customer at booking time) */}
       {b.description_text && (
-        <p className="mt-2 text-xs text-gray-500 bg-gray-50 rounded p-2">
+        <p className="mt-2 text-xs text-black/50 bg-[#FAFAFA] rounded p-2">
           📋 {b.description_text}
         </p>
       )}
 
       {/* Customer notes (new field) */}
       {b.customer_notes && (
-        <p className="mt-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded p-2">
+        <p className="mt-2 text-xs text-orange-700 bg-[#f97316]/10 border border-[#f97316]/20 rounded p-2">
           📝 Customer notes: {b.customer_notes}
         </p>
       )}
@@ -375,13 +375,13 @@ function JobCard({ b, act }) {
               onClick={() =>
                 act('cancel', { booking_id: b.id, reason: 'Operator cancelled', by: 'operator' }, 'Cancel job and refund $50?')
               }
-              className="border border-red-300 text-red-600 text-sm py-2 rounded-lg"
+              className="border border-red-300 text-[#EF4444] text-sm py-2 rounded-lg"
             >
               Cancel
             </button>
             <button
               onClick={() => act('no-show', { booking_id: b.id }, `Mark ${b.name} as a no-show?`)}
-              className="border border-orange-300 text-orange-600 text-sm py-2 rounded-lg"
+              className="border border-orange-300 text-[#f97316] text-sm py-2 rounded-lg"
             >
               No-show
             </button>
@@ -398,8 +398,8 @@ function JobCard({ b, act }) {
 
       {/* Inline reschedule UI */}
       {rescheduling && !done && !isNoShow && (
-        <div className="mt-3 space-y-2 border border-gray-200 rounded-xl p-3">
-          <p className="text-xs font-semibold text-gray-600">Reschedule to:</p>
+        <div className="mt-3 space-y-2 border border-black/[0.06] rounded-xl p-3">
+          <p className="text-xs font-semibold text-black/60">Reschedule to:</p>
           <input
             type="date"
             value={rescheduleDate}
@@ -413,7 +413,7 @@ function JobCard({ b, act }) {
                   key={s.time}
                   onClick={() => setRescheduleTime(s.time)}
                   className={`px-2 py-1 rounded text-xs ${
-                    rescheduleTime === s.time ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'
+                    rescheduleTime === s.time ? 'bg-[#f97316] text-white' : 'bg-gray-100 text-black/70'
                   }`}
                 >
                   {s.label}
@@ -437,7 +437,7 @@ function JobCard({ b, act }) {
                 });
                 setRescheduling(false);
               }}
-              className="flex-1 bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg"
+              className="flex-1 bg-[#f97316] text-white text-sm font-semibold py-2 rounded-lg"
             >
               Confirm reschedule
             </button>
@@ -474,12 +474,12 @@ function OperatorNotes({ bookingId, initial }) {
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Operator notes (e.g. gate code, extra items, cash collected)"
-        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs h-14 resize-none"
+        className="w-full border border-black/[0.06] rounded-lg px-2 py-1.5 text-xs h-14 resize-none"
       />
       <button
         onClick={save}
         disabled={saving}
-        className="text-xs text-orange-600 font-medium"
+        className="text-xs text-[#f97316] font-medium"
       >
         {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save notes'}
       </button>
@@ -515,7 +515,7 @@ function QuickSMS({ bookingId, phone, name }) {
         value={msg}
         onChange={(e) => setMsg(e.target.value)}
         placeholder={`Quick text to ${name}…`}
-        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs h-14 resize-none"
+        className="w-full border border-black/[0.06] rounded-lg px-2 py-1.5 text-xs h-14 resize-none"
       />
       <button
         onClick={send}
@@ -542,8 +542,8 @@ function EarningsDashboard() {
       .catch(() => { setLoading(false); });
   }, []);
 
-  if (loading) return <p className="text-center text-gray-400 py-10">Loading earnings…</p>;
-  if (!data || data.error) return <p className="text-center text-gray-400 py-10">Failed to load earnings.</p>;
+  if (loading) return <p className="text-center text-black/40 py-10">Loading earnings…</p>;
+  if (!data || data.error) return <p className="text-center text-black/40 py-10">Failed to load earnings.</p>;
 
   const sources = Object.entries(data.sourceBreakdown || {}).sort((a, b) => b[1].count - a[1].count);
   const totalEarned = data.totalEarned || 0;
@@ -554,51 +554,51 @@ function EarningsDashboard() {
     <div className="space-y-4">
       <DepartureCountdown />
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-gray-900">${totalEarned.toLocaleString()}</div>
-          <div className="text-sm text-gray-500 mt-1">Total earned</div>
-          <div className="text-xs text-gray-400">{data.completedJobs || 0} jobs completed</div>
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4">
+          <div className="text-2xl font-bold text-[#1a1a1a]">${totalEarned.toLocaleString()}</div>
+          <div className="text-sm text-black/50 mt-1">Total earned</div>
+          <div className="text-xs text-black/40">{data.completedJobs || 0} jobs completed</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-orange-600">${totalPipeline.toLocaleString()}</div>
-          <div className="text-sm text-gray-500 mt-1">In pipeline</div>
-          <div className="text-xs text-gray-400">{data.upcomingJobs || 0} confirmed upcoming</div>
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4">
+          <div className="text-2xl font-bold text-[#f97316]">${totalPipeline.toLocaleString()}</div>
+          <div className="text-sm text-black/50 mt-1">In pipeline</div>
+          <div className="text-xs text-black/40">{data.upcomingJobs || 0} confirmed upcoming</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-gray-900">${avgJobValue}</div>
-          <div className="text-sm text-gray-500 mt-1">Avg job value</div>
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4">
+          <div className="text-2xl font-bold text-[#1a1a1a]">${avgJobValue}</div>
+          <div className="text-sm text-black/50 mt-1">Avg job value</div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-2xl font-bold text-green-600">
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4">
+          <div className="text-2xl font-bold text-[#22C55E]">
             ${(totalEarned + totalPipeline).toLocaleString()}
           </div>
-          <div className="text-sm text-gray-500 mt-1">Total + pipeline</div>
+          <div className="text-sm text-black/50 mt-1">Total + pipeline</div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-4">
-        <h3 className="font-semibold text-gray-900 mb-3">Where bookings come from</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] p-4">
+        <h3 className="font-semibold text-[#1a1a1a] mb-3">Where bookings come from</h3>
         <div className="space-y-2">
           {sources.map(([source, stats]) => (
             <div key={source} className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <span className="capitalize font-medium text-gray-800">{source}</span>
-                <span className="text-gray-400">{stats.count} jobs</span>
+                <span className="text-black/40">{stats.count} jobs</span>
               </div>
-              <span className="font-semibold text-gray-700">${stats.revenue}</span>
+              <span className="font-semibold text-black/70">${stats.revenue}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-4">
-        <h3 className="font-semibold text-gray-900 mb-3">Revenue by work day</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] p-4">
+        <h3 className="font-semibold text-[#1a1a1a] mb-3">Revenue by work day</h3>
         <div className="space-y-2">
           {Object.entries(data.byDate).map(([date, stats]) => (
             <div key={date} className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">{date}</span>
+              <span className="text-black/60">{date}</span>
               <div className="flex gap-3">
-                <span className="text-gray-400">{stats.jobs} jobs</span>
+                <span className="text-black/40">{stats.jobs} jobs</span>
                 <span className="font-semibold">${stats.revenue}</span>
               </div>
             </div>
@@ -634,21 +634,21 @@ function WaitlistView() {
     load();
   };
 
-  if (loading) return <p className="text-center text-gray-400 py-10">Loading waitlist…</p>;
+  if (loading) return <p className="text-center text-black/40 py-10">Loading waitlist…</p>;
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-500">{list.length} {list.length === 1 ? 'person' : 'people'} waiting for a slot</p>
+      <p className="text-sm text-black/50">{list.length} {list.length === 1 ? 'person' : 'people'} waiting for a slot</p>
       {list.length === 0 && (
-        <p className="text-center text-gray-400 py-10">Waitlist is empty.</p>
+        <p className="text-center text-black/40 py-10">Waitlist is empty.</p>
       )}
       {list.map((entry) => (
-        <div key={entry.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+        <div key={entry.id} className="bg-white rounded-2xl border border-black/[0.06] p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="font-semibold text-gray-900">{entry.name}</p>
-              <a href={`tel:${entry.phone}`} className="text-sm text-orange-600">{entry.phone}</a>
-              {entry.address && <p className="text-xs text-gray-500 mt-0.5">{entry.address}</p>}
+              <p className="font-semibold text-[#1a1a1a]">{entry.name}</p>
+              <a href={`tel:${entry.phone}`} className="text-sm text-[#f97316]">{entry.phone}</a>
+              {entry.address && <p className="text-xs text-black/50 mt-0.5">{entry.address}</p>}
               <div className="flex gap-2 mt-1 flex-wrap">
                 {entry.preferred_day_type && (
                   <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5 capitalize">{entry.preferred_day_type}</span>
@@ -656,17 +656,17 @@ function WaitlistView() {
                 {entry.load_size && (
                   <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5 capitalize">{entry.load_size}</span>
                 )}
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-black/40">
                   Joined {new Date(entry.created_at).toLocaleDateString()}
                 </span>
                 {entry.notified && (
-                  <span className="text-xs bg-blue-50 text-blue-600 rounded px-1.5 py-0.5">Notified</span>
+                  <span className="text-xs bg-[#3B82F6]/10 text-[#3B82F6] rounded px-1.5 py-0.5">Notified</span>
                 )}
               </div>
             </div>
             <button
               onClick={() => notify(entry)}
-              className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg ml-3 flex-shrink-0"
+              className="bg-[#f97316] text-white text-xs font-semibold px-3 py-2 rounded-lg ml-3 flex-shrink-0"
             >
               Notify
             </button>
@@ -736,7 +736,7 @@ function ManualBookingButton({ onCreated }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-sm font-semibold text-gray-600 hover:border-orange-400 hover:text-orange-600"
+        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-sm font-semibold text-black/60 hover:border-orange-400 hover:text-[#f97316]"
       >
         + Add manual booking
       </button>
@@ -752,8 +752,8 @@ function ManualBookingButton({ onCreated }) {
   });
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
-      <h3 className="font-bold text-gray-900">Manual booking</h3>
+    <div className="bg-white rounded-2xl border border-black/[0.06] p-4 space-y-3">
+      <h3 className="font-bold text-[#1a1a1a]">Manual booking</h3>
 
       <div className="space-y-2">
         <input value={form.name} onChange={set('name')} placeholder="Customer name" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -801,7 +801,7 @@ function ManualBookingButton({ onCreated }) {
             <button
               key={s.time}
               onClick={() => setForm((f) => ({ ...f, job_time: s.time }))}
-              className={`px-2 py-1 rounded text-xs ${form.job_time === s.time ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`px-2 py-1 rounded text-xs ${form.job_time === s.time ? 'bg-[#f97316] text-white' : 'bg-gray-100 text-black/70'}`}
             >
               {s.label}
             </button>
@@ -813,36 +813,36 @@ function ManualBookingButton({ onCreated }) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs text-gray-500">Freon appliances ($40 each)</label>
+          <label className="text-xs text-black/50">Freon appliances ($40 each)</label>
           <input type="number" min="0" max="10" value={form.freon_count} onChange={set('freon_count')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Stairs (flights, $25 each)</label>
+          <label className="text-xs text-black/50">Stairs (flights, $25 each)</label>
           <input type="number" min="0" max="10" value={form.stairs} onChange={set('stairs')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-600">
+      <label className="flex items-center gap-2 text-sm text-black/60">
         <input type="checkbox" checked={form.same_day} onChange={setBool('same_day')} className="w-4 h-4 rounded" />
         Same-day pickup (+$50)
       </label>
 
       <textarea value={form.notes} onChange={set('notes')} placeholder="Internal notes (optional, not sent to customer)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm h-16" />
 
-      <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+      <div className="bg-[#FAFAFA] rounded-lg p-3 text-sm space-y-1">
         <div className="flex justify-between"><span>Base ({LOAD_LABELS[form.load_size]})</span><span>${livePrice.base_price}</span></div>
         {livePrice.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({form.freon_count})</span><span>${livePrice.freon_fee}</span></div>}
         {livePrice.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({form.stairs})</span><span>${livePrice.stairs_fee}</span></div>}
         {livePrice.same_day_fee > 0 && <div className="flex justify-between"><span>Same-day</span><span>${livePrice.same_day_fee}</span></div>}
         <div className="flex justify-between font-bold pt-1 border-t"><span>Total</span><span>${livePrice.total}</span></div>
-        <div className="flex justify-between text-gray-500"><span>Deposit</span><span>$50</span></div>
-        <div className="flex justify-between text-gray-500"><span>Balance on pickup</span><span>${livePrice.balance_due}</span></div>
+        <div className="flex justify-between text-black/50"><span>Deposit</span><span>$50</span></div>
+        <div className="flex justify-between text-black/50"><span>Balance on pickup</span><span>${livePrice.balance_due}</span></div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-[#EF4444]">{error}</p>}
       <div className="flex gap-2">
         <button onClick={() => setOpen(false)} className="flex-1 border border-gray-300 text-sm py-2 rounded-lg">Cancel</button>
-        <button onClick={submit} disabled={submitting || !form.name || !form.phone || !form.address || !form.job_date} className="flex-1 bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg disabled:bg-orange-300">
+        <button onClick={submit} disabled={submitting || !form.name || !form.phone || !form.address || !form.job_date} className="flex-1 bg-[#f97316] text-white text-sm font-semibold py-2 rounded-lg disabled:bg-[#f97316]/50">
           {submitting ? 'Creating…' : 'Create + send deposit link'}
         </button>
       </div>
@@ -890,7 +890,7 @@ function AddCustomDateButton({ onAdded }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-sm font-semibold text-gray-600 hover:border-orange-400 hover:text-orange-600"
+        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-sm font-semibold text-black/60 hover:border-orange-400 hover:text-[#f97316]"
       >
         + Add custom work day
       </button>
@@ -898,19 +898,19 @@ function AddCustomDateButton({ onAdded }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
-      <h3 className="font-bold text-gray-900">Add custom work day</h3>
-      <p className="text-xs text-gray-500">Opens slots on a specific date (e.g. a Thursday or weekday). Default slots are Sundays only.</p>
+    <div className="bg-white rounded-2xl border border-black/[0.06] p-4 space-y-3">
+      <h3 className="font-bold text-[#1a1a1a]">Add custom work day</h3>
+      <p className="text-xs text-black/50">Opens slots on a specific date (e.g. a Thursday or weekday). Default slots are Sundays only.</p>
       <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
       <div>
-        <label className="text-xs text-gray-500">Max jobs per slot</label>
+        <label className="text-xs text-black/50">Max jobs per slot</label>
         <input type="number" min="1" max="10" value={maxJobs} onChange={(e) => setMaxJobs(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
       </div>
-      <p className="text-xs text-gray-400">Slots: 7:30 AM, 9:00 AM, 11:00 AM, 1:00 PM</p>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <p className="text-xs text-black/40">Slots: 7:30 AM, 9:00 AM, 11:00 AM, 1:00 PM</p>
+      {error && <p className="text-sm text-[#EF4444]">{error}</p>}
       <div className="flex gap-2">
         <button onClick={() => setOpen(false)} className="flex-1 border border-gray-300 text-sm py-2 rounded-lg">Cancel</button>
-        <button onClick={submit} disabled={submitting || !date} className="flex-1 bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg disabled:bg-orange-300">
+        <button onClick={submit} disabled={submitting || !date} className="flex-1 bg-[#f97316] text-white text-sm font-semibold py-2 rounded-lg disabled:bg-[#f97316]/50">
           {submitting ? 'Adding…' : 'Add slots'}
         </button>
       </div>
@@ -940,7 +940,7 @@ function DayOfSummary({ bookings }) {
   const remaining = todayJobs.filter((b) => b.status !== 'completed').length;
 
   return (
-    <div className="bg-gray-900 text-white rounded-2xl p-4 space-y-3">
+    <div className="bg-[#f97316] text-white rounded-2xl p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="font-bold text-lg">Today — {todayName}</span>
         <span className="text-orange-400 font-bold text-lg">${totalBalance} to collect</span>
@@ -948,15 +948,15 @@ function DayOfSummary({ bookings }) {
       <div className="grid grid-cols-3 gap-2 text-center text-sm">
         <div>
           <div className="font-bold text-xl">{todayJobs.length}</div>
-          <div className="text-gray-400 text-xs">Total jobs</div>
+          <div className="text-black/40 text-xs">Total jobs</div>
         </div>
         <div>
           <div className="font-bold text-xl text-green-400">{completed}</div>
-          <div className="text-gray-400 text-xs">Done</div>
+          <div className="text-black/40 text-xs">Done</div>
         </div>
         <div>
           <div className="font-bold text-xl text-orange-400">{remaining}</div>
-          <div className="text-gray-400 text-xs">Remaining</div>
+          <div className="text-black/40 text-xs">Remaining</div>
         </div>
       </div>
     </div>
@@ -980,14 +980,14 @@ function DepartureCountdown() {
   }
 
   return (
-    <div className="bg-gray-900 text-white rounded-2xl p-4 flex items-center justify-between">
+    <div className="bg-[#f97316] text-white rounded-2xl p-4 flex items-center justify-between">
       <div>
         <div className="text-2xl font-bold">{daysLeft} days left</div>
-        <div className="text-gray-400 text-sm">Until departure (Aug 27)</div>
+        <div className="text-black/40 text-sm">Until departure (Aug 27)</div>
       </div>
       <div className="text-right">
         <div className="text-2xl font-bold text-orange-400">{operatingDays}</div>
-        <div className="text-gray-400 text-sm">Operating days left</div>
+        <div className="text-black/40 text-sm">Operating days left</div>
       </div>
     </div>
   );
@@ -1055,7 +1055,7 @@ function ScheduleView() {
     '13:00': '1:00 PM',
   };
 
-  if (loading) return <p className="text-center text-gray-400 py-10">Loading schedule…</p>;
+  if (loading) return <p className="text-center text-black/40 py-10">Loading schedule…</p>;
 
   return (
     <div className="space-y-4">
@@ -1063,41 +1063,41 @@ function ScheduleView() {
       {/* Summary stats */}
       {stats && (
         <div className="grid grid-cols-4 gap-2">
-          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
-            <div className="text-xl font-bold text-gray-900">{stats.operatingDays}</div>
-            <div className="text-xs text-gray-400">Operating days</div>
+          <div className="bg-white rounded-xl border border-black/[0.06] p-3 text-center">
+            <div className="text-xl font-bold text-[#1a1a1a]">{stats.operatingDays}</div>
+            <div className="text-xs text-black/40">Operating days</div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
-            <div className="text-xl font-bold text-gray-900">{stats.totalBooked}</div>
-            <div className="text-xs text-gray-400">Booked</div>
+          <div className="bg-white rounded-xl border border-black/[0.06] p-3 text-center">
+            <div className="text-xl font-bold text-[#1a1a1a]">{stats.totalBooked}</div>
+            <div className="text-xs text-black/40">Booked</div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
-            <div className="text-xl font-bold text-gray-900">{stats.totalUpcomingSlots}</div>
-            <div className="text-xs text-gray-400">Capacity</div>
+          <div className="bg-white rounded-xl border border-black/[0.06] p-3 text-center">
+            <div className="text-xl font-bold text-[#1a1a1a]">{stats.totalUpcomingSlots}</div>
+            <div className="text-xs text-black/40">Capacity</div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
-            <div className={`text-xl font-bold ${stats.fillRate > 70 ? 'text-orange-600' : 'text-gray-900'}`}>
+          <div className="bg-white rounded-xl border border-black/[0.06] p-3 text-center">
+            <div className={`text-xl font-bold ${stats.fillRate > 70 ? 'text-[#f97316]' : 'text-[#1a1a1a]'}`}>
               {stats.fillRate}%
             </div>
-            <div className="text-xs text-gray-400">Fill rate</div>
+            <div className="text-xs text-black/40">Fill rate</div>
           </div>
         </div>
       )}
 
       {/* Add operating day */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+      <div className="bg-white rounded-2xl border border-black/[0.06] p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-gray-900">Add operating day</h3>
+          <h3 className="font-bold text-[#1a1a1a]">Add operating day</h3>
           <button
             onClick={() => setShowBulk((s) => !s)}
-            className="text-xs text-orange-600 font-medium"
+            className="text-xs text-[#f97316] font-medium"
           >
             Bulk update all →
           </button>
         </div>
 
         {showBulk && (
-          <div className="bg-orange-50 rounded-xl p-3 space-y-2">
+          <div className="bg-[#f97316]/10 rounded-xl p-3 space-y-2">
             <p className="text-xs text-orange-700 font-medium">
               Set capacity for ALL future empty slots at once. Use this if you add a second crew.
             </p>
@@ -1113,7 +1113,7 @@ function ScheduleView() {
               </select>
               <button
                 onClick={applyBulkMax}
-                className="flex-1 bg-orange-500 text-white text-sm font-semibold py-2 rounded-lg"
+                className="flex-1 bg-[#f97316] text-white text-sm font-semibold py-2 rounded-lg"
               >
                 Apply to all future slots
               </button>
@@ -1140,18 +1140,18 @@ function ScheduleView() {
           <button
             onClick={addDay}
             disabled={!addingDate}
-            className="bg-orange-500 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:bg-orange-300"
+            className="bg-[#f97316] text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:bg-[#f97316]/50"
           >
             Add
           </button>
         </div>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-black/40">
           Thu/Sun auto-generate 16 weeks rolling every Monday. Stat holidays are blocked automatically.
         </p>
       </div>
 
       {schedule.length === 0 && (
-        <p className="text-center text-gray-400 py-10">No upcoming slots in schedule.</p>
+        <p className="text-center text-black/40 py-10">No upcoming slots in schedule.</p>
       )}
 
       {schedule.map((day) => {
@@ -1163,26 +1163,26 @@ function ScheduleView() {
         const isSunday = day.day_type === 'sunday';
 
         return (
-          <div key={day.date} className={`bg-white rounded-2xl border p-4 ${isFull ? 'border-red-200' : 'border-gray-200'}`}>
+          <div key={day.date} className={`bg-white rounded-2xl border p-4 ${isFull ? 'border-[#EF4444]/20' : 'border-black/[0.06]'}`}>
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-gray-900">
+                  <span className="font-bold text-[#1a1a1a]">
                     {new Date(`${day.date}T12:00:00Z`).toLocaleDateString('en-CA', {
                       weekday: 'long', month: 'short', day: 'numeric',
                     })}
                   </span>
                   <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                    isThursday ? 'bg-blue-50 text-blue-600' :
-                    isSunday ? 'bg-orange-50 text-orange-600' :
-                    'bg-gray-100 text-gray-600'
+                    isThursday ? 'bg-[#3B82F6]/10 text-[#3B82F6]' :
+                    isSunday ? 'bg-[#f97316]/10 text-[#f97316]' :
+                    'bg-[#F5F5F7] text-black/60'
                   }`}>
                     {day.day_type}
                   </span>
-                  {isFull && <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-medium">FULL</span>}
-                  {allClosed && !isFull && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Closed</span>}
+                  {isFull && <span className="text-xs bg-[#EF4444]/10 text-[#EF4444] px-1.5 py-0.5 rounded font-medium">FULL</span>}
+                  {allClosed && !isFull && <span className="text-xs bg-gray-100 text-black/50 px-1.5 py-0.5 rounded">Closed</span>}
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">
+                <div className="text-xs text-black/40 mt-0.5">
                   {totalBooked} / {totalMax} booked
                 </div>
               </div>
@@ -1191,8 +1191,8 @@ function ScheduleView() {
                   onClick={() => act({ action: allClosed ? 'open_day' : 'close_day', slot_date: day.date })}
                   className={`text-xs px-2 py-1 rounded-lg border font-medium ${
                     allClosed
-                      ? 'border-green-200 text-green-600'
-                      : 'border-gray-200 text-gray-500'
+                      ? 'border-[#22C55E]/20 text-[#22C55E]'
+                      : 'border-black/[0.06] text-black/50'
                   }`}
                 >
                   {allClosed ? 'Open all' : 'Close day'}
@@ -1206,7 +1206,7 @@ function ScheduleView() {
                     if (window.confirm(`Remove all slots for ${day.date}?`))
                       act({ action: 'delete_day', slot_date: day.date });
                   }}
-                  className="text-xs text-red-500 border border-red-200 rounded-lg px-2 py-1"
+                  className="text-xs text-[#EF4444] border border-[#EF4444]/20 rounded-lg px-2 py-1"
                 >
                   Remove
                 </button>
@@ -1229,16 +1229,16 @@ function ScheduleView() {
                       isPast
                         ? 'opacity-30 pointer-events-none'
                         : !slot.is_available
-                        ? 'bg-gray-50 opacity-60'
+                        ? 'bg-[#FAFAFA] opacity-60'
                         : 'bg-white border border-gray-100'
                     }`}
                   >
                     <div className="w-16 flex-shrink-0">
-                      <span className="text-sm font-semibold text-gray-700">
+                      <span className="text-sm font-semibold text-black/70">
                         {TIME_LABELS[slot.slot_time] || slot.slot_time}
                       </span>
                       {isPast && (
-                        <span className="block text-xs text-gray-400">passed</span>
+                        <span className="block text-xs text-black/40">passed</span>
                       )}
                     </div>
 
@@ -1253,7 +1253,7 @@ function ScheduleView() {
                           style={{ width: `${Math.max(pct, slotFull ? 100 : 0)}%` }}
                         />
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className="text-xs text-black/40 mt-0.5">
                         {slot.jobs_booked} / {slot.max_jobs} booked
                       </div>
                     </div>
@@ -1266,11 +1266,11 @@ function ScheduleView() {
                           slot_time: slot.slot_time,
                           max_jobs: Math.max(slot.jobs_booked, slot.max_jobs - 1),
                         })}
-                        className="w-6 h-6 rounded border border-gray-200 text-sm font-bold text-gray-500 flex items-center justify-center"
+                        className="w-6 h-6 rounded border border-black/[0.06] text-sm font-bold text-black/50 flex items-center justify-center"
                       >
                         −
                       </button>
-                      <span className="text-xs font-medium text-gray-700 w-4 text-center">
+                      <span className="text-xs font-medium text-black/70 w-4 text-center">
                         {slot.max_jobs}
                       </span>
                       <button
@@ -1280,7 +1280,7 @@ function ScheduleView() {
                           slot_time: slot.slot_time,
                           max_jobs: slot.max_jobs + 1,
                         })}
-                        className="w-6 h-6 rounded border border-gray-200 text-sm font-bold text-gray-500 flex items-center justify-center"
+                        className="w-6 h-6 rounded border border-black/[0.06] text-sm font-bold text-black/50 flex items-center justify-center"
                       >
                         +
                       </button>
@@ -1294,8 +1294,8 @@ function ScheduleView() {
                       })}
                       className={`text-xs px-2 py-1 rounded-lg font-medium border flex-shrink-0 ${
                         slot.is_available
-                          ? 'border-green-200 text-green-600 bg-green-50'
-                          : 'border-gray-200 text-gray-400 bg-gray-50'
+                          ? 'border-[#22C55E]/20 text-[#22C55E] bg-[#22C55E]/10'
+                          : 'border-black/[0.06] text-black/40 bg-[#FAFAFA]'
                       }`}
                     >
                       {slot.is_available ? 'Open' : 'Closed'}
@@ -1326,36 +1326,36 @@ function LeadsView() {
 
   useEffect(() => { load(); }, []);
 
-  if (loading) return <p className="text-center text-gray-400 py-10">Loading leads…</p>;
+  if (loading) return <p className="text-center text-black/40 py-10">Loading leads…</p>;
 
   const withPrice = leads.filter((l) => l.ai_price_estimate);
   const withoutPrice = leads.filter((l) => !l.ai_price_estimate);
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">{leads.length} unconverted lead{leads.length !== 1 ? 's' : ''}</p>
-      {leads.length === 0 && <p className="text-center text-gray-400 py-10">No unconverted leads right now.</p>}
+      <p className="text-sm text-black/50">{leads.length} unconverted lead{leads.length !== 1 ? 's' : ''}</p>
+      {leads.length === 0 && <p className="text-center text-black/40 py-10">No unconverted leads right now.</p>}
 
       {withPrice.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Got a price — didn&apos;t book</p>
+          <p className="text-xs font-semibold text-black/50 uppercase tracking-wide">Got a price — didn&apos;t book</p>
           {withPrice.map((lead) => (
-            <div key={lead.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+            <div key={lead.id} className="bg-white rounded-2xl border border-black/[0.06] p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <a href={`tel:${lead.phone}`} className="text-orange-600 font-semibold text-sm">{lead.phone}</a>
+                  <a href={`tel:${lead.phone}`} className="text-[#f97316] font-semibold text-sm">{lead.phone}</a>
                   <div className="flex gap-2 mt-1 flex-wrap">
-                    <span className="text-xs bg-green-50 text-green-700 rounded px-1.5 py-0.5 font-medium">${lead.ai_price_estimate} quote</span>
+                    <span className="text-xs bg-[#22C55E]/10 text-green-700 rounded px-1.5 py-0.5 font-medium">${lead.ai_price_estimate} quote</span>
                     {lead.load_size && (
-                      <span className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 capitalize">{lead.load_size.replace('_', ' ')}</span>
+                      <span className="text-xs bg-[#F5F5F7] text-black/60 rounded px-1.5 py-0.5 capitalize">{lead.load_size.replace('_', ' ')}</span>
                     )}
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-black/40">
                       {new Date(lead.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    {lead.follow_up_sent && <span className="text-xs bg-blue-50 text-blue-600 rounded px-1.5 py-0.5">Followed up</span>}
+                    {lead.follow_up_sent && <span className="text-xs bg-[#3B82F6]/10 text-[#3B82F6] rounded px-1.5 py-0.5">Followed up</span>}
                   </div>
                 </div>
-                <a href={`tel:${lead.phone}`} className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
+                <a href={`tel:${lead.phone}`} className="bg-[#f97316] text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
               </div>
             </div>
           ))}
@@ -1364,20 +1364,20 @@ function LeadsView() {
 
       {withoutPrice.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Entered phone — no price yet</p>
+          <p className="text-xs font-semibold text-black/50 uppercase tracking-wide">Entered phone — no price yet</p>
           {withoutPrice.map((lead) => (
-            <div key={lead.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+            <div key={lead.id} className="bg-white rounded-2xl border border-black/[0.06] p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <a href={`tel:${lead.phone}`} className="text-orange-600 font-semibold text-sm">{lead.phone}</a>
+                  <a href={`tel:${lead.phone}`} className="text-[#f97316] font-semibold text-sm">{lead.phone}</a>
                   <div className="flex gap-2 mt-1 flex-wrap">
-                    <span className="text-xs bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5">No photos uploaded</span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs bg-[#F59E0B]/10 text-yellow-700 rounded px-1.5 py-0.5">No photos uploaded</span>
+                    <span className="text-xs text-black/40">
                       {new Date(lead.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 </div>
-                <a href={`tel:${lead.phone}`} className="bg-orange-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
+                <a href={`tel:${lead.phone}`} className="bg-[#f97316] text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
               </div>
             </div>
           ))}

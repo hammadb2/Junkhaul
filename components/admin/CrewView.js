@@ -5,12 +5,12 @@ import { formatDateLong } from '@/lib/dates';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { X, Check, Circle, UserPlus, Radio, Truck, Warehouse, Heart, ChevronRight, Mail, Phone, Clock, FileText, AlertTriangle, Send } from 'lucide-react';
 
-// ── Dark theme tokens (Tailwind classes) ──
-const CARD = 'bg-[#161618] border border-white/[0.06] rounded-2xl';
-const INPUT = 'bg-[#1A1A1E] border border-white/[0.08] rounded-lg text-white placeholder-white/30';
-const TXT = 'text-white';
-const TXT2 = 'text-white/60';
-const TXT3 = 'text-white/40';
+// ── Light theme tokens (Tailwind classes) ──
+const CARD = 'bg-white border border-black/[0.06] rounded-2xl';
+const INPUT = 'bg-[#F0F0F2] border border-black/[0.06] rounded-lg text-[#1a1a1a] placeholder-black/30';
+const TXT = 'text-[#1a1a1a]';
+const TXT2 = 'text-black/60';
+const TXT3 = 'text-black/40';
 const ORANGE = 'text-[#f97316]';
 const GREEN = 'text-[#22C55E]';
 const RED = 'text-[#EF4444]';
@@ -61,7 +61,7 @@ function Ring({ value, max, size = 48, stroke = 4, color = '#f97316' }) {
   const offset = circ - pct * circ;
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={stroke} />
       <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
     </svg>
   );
@@ -124,7 +124,7 @@ export default function CrewView() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-white">Crew Management</h2>
+        <h2 className="text-lg font-bold text-[#1a1a1a]">Crew Management</h2>
         {message && (
           <span className={`text-sm font-medium ${message.type === 'error' ? RED : GREEN}`}>
             {message.text}
@@ -135,7 +135,7 @@ export default function CrewView() {
       {/* Stat cards with ring indicators */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total" value={summary.total} icon={<Circle size={16} className="text-white/40" />} />
+          <StatCard label="Total" value={summary.total} icon={<Circle size={16} className="text-black/40" />} />
           <StatCard label="Active" value={summary.onboarded} icon={<Check size={16} className="text-[#22C55E]" />} ringValue={summary.onboarded} ringMax={summary.total} ringColor="#22C55E" />
           <StatCard label="Pending" value={summary.pending} icon={<AlertTriangle size={16} className="text-[#F59E0B]" />} accent={summary.pending > 0} />
           <StatCard label="Clocked In" value={summary.clocked_in_now} icon={<Clock size={16} className="text-[#f97316]" />} accent={summary.clocked_in_now > 0} ringValue={summary.clocked_in_now} ringMax={summary.onboarded || 1} ringColor="#f97316" />
@@ -172,7 +172,7 @@ function StatCard({ label, value, icon, accent, ringValue, ringMax, ringColor })
         </div>
       )}
       {ringValue == null && (
-        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center">
+        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-black/[0.06] flex items-center justify-center">
           {icon}
         </div>
       )}
@@ -191,20 +191,20 @@ function PendingInvitesSection({ invites, onResent, flash }) {
   if (!invites || invites.length === 0) return null;
   return (
     <div className={CARD + ' overflow-hidden'}>
-      <div className="px-4 py-3 border-b border-white/[0.06] font-semibold text-white flex items-center gap-2">
+      <div className="px-4 py-3 border-b border-black/[0.06] font-semibold text-[#1a1a1a] flex items-center gap-2">
         <Mail size={16} className="text-[#F59E0B]" />
         Pending invites ({invites.length})
       </div>
-      <div className="divide-y divide-white/[0.04]">
+      <div className="divide-y divide-black/[0.04]">
         {invites.map((inv) => (
           <div key={inv.id} className="px-4 py-3 flex items-center gap-3 text-sm">
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-white truncate">{inv.first_name} {inv.last_name}</div>
-              <div className="text-xs text-white/40 truncate">{inv.email}</div>
+              <div className="font-medium text-[#1a1a1a] truncate">{inv.first_name} {inv.last_name}</div>
+              <div className="text-xs text-black/40 truncate">{inv.email}</div>
             </div>
             <div className="text-right hidden sm:block">
-              <div className="text-white/70 tabular-nums">${inv.pay_rate}/hr</div>
-              <div className="text-xs text-white/30">Expires {fmtDate(inv.expires_at)}</div>
+              <div className="text-black/70 tabular-nums">${inv.pay_rate}/hr</div>
+              <div className="text-xs text-black/30">Expires {fmtDate(inv.expires_at)}</div>
             </div>
             <button
               onClick={async () => {
@@ -256,12 +256,12 @@ function InviteForm({ onInvited, flash }) {
 
   return (
     <div className={CARD + ' overflow-hidden'}>
-      <button onClick={() => setOpen((o) => !o)} className="w-full px-4 py-3 flex items-center justify-between font-semibold text-white">
+      <button onClick={() => setOpen((o) => !o)} className="w-full px-4 py-3 flex items-center justify-between font-semibold text-[#1a1a1a]">
         <span className="flex items-center gap-2"><UserPlus size={18} className="text-[#f97316]" /> Invite new crew member</span>
-        <span className="text-white/40 text-sm">{open ? 'Cancel' : 'Open'}</span>
+        <span className="text-black/40 text-sm">{open ? 'Cancel' : 'Open'}</span>
       </button>
       {open && (
-        <form onSubmit={submit} className="p-4 border-t border-white/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form onSubmit={submit} className="p-4 border-t border-black/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="First name" required>
             <input value={form.first_name} onChange={(e) => set('first_name', e.target.value)} required className={'w-full px-3 py-2 text-sm ' + INPUT} />
           </Field>
@@ -291,7 +291,7 @@ function InviteForm({ onInvited, flash }) {
 function Field({ label, required, children }) {
   return (
     <label className="block space-y-1">
-      <span className="block text-sm font-medium text-white/70">{label}{required && <span className="text-[#EF4444]"> *</span>}</span>
+      <span className="block text-sm font-medium text-black/70">{label}{required && <span className="text-[#EF4444]"> *</span>}</span>
       {children}
     </label>
   );
@@ -303,23 +303,23 @@ function Field({ label, required, children }) {
 function EmployeeList({ employees, onSelect }) {
   if (employees.length === 0) {
     return (
-      <div className={CARD + ' p-6 text-center text-white/40 text-sm'}>
+      <div className={CARD + ' p-6 text-center text-black/40 text-sm'}>
         No crew members yet. Invite someone to get started.
       </div>
     );
   }
   return (
     <div className={CARD + ' overflow-hidden'}>
-      <div className="px-4 py-3 border-b border-white/[0.06] font-semibold text-white">
+      <div className="px-4 py-3 border-b border-black/[0.06] font-semibold text-[#1a1a1a]">
         Crew members ({employees.length})
       </div>
-      <div className="divide-y divide-white/[0.04]">
+      <div className="divide-y divide-black/[0.04]">
         {employees.map((e) => (
-          <button key={e.id} onClick={() => onSelect(e.id)} className="w-full text-left px-4 py-3 hover:bg-white/[0.03] flex items-center gap-3 text-sm transition-colors">
+          <button key={e.id} onClick={() => onSelect(e.id)} className="w-full text-left px-4 py-3 hover:bg-black/[0.03] flex items-center gap-3 text-sm transition-colors">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-white truncate">{e.first_name} {e.last_name}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[e.status] || 'bg-white/10 text-white/60'}`}>{statusLabel(e.status)}</span>
+                <span className="font-medium text-[#1a1a1a] truncate">{e.first_name} {e.last_name}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[e.status] || 'bg-black/10 text-black/60'}`}>{statusLabel(e.status)}</span>
                 {e.clocked_in && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-[#f97316]/15 text-[#f97316] font-medium flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" />
@@ -327,17 +327,17 @@ function EmployeeList({ employees, onSelect }) {
                   </span>
                 )}
               </div>
-              <div className="text-xs text-white/40 truncate">{e.email}</div>
-              <div className="flex items-center gap-3 mt-1 text-xs text-white/30">
+              <div className="text-xs text-black/40 truncate">{e.email}</div>
+              <div className="flex items-center gap-3 mt-1 text-xs text-black/30">
                 <OnboardBadge ok={e.onboarding?.contract_signed} label="Contract" />
                 <OnboardBadge ok={e.onboarding?.td1_federal} label="TD1" />
                 <OnboardBadge ok={e.onboarding?.acknowledgments} label="Ack" />
-                <span className="text-white/40 tabular-nums">{fmtMins(e.period?.total_minutes)} this period</span>
+                <span className="text-black/40 tabular-nums">{fmtMins(e.period?.total_minutes)} this period</span>
               </div>
             </div>
             <div className="text-right hidden sm:block">
-              <div className="text-white/70 font-medium tabular-nums">${e.pay_rate}/hr</div>
-              <div className="text-xs text-white/30 flex items-center gap-1 justify-end">View <ChevronRight size={12} /></div>
+              <div className="text-black/70 font-medium tabular-nums">${e.pay_rate}/hr</div>
+              <div className="text-xs text-black/30 flex items-center gap-1 justify-end">View <ChevronRight size={12} /></div>
             </div>
           </button>
         ))}
@@ -348,7 +348,7 @@ function EmployeeList({ employees, onSelect }) {
 
 function OnboardBadge({ ok, label }) {
   return (
-    <span className={ok ? GREEN : 'text-white/20'}>
+    <span className={ok ? GREEN : 'text-black/20'}>
       {ok ? '✓' : '○'} {label}
     </span>
   );
@@ -360,10 +360,10 @@ function OnboardBadge({ ok, label }) {
 function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [payRate, setPayRate] = useState('');
-  const [status, setStatus] = useState('');
+  const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -373,25 +373,57 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
       const d = await res.json();
       if (mounted) {
         setDetail(d);
-        setPayRate(d.employee?.pay_rate ?? '');
-        setStatus(d.employee?.status ?? '');
+        setEditForm({
+          first_name: d.employee?.first_name ?? '',
+          last_name: d.employee?.last_name ?? '',
+          email: d.employee?.email ?? '',
+          phone: d.employee?.phone ?? '',
+          pay_rate: d.employee?.pay_rate ?? '',
+          status: d.employee?.status ?? '',
+          address: d.employee?.address ?? '',
+          hire_date: d.employee?.hire_date ?? '',
+        });
         setLoading(false);
       }
     })();
     return () => { mounted = false; };
   }, [id]);
 
+  const setField = (k, v) => setEditForm((p) => ({ ...p, [k]: v }));
+
   const save = async () => {
     setSaving(true);
     const body = {};
-    if (payRate !== '' && payRate !== detail.employee?.pay_rate) body.pay_rate = Number(payRate);
-    if (status && status !== detail.employee?.status) body.status = status;
+    const emp = detail.employee;
+    for (const k of ['first_name', 'last_name', 'email', 'phone', 'address', 'hire_date']) {
+      if (editForm[k] !== emp[k]) body[k] = editForm[k];
+    }
+    if (editForm.pay_rate !== '' && Number(editForm.pay_rate) !== emp.pay_rate) body.pay_rate = Number(editForm.pay_rate);
+    if (editForm.status && editForm.status !== emp.status) body.status = editForm.status;
     if (Object.keys(body).length === 0) { setSaving(false); return; }
+    if (body.email || body.first_name || body.last_name) body.send_reset = true;
     const res = await fetch(`/api/admin/crew/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await res.json();
     setSaving(false);
-    if (res.ok) { flash('success', 'Employee updated'); onSaved(); onClose(); }
+    if (res.ok) {
+      flash('success', d.reset_sent ? 'Employee updated — password reset link sent' : 'Employee updated');
+      onSaved();
+      onClose();
+    }
     else { flash('error', d.error || 'Update failed'); }
+  };
+
+  const sendResetLink = async () => {
+    setSendingReset(true);
+    const res = await fetch(`/api/admin/crew/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ send_reset: true, status: editForm.status }),
+    });
+    const d = await res.json();
+    setSendingReset(false);
+    if (res.ok) flash('success', `Password reset link sent to ${detail.employee.email}`);
+    else flash('error', d.error || 'Failed to send reset link');
   };
 
   const terminate = async () => {
@@ -407,22 +439,22 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
     try {
       const res = await fetch(`/api/admin/crew/${id}/resend-invite`, { method: 'POST' });
       const d = await res.json();
-      if (res.ok) { flash('success', `Invite resent to ${detail.employee.email}`); }
+      if (res.ok) { flash('success', `Invite resent to ${detail.employee.email} — old account cleared`); onSaved(); onClose(); }
       else { flash('error', d.error || 'Resend failed'); }
     } catch { flash('error', 'Resend failed'); }
     setResending(false);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/30 z-50 flex justify-end" onClick={onClose}>
       <div
-        className="bg-[#0F0F11] border-l border-white/[0.08] w-full max-w-md h-full overflow-y-auto slide-in-right"
+        className="bg-white border-l border-black/[0.08] w-full max-w-md h-full overflow-y-auto slide-in-right"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-[#0F0F11] border-b border-white/[0.06] px-5 py-4 flex items-center justify-between z-10">
-          <span className="text-xs text-white/40 uppercase tracking-wider">Employee Detail</span>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-white/60 hover:text-white">
+        <div className="sticky top-0 bg-white border-b border-black/[0.06] px-5 py-4 flex items-center justify-between z-10">
+          <span className="text-xs text-black/40 uppercase tracking-wider">Employee Detail</span>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-black/[0.06] flex items-center justify-center text-black/60 hover:text-[#1a1a1a]">
             <X size={18} />
           </button>
         </div>
@@ -439,9 +471,9 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
                 {detail.employee.first_name?.[0] || '?'}
               </div>
               <div className="min-w-0">
-                <h3 className="text-lg font-bold text-white truncate">{detail.employee.first_name} {detail.employee.last_name}</h3>
-                <p className="text-sm text-white/40 truncate">{detail.employee.email}</p>
-                <p className="text-sm text-white/40">{detail.employee.phone || 'No phone'}</p>
+                <h3 className="text-lg font-bold text-[#1a1a1a] truncate">{detail.employee.first_name} {detail.employee.last_name}</h3>
+                <p className="text-sm text-black/40 truncate">{detail.employee.email}</p>
+                <p className="text-sm text-black/40">{detail.employee.phone || 'No phone'}</p>
               </div>
             </div>
 
@@ -459,11 +491,11 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
                 <div className={CARD + ' p-4 flex items-center gap-4'}>
                   <div className="relative" style={{ width: 64, height: 64 }}>
                     <Ring value={done} max={checks.length} size={64} stroke={6} color={pct === 100 ? '#22C55E' : '#f97316'} />
-                    <div className="absolute inset-0 flex items-center justify-center text-white font-bold text-sm tabular-nums">{pct}%</div>
+                    <div className="absolute inset-0 flex items-center justify-center text-[#1a1a1a] font-bold text-sm tabular-nums">{pct}%</div>
                   </div>
                   <div>
-                    <div className="font-semibold text-white text-sm">Onboarding Progress</div>
-                    <div className="text-xs text-white/40 mt-0.5">{done}/{checks.length} steps complete</div>
+                    <div className="font-semibold text-[#1a1a1a] text-sm">Onboarding Progress</div>
+                    <div className="text-xs text-black/40 mt-0.5">{done}/{checks.length} steps complete</div>
                     {detail.employee.onboarding_completed_at && (
                       <div className="text-xs text-[#22C55E] mt-1">Completed {fmtDate(detail.employee.onboarding_completed_at)}</div>
                     )}
@@ -472,16 +504,57 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
               );
             })()}
 
+            {/* Editable profile info */}
+            <Section title="Profile (editable)">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="First name">
+                  <input value={editForm.first_name ?? ''} onChange={(e) => setField('first_name', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
+                </Field>
+                <Field label="Last name">
+                  <input value={editForm.last_name ?? ''} onChange={(e) => setField('last_name', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
+                </Field>
+                <Field label="Email">
+                  <input type="email" value={editForm.email ?? ''} onChange={(e) => setField('email', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
+                </Field>
+                <Field label="Phone">
+                  <input value={editForm.phone ?? ''} onChange={(e) => setField('phone', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
+                </Field>
+                <Field label="Pay rate ($/hr)">
+                  <input type="number" step="0.25" value={editForm.pay_rate ?? ''} onChange={(e) => setField('pay_rate', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
+                </Field>
+                <Field label="Status">
+                  <select value={editForm.status ?? ''} onChange={(e) => setField('status', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT}>
+                    <option value="pending">Pending</option>
+                    <option value="active">Active</option>
+                    <option value="onboarded">Onboarded</option>
+                    <option value="terminated">Terminated</option>
+                  </select>
+                </Field>
+                <Field label="Hire date">
+                  <input type="date" value={editForm.hire_date ?? ''} onChange={(e) => setField('hire_date', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
+                </Field>
+                <Field label="Address">
+                  <input value={editForm.address ?? ''} onChange={(e) => setField('address', e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
+                </Field>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button onClick={save} disabled={saving} className="flex-1 bg-[#f97316] text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 active:scale-95 transition-transform">
+                  {saving ? 'Saving...' : 'Save changes'}
+                </button>
+                <button onClick={sendResetLink} disabled={sendingReset} className="px-4 py-2.5 rounded-lg text-sm font-semibold border border-black/[0.10] text-[#1a1a1a] disabled:opacity-50 active:scale-95 transition-transform whitespace-nowrap">
+                  <span className="flex items-center gap-1.5"><Mail size={14} /> {sendingReset ? 'Sending...' : 'Send reset link'}</span>
+                </button>
+              </div>
+              <p className="text-xs text-black/30 mt-2">Changing email or name will automatically send a password reset link to the crew member.</p>
+            </Section>
+
             {/* Onboarding details */}
             <Section title="Onboarding">
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <DetailRow label="Status" value={<span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[detail.employee.status] || 'bg-white/10 text-white/60'}`}>{statusLabel(detail.employee.status)}</span>} />
-                <DetailRow label="Hire date" value={fmtDate(detail.employee.hire_date)} />
                 <DetailRow label="Contract" value={detail.employee.contract_signed ? `Signed · ${fmtDate(detail.employee.contract_signed_at)}` : 'Not signed'} />
                 <DetailRow label="TD1 Federal" value={detail.employee.td1_federal_data ? 'Filed' : 'Not filed'} />
                 <DetailRow label="TD1 Alberta" value={detail.employee.td1_ab_data ? 'Filed' : 'Not filed'} />
                 <DetailRow label="Acknowledgments" value={detail.employee.acknowledgments ? 'Signed' : 'Not signed'} />
-                <DetailRow label="Address" value={detail.employee.address || '—'} />
               </div>
               {!detail.employee.onboarding_completed_at && (
                 <button
@@ -490,7 +563,7 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
                   className="mt-3 w-full flex items-center justify-center gap-2 bg-[#f97316] text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 active:scale-95 transition-transform"
                 >
                   <Send size={14} />
-                  {resending ? 'Sending...' : 'Resend invite link'}
+                  {resending ? 'Sending...' : 'Resend invite (clears old account)'}
                 </button>
               )}
             </Section>
@@ -498,16 +571,16 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
             {/* Documents */}
             <Section title={`Documents (${detail.documents.length})`}>
               {detail.documents.length === 0 ? (
-                <p className="text-sm text-white/30">No documents uploaded.</p>
+                <p className="text-sm text-black/30">No documents uploaded.</p>
               ) : (
-                <div className="divide-y divide-white/[0.04]">
+                <div className="divide-y divide-black/[0.04]">
                   {detail.documents.map((doc) => (
                     <div key={doc.id} className="py-2 flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <FileText size={14} className="text-white/30" />
+                        <FileText size={14} className="text-black/30" />
                         <div>
-                          <div className="font-medium text-white/80">{doc.doc_type}</div>
-                          <div className="text-xs text-white/30">Uploaded {fmtDate(doc.created_at)}</div>
+                          <div className="font-medium text-black/80">{doc.doc_type}</div>
+                          <div className="text-xs text-black/30">Uploaded {fmtDate(doc.created_at)}</div>
                         </div>
                       </div>
                       {doc.file_url && (
@@ -522,19 +595,19 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
             {/* Recent sessions */}
             <Section title="Recent clock sessions">
               {detail.recent_sessions.length === 0 ? (
-                <p className="text-sm text-white/30">No sessions recorded.</p>
+                <p className="text-sm text-black/30">No sessions recorded.</p>
               ) : (
-                <div className="divide-y divide-white/[0.04]">
+                <div className="divide-y divide-black/[0.04]">
                   {detail.recent_sessions.slice(0, 8).map((s) => (
                     <div key={s.id} className="py-2 flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <Clock size={14} className="text-white/30" />
+                        <Clock size={14} className="text-black/30" />
                         <div>
-                          <div className="text-white/80">Booking #{s.booking_id?.slice(0, 8)}</div>
-                          <div className="text-xs text-white/30">{fmtDateTime(s.clock_in_at)} → {s.clock_out_at ? fmtDateTime(s.clock_out_at) : 'active'}</div>
+                          <div className="text-black/80">Booking #{s.booking_id?.slice(0, 8)}</div>
+                          <div className="text-xs text-black/30">{fmtDateTime(s.clock_in_at)} → {s.clock_out_at ? fmtDateTime(s.clock_out_at) : 'active'}</div>
                         </div>
                       </div>
-                      <div className="text-white/70 font-medium tabular-nums">{fmtMins(s.duration_minutes)}</div>
+                      <div className="text-black/70 font-medium tabular-nums">{fmtMins(s.duration_minutes)}</div>
                     </div>
                   ))}
                 </div>
@@ -544,16 +617,16 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
             {/* Assignments */}
             <Section title="Crew assignments">
               {detail.assignments.length === 0 ? (
-                <p className="text-sm text-white/30">No assignments.</p>
+                <p className="text-sm text-black/30">No assignments.</p>
               ) : (
-                <div className="divide-y divide-white/[0.04]">
+                <div className="divide-y divide-black/[0.04]">
                   {detail.assignments.slice(0, 8).map((a) => (
                     <div key={a.id} className="py-2 flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <Truck size={14} className="text-white/30" />
+                        <Truck size={14} className="text-black/30" />
                         <div>
-                          <div className="text-white/80">{formatDateLong(a.assignment_date)}</div>
-                          <div className="text-xs text-white/30">{a.driver_employee_id === id ? 'Driver' : 'Secondary'}{a.uhaul_location ? ` · U-Haul: ${a.uhaul_location}` : ''}</div>
+                          <div className="text-black/80">{formatDateLong(a.assignment_date)}</div>
+                          <div className="text-xs text-black/30">{a.driver_employee_id === id ? 'Driver' : 'Secondary'}{a.uhaul_location ? ` · U-Haul: ${a.uhaul_location}` : ''}</div>
                         </div>
                       </div>
                     </div>
@@ -562,25 +635,9 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
               )}
             </Section>
 
-            {/* Admin controls */}
-            <Section title="Admin controls">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                <Field label="Pay rate ($/hr)">
-                  <input type="number" step="0.25" value={payRate} onChange={(e) => setPayRate(e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
-                </Field>
-                <Field label="Status">
-                  <select value={status} onChange={(e) => setStatus(e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT}>
-                    <option value="pending">Pending</option>
-                    <option value="active">Active</option>
-                    <option value="onboarded">Onboarded</option>
-                    <option value="terminated">Terminated</option>
-                  </select>
-                </Field>
-                <button onClick={save} disabled={saving} className="bg-[#f97316] text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 active:scale-95 transition-transform">
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-              <button onClick={terminate} className="mt-3 text-sm text-[#EF4444] font-semibold underline">Terminate employee</button>
+            {/* Danger zone */}
+            <Section title="Danger zone">
+              <button onClick={terminate} className="text-sm text-[#EF4444] font-semibold underline">Terminate employee</button>
             </Section>
           </div>
         ) : (
@@ -593,8 +650,8 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
 
 function Section({ title, children }) {
   return (
-    <div className="bg-white/[0.03] rounded-xl border border-white/[0.04] p-4">
-      <div className="font-semibold text-white/80 text-sm mb-2">{title}</div>
+    <div className="bg-black/[0.03] rounded-xl border border-black/[0.04] p-4">
+      <div className="font-semibold text-black/80 text-sm mb-2">{title}</div>
       {children}
     </div>
   );
@@ -603,8 +660,8 @@ function Section({ title, children }) {
 function DetailRow({ label, value }) {
   return (
     <div>
-      <div className="text-xs text-white/30">{label}</div>
-      <div className="text-white/80">{value}</div>
+      <div className="text-xs text-black/30">{label}</div>
+      <div className="text-black/80">{value}</div>
     </div>
   );
 }
@@ -643,11 +700,11 @@ function AssignmentsSection({ assignments, activeEmployees, onCreated, flash }) 
 
   return (
     <div className={CARD + ' overflow-hidden'}>
-      <div className="px-4 py-3 border-b border-white/[0.06] font-semibold text-white flex items-center gap-2">
+      <div className="px-4 py-3 border-b border-black/[0.06] font-semibold text-[#1a1a1a] flex items-center gap-2">
         <Truck size={16} className="text-[#f97316]" /> Crew assignments
       </div>
 
-      <form onSubmit={create} className="p-4 border-b border-white/[0.06] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+      <form onSubmit={create} className="p-4 border-b border-black/[0.06] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
         <Field label="Date">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={'w-full px-3 py-2 text-sm ' + INPUT} />
         </Field>
@@ -673,17 +730,17 @@ function AssignmentsSection({ assignments, activeEmployees, onCreated, flash }) 
         </div>
       </form>
 
-      <div className="divide-y divide-white/[0.04]">
+      <div className="divide-y divide-black/[0.04]">
         {upcoming.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-white/30">No upcoming assignments.</p>
+          <p className="px-4 py-6 text-center text-sm text-black/30">No upcoming assignments.</p>
         ) : (
           upcoming.map((a) => (
             <div key={a.id} className="px-4 py-3 flex items-center gap-3 text-sm">
-              <div className="w-28 font-medium text-white tabular-nums">{formatDateLong(a.assignment_date)}</div>
+              <div className="w-28 font-medium text-[#1a1a1a] tabular-nums">{formatDateLong(a.assignment_date)}</div>
               <div className="flex-1 min-w-0">
-                <div className="text-white/80"><span className="text-xs text-white/30">Driver:</span> {nameOf(a.driver)}</div>
-                {a.secondary && <div className="text-white/60 text-xs"><span className="text-white/30">Secondary:</span> {nameOf(a.secondary)}</div>}
-                {a.uhaul_location && <div className="text-white/40 text-xs">U-Haul: {a.uhaul_location}</div>}
+                <div className="text-black/80"><span className="text-xs text-black/30">Driver:</span> {nameOf(a.driver)}</div>
+                {a.secondary && <div className="text-black/60 text-xs"><span className="text-black/30">Secondary:</span> {nameOf(a.secondary)}</div>}
+                {a.uhaul_location && <div className="text-black/40 text-xs">U-Haul: {a.uhaul_location}</div>}
               </div>
             </div>
           ))
@@ -719,13 +776,13 @@ function StorageSection({ facilities, onSaved, flash }) {
 
   return (
     <div className={CARD + ' overflow-hidden'}>
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-        <span className="font-semibold text-white flex items-center gap-2"><Warehouse size={16} className="text-[#f97316]" /> Storage facilities</span>
+      <div className="px-4 py-3 border-b border-black/[0.06] flex items-center justify-between">
+        <span className="font-semibold text-[#1a1a1a] flex items-center gap-2"><Warehouse size={16} className="text-[#f97316]" /> Storage facilities</span>
         <button onClick={() => { reset(); setOpen((o) => !o); }} className="text-sm text-[#f97316] font-semibold">{open ? 'Cancel' : '+ Add'}</button>
       </div>
 
       {open && (
-        <form onSubmit={submit} className="p-4 border-b border-white/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form onSubmit={submit} className="p-4 border-b border-black/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name" required><input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
           <Field label="Address" required><AddressAutocomplete value={form.address} onChange={(v) => setForm((p) => ({ ...p, address: v }))} onSelect={(f) => setForm((p) => ({ ...p, address: f.place_name }))} placeholder="Storage facility address" dark /></Field>
           <Field label="Access code"><input value={form.access_code} onChange={(e) => setForm((p) => ({ ...p, access_code: e.target.value }))} className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
@@ -736,17 +793,17 @@ function StorageSection({ facilities, onSaved, flash }) {
         </form>
       )}
 
-      <div className="divide-y divide-white/[0.04]">
+      <div className="divide-y divide-black/[0.04]">
         {facilities.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-white/30">No storage facilities.</p>
+          <p className="px-4 py-6 text-center text-sm text-black/30">No storage facilities.</p>
         ) : (
           facilities.map((f) => (
-            <button key={f.id} onClick={() => edit(f)} className="w-full text-left px-4 py-3 hover:bg-white/[0.03] flex items-center gap-3 text-sm transition-colors">
+            <button key={f.id} onClick={() => edit(f)} className="w-full text-left px-4 py-3 hover:bg-black/[0.03] flex items-center gap-3 text-sm transition-colors">
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-white truncate">{f.name}</div>
-                <div className="text-xs text-white/40 truncate">{f.address}</div>
+                <div className="font-medium text-[#1a1a1a] truncate">{f.name}</div>
+                <div className="text-xs text-black/40 truncate">{f.address}</div>
               </div>
-              <div className="text-right text-xs text-white/30">
+              <div className="text-right text-xs text-black/30">
                 {f.access_code && <div>Code: {f.access_code}</div>}
                 {f.capacity_sqft != null && <div className="tabular-nums">{f.capacity_sqft} sqft</div>}
               </div>
@@ -784,13 +841,13 @@ function DonationSection({ centers, onSaved, flash }) {
 
   return (
     <div className={CARD + ' overflow-hidden'}>
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-        <span className="font-semibold text-white flex items-center gap-2"><Heart size={16} className="text-[#f97316]" /> Donation centers</span>
+      <div className="px-4 py-3 border-b border-black/[0.06] flex items-center justify-between">
+        <span className="font-semibold text-[#1a1a1a] flex items-center gap-2"><Heart size={16} className="text-[#f97316]" /> Donation centers</span>
         <button onClick={() => { reset(); setOpen((o) => !o); }} className="text-sm text-[#f97316] font-semibold">{open ? 'Cancel' : '+ Add'}</button>
       </div>
 
       {open && (
-        <form onSubmit={submit} className="p-4 border-b border-white/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form onSubmit={submit} className="p-4 border-b border-black/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name" required><input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
           <Field label="Address" required><AddressAutocomplete value={form.address} onChange={(v) => setForm((p) => ({ ...p, address: v }))} onSelect={(f) => setForm((p) => ({ ...p, address: f.place_name }))} placeholder="Donation center address" dark /></Field>
           <Field label="Phone"><input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} className={'w-full px-3 py-2 text-sm ' + INPUT} /></Field>
@@ -802,18 +859,18 @@ function DonationSection({ centers, onSaved, flash }) {
         </form>
       )}
 
-      <div className="divide-y divide-white/[0.04]">
+      <div className="divide-y divide-black/[0.04]">
         {centers.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-white/30">No donation centers.</p>
+          <p className="px-4 py-6 text-center text-sm text-black/30">No donation centers.</p>
         ) : (
           centers.map((c) => (
-            <button key={c.id} onClick={() => edit(c)} className="w-full text-left px-4 py-3 hover:bg-white/[0.03] flex items-center gap-3 text-sm transition-colors">
+            <button key={c.id} onClick={() => edit(c)} className="w-full text-left px-4 py-3 hover:bg-black/[0.03] flex items-center gap-3 text-sm transition-colors">
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-white truncate">{c.name}</div>
-                <div className="text-xs text-white/40 truncate">{c.address}</div>
-                {c.accepted_items && <div className="text-xs text-white/30 truncate">Accepts: {c.accepted_items}</div>}
+                <div className="font-medium text-[#1a1a1a] truncate">{c.name}</div>
+                <div className="text-xs text-black/40 truncate">{c.address}</div>
+                {c.accepted_items && <div className="text-xs text-black/30 truncate">Accepts: {c.accepted_items}</div>}
               </div>
-              <div className="text-right text-xs text-white/30">
+              <div className="text-right text-xs text-black/30">
                 {c.phone && <div>{c.phone}</div>}
                 {c.hours && <div>{c.hours}</div>}
               </div>
@@ -855,26 +912,26 @@ function BroadcastSection({ flash }) {
   return (
     <div className={CARD + ' p-4'}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between">
-        <span className="font-bold text-white text-sm flex items-center gap-2"><Radio size={18} className="text-[#f97316]" /> Broadcast Message</span>
-        <span className="text-white/40 text-xs">{open ? '−' : '+'}</span>
+        <span className="font-bold text-[#1a1a1a] text-sm flex items-center gap-2"><Radio size={18} className="text-[#f97316]" /> Broadcast Message</span>
+        <span className="text-black/40 text-xs">{open ? '−' : '+'}</span>
       </button>
 
       {open && (
         <form onSubmit={send} className="mt-4 space-y-3">
-          <div className="text-xs text-white/30">Send a push notification to crew members&apos; phones.</div>
+          <div className="text-xs text-black/30">Send a push notification to crew members&apos; phones.</div>
           <div>
-            <label className="block text-xs font-medium text-white/50 mb-1">Send to</label>
+            <label className="block text-xs font-medium text-black/50 mb-1">Send to</label>
             <select value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })} className={'w-full px-3 py-2 text-sm ' + INPUT}>
               <option value="all">All crew members</option>
               {employees.map((emp) => (<option key={emp.id} value={emp.id}>{emp.name} {emp.push_subscriptions > 0 ? `(${emp.push_subscriptions} device)` : '(no device)'}</option>))}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-white/50 mb-1">Title</label>
+            <label className="block text-xs font-medium text-black/50 mb-1">Title</label>
             <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Schedule update" required className={'w-full px-3 py-2 text-sm ' + INPUT} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-white/50 mb-1">Message</label>
+            <label className="block text-xs font-medium text-black/50 mb-1">Message</label>
             <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Type your message..." required rows={3} className={'w-full px-3 py-2 text-sm resize-none ' + INPUT} />
           </div>
           <button type="submit" disabled={sending} className="w-full bg-[#f97316] text-white font-semibold py-2.5 rounded-lg text-sm disabled:opacity-50 active:scale-95 transition-transform">

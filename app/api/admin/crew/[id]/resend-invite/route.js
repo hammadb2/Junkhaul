@@ -77,8 +77,8 @@ ${bodyHTML}
 }
 
 // POST /api/admin/crew/[id]/resend-invite
-// Resends onboarding invite to an existing employee who hasn't completed onboarding.
-// Generates a fresh token and expiry, updates the existing invite record.
+// Resends onboarding invite. If the employee started but didn't finish onboarding,
+// deletes the incomplete employee record so they can start fresh with the new invite.
 export async function POST(req, { params }) {
   if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -98,15 +98,35 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: 'This employee has already completed onboarding' }, { status: 400 });
   }
 
+  // Delete the incomplete employee record so they can sign up fresh with the new invite.
+  // This clears the "account already exists" error when they try to accept the new invite.
+  // We keep the invite record but reset it to pending.
+  await supabaseAdmin.from('employee_documents').delete().eq('employee_id', id);
+  await supabaseAdmin.from('employee_sessions').delete().eq('employee_id', id);
+  await supabaseAdmin.from('job_clock_sessions').delete().eq('employee_id', id);
+  await supabaseAdmin.from('employees').delete().eq('id', id);
+
+  // Also check for any OTHER employee records with the same email (partial signups via /api/employee/signup)
+  const { data: dupes } = await supabaseAdmin
+    .from('employees')
+    .select('id')
+    .eq('email', employee.email);
+  for (const d of dupes || []) {
+    await supabaseAdmin.from('employee_documents').delete().eq('employee_id', d.id);
+    await supabaseAdmin.from('employee_sessions').delete().eq('employee_id', d.id);
+    await supabaseAdmin.from('job_clock_sessions').delete().eq('employee_id', d.id);
+    await supabaseAdmin.from('employees').delete().eq('id', d.id);
+  }
+
   const token = randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 864e5).toISOString();
 
   let invite;
   if (employee.invite_id) {
-    // Update existing invite with fresh token
+    // Reset existing invite with fresh token
     const { data, error } = await supabaseAdmin
       .from('employee_invites')
-      .update({ token, expires_at: expiresAt, status: 'pending' })
+      .update({ token, expires_at: expiresAt, status: 'pending', accepted_at: null })
       .eq('id', employee.invite_id)
       .select()
       .single();
@@ -130,9 +150,6 @@ export async function POST(req, { params }) {
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     invite = data;
-
-    // Link invite to employee
-    await supabaseAdmin.from('employees').update({ invite_id: invite.id }).eq('id', id);
   }
 
   // Send the email
