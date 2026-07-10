@@ -1,97 +1,30 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
-import Webcam from 'react-webcam';
+import { useRef, useState } from 'react';
 
 // ============================================================
-// SelfieCapture — proper selfie capture using front camera.
-// Shows a face guide overlay, captures at high quality.
-// Falls back to file upload if camera not available.
+// SelfieCapture — simple file upload. Admin reviews later.
 // ============================================================
-
-const videoConstraints = {
-  facingMode: { ideal: 'user' },
-  width: { ideal: 1280 },
-  height: { ideal: 1280 },
-};
 
 export default function SelfieCapture({ onCapture, uploaded, previewUrl, uploading }) {
-  const [mode, setMode] = useState('idle'); // idle | camera | captured | fallback
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const [capturedImg, setCapturedImg] = useState(null);
-  const webcamRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [dragOver, setDragOver] = useState(false);
 
-  useEffect(() => {
-    return () => { /* cleanup */ };
-  }, []);
-
-  const handleCameraReady = useCallback(() => {
-    setCameraReady(true);
-  }, []);
-
-  const handleCameraError = useCallback((err) => {
-    console.warn('Selfie camera error:', err);
-    setCameraError('Camera not available. You can upload a photo instead.');
-    setMode('fallback');
-  }, []);
-
-  const capture = useCallback(() => {
-    if (!webcamRef.current) return;
-    const imageSrc = webcamRef.current.getScreenshot({
-      width: 720,
-      height: 720,
-    });
-    if (imageSrc) {
-      setCapturedImg(imageSrc);
-      setMode('captured');
-    }
-  }, []);
-
-  const confirmCapture = async () => {
-    const img = new Image();
-    img.src = capturedImg;
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    // Reverse the front-camera capture so saved selfie has natural orientation.
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(img, 0, 0);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
-    if (!blob) return;
-    const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
-    await onCapture(file);
-    setMode('idle');
-    setCapturedImg(null);
-  };
-
-  const retakeCapture = () => {
-    setCapturedImg(null);
-    setMode('camera');
-    setCameraReady(false);
-  };
-
-  const handleFileUpload = (e) => {
+  const handleFile = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      onCapture(file);
-      setMode('idle');
-    }
+    if (file) onCapture(file);
   };
 
-  // Already uploaded — show preview
-  if (uploaded && mode === 'idle') {
+  // Already uploaded
+  if (uploaded) {
     return (
       <div className="dark-card" style={{ padding: 16, borderRadius: 16, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.05)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {previewUrl ? (
+          {uploading ? (
+            <div style={{ width: 56, height: 56, borderRadius: 28, background: '#F0F0F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 28, height: 28, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : previewUrl ? (
             <img src={previewUrl} alt="Selfie" style={{ width: 56, height: 56, borderRadius: 28, objectFit: 'cover', border: '2px solid #22C55E' }} />
           ) : (
             <div style={{ width: 56, height: 56, borderRadius: 28, background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -106,166 +39,57 @@ export default function SelfieCapture({ onCapture, uploaded, previewUrl, uploadi
           </div>
           {!uploading && (
             <button
-              onClick={() => setMode('camera')}
+              onClick={() => fileInputRef.current?.click()}
               style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 13, cursor: 'pointer', padding: '8px 12px', minHeight: 36 }}
             >
-              Retake
+              Replace
             </button>
           )}
         </div>
+        <input ref={fileInputRef} type="file" accept="image/*" capture="user" style={{ display: 'none' }} onChange={handleFile} />
       </div>
     );
   }
 
-  // Captured — show preview
-  if (mode === 'captured' && capturedImg) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#000', aspectRatio: '1' }}>
-          <img src={capturedImg} alt="Selfie preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={retakeCapture}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
-          >
-            Retake
-          </button>
-          <button
-            onClick={confirmCapture}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: 'none', background: '#f97316', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
-          >
-            Use Photo
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Camera mode — front camera with face guide
-  if (mode === 'camera') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#000', aspectRatio: '1' }}>
-          <Webcam
-            ref={webcamRef}
-            audio={false}
-            screenshotFormat="image/jpeg"
-            screenshotQuality={0.92}
-            videoConstraints={videoConstraints}
-            onUserMedia={handleCameraReady}
-            onUserMediaError={handleCameraError}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-            mirrored={false}
-          />
-
-          {/* Face guide overlay — proper circle */}
-          {cameraReady && (
-            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{
-                width: '65%',
-                aspectRatio: '1',
-                border: '3px dashed rgba(255,255,255,0.5)',
-                borderRadius: '50%',
-                boxShadow: '0 0 0 9999px rgba(0,0,0,0.3)',
-              }} />
-            </div>
-          )}
-
-          {/* Label */}
-          <div style={{ position: 'absolute', bottom: 12, left: 0, right: 0, textAlign: 'center' }}>
-            <span style={{ background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 13, fontWeight: 500, padding: '4px 12px', borderRadius: 20 }}>
-              Center your face in the circle
-            </span>
-          </div>
-        </div>
-
-        {cameraError && (
-          <div style={{ fontSize: 13, color: '#ea580c', textAlign: 'center' }}>{cameraError}</div>
-        )}
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setMode('fallback')}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 48 }}
-          >
-            Upload Instead
-          </button>
-          <button
-            onClick={capture}
-            disabled={!cameraReady}
-            style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: 'none', background: cameraReady ? '#f97316' : '#ccc', color: 'white', fontSize: 14, fontWeight: 600, cursor: cameraReady ? 'pointer' : 'not-allowed', minHeight: 48 }}
-          >
-            Capture
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback — file upload
-  if (mode === 'fallback') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="dark-card"
-          style={{ padding: 24, borderRadius: 16, border: '2px dashed rgba(0,0,0,.15)', background: '#F0F0F2', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}
-        >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-            <circle cx="12" cy="13" r="4"></circle>
-          </svg>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>Upload Selfie</span>
-          <span style={{ fontSize: 12, color: 'rgba(0,0,0,.4)' }}>Take a selfie or choose from gallery</span>
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          capture="user"
-          style={{ display: 'none' }}
-          onChange={handleFileUpload}
-        />
-        <button
-          onClick={() => setMode('camera')}
-          style={{ background: 'transparent', border: 'none', color: '#f97316', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
-        >
-          ← Try camera again
-        </button>
-      </div>
-    );
-  }
-
-  // Idle — initial state
+  // Not uploaded — upload card
   return (
-    <div className="dark-card" style={{ padding: 16, borderRadius: 16, border: '1px solid rgba(0,0,0,.06)', background: '#fff' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <div style={{ width: 48, height: 48, borderRadius: 24, background: '#F0F0F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-            <circle cx="12" cy="13" r="4"></circle>
-          </svg>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>Crew selfie</div>
-          <div style={{ fontSize: 13, color: 'rgba(0,0,0,.4)' }}>Tap to take a selfie</div>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={() => setMode('camera')}
-          style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: 'none', background: '#f97316', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 46 }}
-        >
-          Take Selfie
-        </button>
-        <button
-          onClick={() => setMode('fallback')}
-          style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid rgba(0,0,0,.1)', background: '#F0F0F2', color: '#1a1a1a', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 46 }}
-        >
-          Upload File
-        </button>
-      </div>
+    <div
+      className="dark-card"
+      style={{
+        padding: 20,
+        borderRadius: 16,
+        border: dragOver ? '2px dashed #f97316' : '2px dashed rgba(0,0,0,.12)',
+        background: dragOver ? 'rgba(249,115,22,0.04)' : '#F0F0F2',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 8,
+        transition: 'border-color 0.2s, background 0.2s',
+      }}
+      onClick={() => fileInputRef.current?.click()}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) onCapture(file);
+      }}
+    >
+      {uploading ? (
+        <div style={{ width: 36, height: 36, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      ) : (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+      )}
+      <span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>{uploading ? 'Uploading...' : 'Upload selfie'}</span>
+      <span style={{ fontSize: 12, color: 'rgba(0,0,0,.4)', textAlign: 'center' }}>
+        Tap to choose a photo of yourself from your device
+      </span>
+      <input ref={fileInputRef} type="file" accept="image/*" capture="user" style={{ display: 'none' }} onChange={handleFile} />
     </div>
   );
 }

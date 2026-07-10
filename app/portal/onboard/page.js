@@ -634,12 +634,11 @@ function OnboardInner() {
     return (
       <Shell>
         <StepShell onBack={() => setStep(1)}>
-          <Headline title="Your documents" subtitle="Scan or upload your photo ID and selfie" />
+          <Headline title="Your documents" subtitle="Upload your photo ID and selfie" />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
             <DocumentScanner
               label="SIN document"
-              docType="sin_document"
               uploaded={docStatus.sin_document === 'uploaded'}
               uploading={uploading === 'sin_document'}
               onCapture={async (file) => {
@@ -649,7 +648,6 @@ function OnboardInner() {
             />
             <DocumentScanner
               label="Driver's license — front"
-              docType="drivers_license_front"
               uploaded={docStatus.drivers_license_front === 'uploaded'}
               uploading={uploading === 'drivers_license_front'}
               onCapture={async (file) => {
@@ -659,18 +657,11 @@ function OnboardInner() {
             />
             <DocumentScanner
               label="Driver's license — back"
-              docType="drivers_license_back"
               uploaded={docStatus.drivers_license_back === 'uploaded'}
               uploading={uploading === 'drivers_license_back'}
               onCapture={async (file) => {
                 setLicenseBack(file);
                 await handleUpload('drivers_license_back', file, "Driver's license — back");
-              }}
-              onBarcodeData={(data) => {
-                // Store extracted license data for onboarding completion
-                if (data && Object.keys(data).length > 0) {
-                  setLicenseData(data);
-                }
               }}
             />
             <SelfieCapture
