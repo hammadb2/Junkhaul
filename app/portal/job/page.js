@@ -23,7 +23,7 @@ const FUEL_LEVELS = ['Empty', '1/4', '1/2', '3/4', 'Full'];
 
 export default function JobFlowPage() {
   return (
-    <Suspense fallback={<div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0B', color: 'rgba(255,255,255,0.4)' }}>Loading...</div>}>
+    <Suspense fallback={<div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FAFAFA', color: 'rgba(0,0,0,.4)' }}>Loading...</div>}>
       <JobFlowInner />
     </Suspense>
   );
@@ -300,15 +300,15 @@ function JobFlowInner() {
 
   // ---------- Render ----------
   if (loading) {
-    return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0B', color: 'rgba(255,255,255,0.4)' }}>Loading...</div>;
+    return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FAFAFA', color: 'rgba(0,0,0,.4)' }}>Loading...</div>;
   }
 
   if (!booking) {
     return (
-      <main style={{ minHeight: '100dvh', background: '#0A0A0B' }} className="safe-top">
+      <main style={{ minHeight: '100dvh', background: '#FAFAFA' }} className="safe-top">
         <div style={{ maxWidth: 448, margin: '0 auto', padding: 24 }}>
           <div className="dark-card" style={{ padding: 24, textAlign: 'center' }}>
-            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginBottom: 16 }}>Job not found.</div>
+            <div style={{ color: 'rgba(0,0,0,.6)', fontSize: 14, marginBottom: 16 }}>Job not found.</div>
             <button onClick={() => router.push('/portal/schedule')} className="btn-primary" style={{ minHeight: 48, width: '100%' }}>Back to schedule</button>
           </div>
         </div>
@@ -339,30 +339,30 @@ function JobFlowInner() {
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setShowIssueForm(false)}>
         <div className="dark-card slide-up" style={{ width: '100%', maxWidth: 448, borderRadius: '20px 20px 0 0', padding: 24, maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Flag size={20} color="#f97316" /> Flag an Issue
             </div>
-            <button onClick={() => setShowIssueForm(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            <button onClick={() => setShowIssueForm(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 20, cursor: 'pointer' }}>✕</button>
           </div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>Report a problem with this job. Your supervisor will be notified immediately.</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>Type</div>
+          <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginBottom: 16 }}>Report a problem with this job. Your supervisor will be notified immediately.</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(0,0,0,.6)', marginBottom: 8 }}>Type</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
             {ISSUE_TYPES.map((t) => (
-              <button key={t.value} onClick={() => setIssueType(t.value)} className="dark-card" style={{ padding: 10, textAlign: 'center', cursor: 'pointer', border: issueType === t.value ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.06)', background: issueType === t.value ? 'rgba(249,115,22,0.08)' : '#161618' }}>
+              <button key={t.value} onClick={() => setIssueType(t.value)} className="dark-card" style={{ padding: 10, textAlign: 'center', cursor: 'pointer', border: issueType === t.value ? '2px solid #f97316' : '1px solid rgba(0,0,0,.06)', background: issueType === t.value ? 'rgba(249,115,22,0.08)' : '#fff' }}>
                 <div style={{ fontSize: 20 }}>{t.icon}</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: issueType === t.value ? '#f97316' : 'rgba(255,255,255,0.7)', marginTop: 4 }}>{t.label}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: issueType === t.value ? '#f97316' : 'rgba(0,0,0,.6)', marginTop: 4 }}>{t.label}</div>
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>Severity</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(0,0,0,.6)', marginBottom: 8 }}>Severity</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             {SEVS.map((s) => (
-              <button key={s.value} onClick={() => setIssueSeverity(s.value)} className="dark-card" style={{ flex: 1, padding: '10px 8px', textAlign: 'center', cursor: 'pointer', border: issueSeverity === s.value ? `2px solid ${s.color}` : '1px solid rgba(255,255,255,0.06)', background: issueSeverity === s.value ? `${s.color}15` : '#161618' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: issueSeverity === s.value ? s.color : 'rgba(255,255,255,0.7)' }}>{s.label}</div>
+              <button key={s.value} onClick={() => setIssueSeverity(s.value)} className="dark-card" style={{ flex: 1, padding: '10px 8px', textAlign: 'center', cursor: 'pointer', border: issueSeverity === s.value ? `2px solid ${s.color}` : '1px solid rgba(0,0,0,.06)', background: issueSeverity === s.value ? `${s.color}15` : '#fff' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: issueSeverity === s.value ? s.color : 'rgba(0,0,0,.6)' }}>{s.label}</div>
               </button>
             ))}
           </div>
-          <textarea value={issueDesc} onChange={(e) => setIssueDesc(e.target.value)} placeholder="Describe the issue..." rows={3} className="dark-input" style={{ width: '100%', padding: '12px 16px', fontSize: 14, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, resize: 'none', marginBottom: 16 }} />
+          <textarea value={issueDesc} onChange={(e) => setIssueDesc(e.target.value)} placeholder="Describe the issue..." rows={3} className="dark-input" style={{ width: '100%', padding: '12px 16px', fontSize: 14, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12, resize: 'none', marginBottom: 16 }} />
           <button
             onClick={async () => {
               setIssueSubmitting(true);
@@ -387,7 +387,7 @@ function JobFlowInner() {
 
   // Shared components
   const PageShell = ({ children, onBack }) => (
-    <main style={{ minHeight: '100dvh', background: '#0A0A0B' }} className="safe-top safe-bottom">
+    <main style={{ minHeight: '100dvh', background: '#FAFAFA' }} className="safe-top safe-bottom">
       {!eod && !checkParam && (
         <div className="progress-line" style={{ borderRadius: 0 }}>
           <div className="progress-line-fill" style={{ width: `${(stepIdx / (STEPS.length - 1)) * 100}%` }} />
@@ -395,11 +395,11 @@ function JobFlowInner() {
       )}
       {onBack && (
         <button onClick={onBack} className="glass-btn" style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, zIndex: 20, width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ArrowLeft size={20} color="rgba(255,255,255,0.7)" />
+          <ArrowLeft size={20} color="rgba(0,0,0,.6)" />
         </button>
       )}
       <button onClick={() => setShowIssueForm(true)} className="glass-btn" style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, zIndex: 20, width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Flag issue">
-        <Flag size={20} color="rgba(255,255,255,0.5)" />
+        <Flag size={20} color="rgba(0,0,0,.5)" />
       </button>
       <div style={{ maxWidth: 448, margin: '0 auto', padding: '24px', paddingBottom: 80 }}>
         {children}
@@ -410,8 +410,8 @@ function JobFlowInner() {
 
   const Headline = ({ title, subtitle }) => (
     <div style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{subtitle}</div>}
+      <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a1a' }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 16, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>{subtitle}</div>}
     </div>
   );
 
@@ -421,10 +421,10 @@ function JobFlowInner() {
         <MapPin size={20} color="#f97316" />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.name}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.address || 'No address'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
-          {booking.time_slot} · <span className="tabular" style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>${Number(booking.total_price || 0).toFixed(2)}</span>
+        <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.name}</div>
+        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{booking.address || 'No address'}</div>
+        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 2 }}>
+          {booking.time_slot} · <span className="tabular" style={{ fontWeight: 600, color: '#1a1a1a' }}>${Number(booking.total_price || 0).toFixed(2)}</span>
         </div>
       </div>
     </div>
@@ -446,7 +446,7 @@ function JobFlowInner() {
     <div className="fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(10,10,11,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ textAlign: 'center' }}>
         <CheckCircle size={64} color="#22C55E" className="celebrate" />
-        <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginTop: 16 }}>{confirmMsg}</div>
+        <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a1a', marginTop: 16 }}>{confirmMsg}</div>
       </div>
     </div>
   ) : null;
@@ -459,9 +459,9 @@ function JobFlowInner() {
         <Headline title="On your way" subtitle="Let the customer know you're coming" />
         {items.length > 0 && (
           <div className="dark-card" style={{ padding: 16, marginBottom: 20 }}>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>Items to pick up ({items.length})</div>
+            <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 8 }}>Items to pick up ({items.length})</div>
             {items.map((it, i) => (
-              <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', padding: '4px 0' }}>
+              <div key={i} style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', padding: '4px 0' }}>
                 {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`}
               </div>
             ))}
@@ -481,14 +481,14 @@ function JobFlowInner() {
         <BookingCard />
         <Headline title="You've arrived" subtitle="Verify the load size" />
         <div className="dark-card" style={{ padding: 20, marginBottom: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Load size</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginTop: 4 }}>{booking.load_size || 'Standard'}</div>
+          <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Load size</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', marginTop: 4 }}>{booking.load_size || 'Standard'}</div>
         </div>
         {items.length > 0 && (
           <div className="dark-card" style={{ padding: 16, marginBottom: 20 }}>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>Verify items</div>
+            <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 8 }}>Verify items</div>
             {items.map((it, i) => (
-              <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', padding: '4px 0' }}>
+              <div key={i} style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', padding: '4px 0' }}>
                 {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`}
               </div>
             ))}
@@ -516,18 +516,18 @@ function JobFlowInner() {
               key={key}
               onClick={() => setPaymentMethod(key)}
               className="dark-card"
-              style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', border: paymentMethod === key ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.06)', background: paymentMethod === key ? 'rgba(249,115,22,0.05)' : '#161618', borderRadius: 16 }}
+              style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', border: paymentMethod === key ? '2px solid #f97316' : '1px solid rgba(0,0,0,.06)', background: paymentMethod === key ? 'rgba(249,115,22,0.05)' : '#fff', borderRadius: 16 }}
             >
-              <Icon size={28} color={paymentMethod === key ? '#f97316' : 'rgba(255,255,255,0.6)'} />
-              <span style={{ fontSize: 16, fontWeight: 600, color: paymentMethod === key ? '#f97316' : 'rgba(255,255,255,0.9)' }}>{label}</span>
+              <Icon size={28} color={paymentMethod === key ? '#f97316' : 'rgba(0,0,0,.6)'} />
+              <span style={{ fontSize: 16, fontWeight: 600, color: paymentMethod === key ? '#f97316' : '#1a1a1a' }}>{label}</span>
             </button>
           ))}
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Amount confirmed ($)</label>
-          <input type="number" step="0.01" value={amountConfirmed} onChange={(e) => setAmountConfirmed(e.target.value)} placeholder={Number(booking.total_price || 0).toFixed(2)} className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+          <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Amount confirmed ($)</label>
+          <input type="number" step="0.01" value={amountConfirmed} onChange={(e) => setAmountConfirmed(e.target.value)} placeholder={Number(booking.total_price || 0).toFixed(2)} className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 20, fontWeight: 600, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }} />
         </div>
-        <button onClick={() => { setError(''); fetch('/api/crew/resend-payment-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking_id: bookingId }) }).then(() => showConfirm('Link sent')).catch(() => {}); }} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, padding: '8px 0', marginBottom: 16, cursor: 'pointer' }}>
+        <button onClick={() => { setError(''); fetch('/api/crew/resend-payment-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking_id: bookingId }) }).then(() => showConfirm('Link sent')).catch(() => {}); }} style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 13, padding: '8px 0', marginBottom: 16, cursor: 'pointer' }}>
           Resend payment link
         </button>
         <ErrorBanner />
@@ -553,12 +553,12 @@ function JobFlowInner() {
                   key={i}
                   onClick={() => setCheckedItems((p) => ({ ...p, [i]: !p[i] }))}
                   className="dark-card"
-                  style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', border: checked ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.06)', background: checked ? 'rgba(34,197,94,0.05)' : '#161618', borderRadius: 14 }}
+                  style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', border: checked ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(0,0,0,.06)', background: checked ? 'rgba(34,197,94,0.05)' : '#fff', borderRadius: 14 }}
                 >
-                  <div style={{ width: 24, height: 24, borderRadius: 6, border: checked ? 'none' : '2px solid rgba(255,255,255,0.2)', background: checked ? '#22C55E' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 6, border: checked ? 'none' : '2px solid rgba(0,0,0,.15)', background: checked ? '#22C55E' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     {checked && <Check size={16} color="white" />}
                   </div>
-                  <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>{label}</span>
+                  <span style={{ fontSize: 14, color: '#1a1a1a' }}>{label}</span>
                 </button>
               );
             })}
@@ -580,28 +580,28 @@ function JobFlowInner() {
           {/* Landfill card */}
           <div className="dark-card" style={{ padding: 16 }}>
             <Trash2 size={24} color="#f97316" style={{ marginBottom: 8 }} />
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Landfill</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>Landfill</div>
             {landfill ? (
               <>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{landfill.name}</div>
-                {landfill.distance_km != null && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }} className="tabular">{landfill.distance_km} km</div>}
+                <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>{landfill.name}</div>
+                {landfill.distance_km != null && <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }} className="tabular">{landfill.distance_km} km</div>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E' }} />
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Open</span>
+                  <span style={{ fontSize: 12, color: 'rgba(0,0,0,.6)' }}>Open</span>
                 </div>
                 {landfill.lat && landfill.lng && (
                   <a href={`https://maps.google.com/?daddr=${landfill.lat},${landfill.lng}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#f97316', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>Directions <ChevronRight size={14} /></a>
                 )}
               </>
-            ) : <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Loading...</div>}
+            ) : <div style={{ fontSize: 13, color: 'rgba(0,0,0,.4)', marginTop: 4 }}>Loading...</div>}
           </div>
           {/* Storage card */}
           <div className="dark-card" style={{ padding: 16 }}>
-            <Warehouse size={24} color="rgba(255,255,255,0.6)" style={{ marginBottom: 8 }} />
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Storage</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>Drop for donation sorting</div>
+            <Warehouse size={24} color="rgba(0,0,0,.6)" style={{ marginBottom: 8 }} />
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>Storage</div>
+            <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>Drop for donation sorting</div>
             {storageFacilities.length > 0 && (
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{storageFacilities.length} facilities</div>
+              <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>{storageFacilities.length} facilities</div>
             )}
           </div>
         </div>
@@ -621,8 +621,8 @@ function JobFlowInner() {
         <BookingCard />
         <Headline title="Record your drop" subtitle="Photos and capacity check" />
         <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Storage facility</label>
-          <select value={selectedFacility} onChange={(e) => setSelectedFacility(e.target.value)} className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}>
+          <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Storage facility</label>
+          <select value={selectedFacility} onChange={(e) => setSelectedFacility(e.target.value)} className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }}>
             <option value="">Select facility...</option>
             {storageFacilities.map((f) => (
               <option key={f.id} value={f.id}>{f.name} ({f.current_usage_pct ?? '?'}% full)</option>
@@ -630,12 +630,12 @@ function JobFlowInner() {
           </select>
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Item photos</label>
+          <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Item photos</label>
           <label style={{ cursor: 'pointer' }}>
             <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={async (e) => { const files = Array.from(e.target.files || []); const urls = await Promise.all(files.map(fileToDataUrl)); setItemPhotos((prev) => [...prev, ...urls]); }} />
             <div className="dark-card" style={{ padding: 20, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <Camera size={24} color="#f97316" />
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>Take photos</span>
+              <span style={{ fontSize: 14, color: 'rgba(0,0,0,.6)' }}>Take photos</span>
             </div>
           </label>
           {itemPhotos.length > 0 && (
@@ -650,26 +650,26 @@ function JobFlowInner() {
           )}
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Capacity photo</label>
+          <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Capacity photo</label>
           <label style={{ cursor: 'pointer' }}>
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => setCapacityPhoto(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)} />
             <div className="dark-card" style={{ padding: 20, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <Camera size={24} color={capacityPhoto ? '#22C55E' : '#f97316'} />
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>{capacityPhoto ? 'Photo taken' : 'Take photo'}</span>
+              <span style={{ fontSize: 14, color: 'rgba(0,0,0,.6)' }}>{capacityPhoto ? 'Photo taken' : 'Take photo'}</span>
             </div>
           </label>
         </div>
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Capacity estimate (%)</label>
-          <input type="number" min="0" max="100" value={capacityPct} onChange={(e) => setCapacityPct(e.target.value)} placeholder="e.g. 65" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+          <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Capacity estimate (%)</label>
+          <input type="number" min="0" max="100" value={capacityPct} onChange={(e) => setCapacityPct(e.target.value)} placeholder="e.g. 65" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }} />
         </div>
         <ErrorBanner />
         <PrimaryBtn onClick={recordDrop} disabled={busy}>Record Drop</PrimaryBtn>
         <button onClick={skipDrop} className="btn-ghost" style={{ width: '100%', minHeight: 48, fontSize: 14, marginTop: 8 }}>No storage drop — landfill only</button>
         {landfill && (
           <div className="dark-card" style={{ padding: 16, marginTop: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Landfill</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{landfill.name} — {landfill.address}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>Landfill</div>
+            <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>{landfill.name} — {landfill.address}</div>
             {landfill.lat && landfill.lng && (
               <a href={`https://maps.google.com/?daddr=${landfill.lat},${landfill.lng}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#f97316', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>Directions <ChevronRight size={14} /></a>
             )}
@@ -685,13 +685,13 @@ function JobFlowInner() {
       <PageShell onBack={() => setStepIdx(5)}>
         <Headline title="Customer signature" subtitle="Have the customer sign below" />
         <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Customer name</label>
-          <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="Customer full name" className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+          <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Customer name</label>
+          <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="Customer full name" className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }} />
         </div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Crew: {emp?.name || ''}</div>
+        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.4)', marginBottom: 16 }}>Crew: {emp?.name || ''}</div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Amount confirmed ($)</label>
-          <input type="number" step="0.01" value={amountConfirmed} onChange={(e) => setAmountConfirmed(e.target.value)} placeholder={Number(booking.total_price || 0).toFixed(2)} className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+          <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Amount confirmed ($)</label>
+          <input type="number" step="0.01" value={amountConfirmed} onChange={(e) => setAmountConfirmed(e.target.value)} placeholder={Number(booking.total_price || 0).toFixed(2)} className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }} />
         </div>
         <div style={{ position: 'relative', marginBottom: 8 }}>
           <canvas
@@ -705,20 +705,20 @@ function JobFlowInner() {
             onMouseMove={draw}
             onMouseUp={endDraw}
             onMouseLeave={endDraw}
-            style={{ width: '100%', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, touchAction: 'none', aspectRatio: '2 / 1' }}
+            style={{ width: '100%', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12, touchAction: 'none', aspectRatio: '2 / 1' }}
           />
-          <button onClick={clearSig} style={{ position: 'absolute', top: 8, right: 8, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 4 }}>
+          <button onClick={clearSig} style={{ position: 'absolute', top: 8, right: 8, background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', cursor: 'pointer', padding: 4 }}>
             <Eraser size={18} />
           </button>
         </div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Draw signature above</div>
+        <div style={{ fontSize: 12, color: 'rgba(0,0,0,.4)', marginBottom: 16 }}>Draw signature above</div>
         <ErrorBanner />
         <PrimaryBtn onClick={completeJob} disabled={busy}>Complete Job</PrimaryBtn>
         {jobComplete && (
           <div className="fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(10,10,11,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
             <div style={{ textAlign: 'center' }}>
               <CheckCircle size={64} color="#22C55E" className="celebrate" />
-              <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginTop: 16 }}>Job complete!</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a1a', marginTop: 16 }}>Job complete!</div>
             </div>
           </div>
         )}
@@ -734,25 +734,25 @@ function JobFlowInner() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
           {/* Dashboard photo */}
           <div className="dark-card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Dashboard photo</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>Dashboard photo</div>
             <label style={{ cursor: 'pointer' }}>
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => setDashPhoto(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   {dashPhoto ? <img src={dashPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Camera size={20} color="#f97316" />}
                 </div>
-                <span style={{ fontSize: 14, color: dashPhoto ? '#22C55E' : 'rgba(255,255,255,0.6)' }}>{dashPhoto ? 'Photo taken' : 'Capture'}</span>
+                <span style={{ fontSize: 14, color: dashPhoto ? '#22C55E' : 'rgba(0,0,0,.6)' }}>{dashPhoto ? 'Photo taken' : 'Capture'}</span>
               </div>
             </label>
           </div>
           {/* Odometer */}
           <div className="dark-card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Odometer (km)</div>
-            <input type="number" value={odometer} onChange={(e) => setOdometer(e.target.value)} placeholder="e.g. 14250" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>Odometer (km)</div>
+            <input type="number" value={odometer} onChange={(e) => setOdometer(e.target.value)} placeholder="e.g. 14250" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }} />
           </div>
           {/* Fuel gauge */}
           <div className="dark-card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 12 }}>Fuel level</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', marginBottom: 12 }}>Fuel level</div>
             <div style={{ display: 'flex', gap: 4 }}>
               {FUEL_LEVELS.map((f, i) => (
                 <button
@@ -760,8 +760,8 @@ function JobFlowInner() {
                   onClick={() => setFuelLevel(f)}
                   style={{
                     flex: 1, height: 48, borderRadius: 8, border: 'none',
-                    background: fuelLevel === f ? '#f97316' : i < FUEL_LEVELS.indexOf(fuelLevel) ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.06)',
-                    color: fuelLevel === f ? 'white' : 'rgba(255,255,255,0.6)',
+                    background: fuelLevel === f ? '#f97316' : i < FUEL_LEVELS.indexOf(fuelLevel) ? 'rgba(249,115,22,0.3)' : 'rgba(0,0,0,.06)',
+                    color: fuelLevel === f ? 'white' : 'rgba(0,0,0,.6)',
                     fontSize: 11, fontWeight: 600, cursor: 'pointer',
                   }}
                 >
@@ -772,31 +772,31 @@ function JobFlowInner() {
           </div>
           {/* Gas receipt + amount */}
           <div className="dark-card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Gas receipt</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>Gas receipt</div>
             <label style={{ cursor: 'pointer' }}>
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => setGasReceipt(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   {gasReceipt ? <img src={gasReceipt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Camera size={20} color="#f97316" />}
                 </div>
-                <span style={{ fontSize: 14, color: gasReceipt ? '#22C55E' : 'rgba(255,255,255,0.6)' }}>{gasReceipt ? 'Photo taken' : 'Capture'}</span>
+                <span style={{ fontSize: 14, color: gasReceipt ? '#22C55E' : 'rgba(0,0,0,.6)' }}>{gasReceipt ? 'Photo taken' : 'Capture'}</span>
               </div>
             </label>
-            <input type="number" step="0.01" value={gasAmount} onChange={(e) => setGasAmount(e.target.value)} placeholder="Gas amount $" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+            <input type="number" step="0.01" value={gasAmount} onChange={(e) => setGasAmount(e.target.value)} placeholder="Gas amount $" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }} />
           </div>
           {/* Dump receipt + amount */}
           <div className="dark-card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Dump receipt (optional)</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>Dump receipt (optional)</div>
             <label style={{ cursor: 'pointer' }}>
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => setDumpReceipt(e.target.files?.[0] ? await fileToDataUrl(e.target.files[0]) : null)} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                <div style={{ width: 56, height: 56, borderRadius: 10, background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   {dumpReceipt ? <img src={dumpReceipt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Camera size={20} color="#f97316" />}
                 </div>
-                <span style={{ fontSize: 14, color: dumpReceipt ? '#22C55E' : 'rgba(255,255,255,0.6)' }}>{dumpReceipt ? 'Photo taken' : 'Capture'}</span>
+                <span style={{ fontSize: 14, color: dumpReceipt ? '#22C55E' : 'rgba(0,0,0,.6)' }}>{dumpReceipt ? 'Photo taken' : 'Capture'}</span>
               </div>
             </label>
-            <input type="number" step="0.01" value={dumpAmount} onChange={(e) => setDumpAmount(e.target.value)} placeholder="Dump amount $" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+            <input type="number" step="0.01" value={dumpAmount} onChange={(e) => setDumpAmount(e.target.value)} placeholder="Dump amount $" className="dark-input tabular" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }} />
           </div>
         </div>
         <ErrorBanner />

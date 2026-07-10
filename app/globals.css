@@ -118,6 +118,12 @@ button {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .glass-bar {
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+}
 
 /* Glass button (circular, translucent) */
 .glass-btn {
@@ -129,6 +135,15 @@ button {
 .glass-btn:active {
   background: rgba(255, 255, 255, 0.14);
   transform: scale(0.95);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .glass-btn {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  :root:not([data-theme="dark"]) .glass-btn:active {
+    background: rgba(0, 0, 0, 0.04);
+  }
 }
 
 /* Dark card */

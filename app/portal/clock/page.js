@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, FileText, Wallet, LogOut } from 'lucide-react';
+import { Calendar, FileText, Wallet, LogOut } from 'lucide-react';
 
 // ============================================================
-// /portal/clock — shift status (read-only).
-// Clock in/out is automatic: starts when first job starts,
-// stops when last job ends. This page just shows the status.
+// /portal/clock — shift status (read-only). Light theme.
 // ============================================================
 
 export default function ClockPage() {
@@ -16,10 +14,8 @@ export default function ClockPage() {
   const [emp, setEmp] = useState(null);
   const [openShift, setOpenShift] = useState(null);
   const [period, setPeriod] = useState(null);
-  const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
 
-  // Tick every second for live shift duration
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
@@ -53,9 +49,9 @@ export default function ClockPage() {
 
   if (loading) {
     return (
-      <main className="min-h-dvh flex items-center justify-center safe-top" style={{ background: '#0A0A0B' }}>
-        <span style={{ color: 'rgba(255,255,255,0.40)' }}>Loading…</span>
-      </main>
+      <div className="min-h-dvh flex items-center justify-center safe-top" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+        <span style={{ color: 'rgba(0,0,0,.4)' }}>Loading…</span>
+      </div>
     );
   }
 
@@ -70,113 +66,90 @@ export default function ClockPage() {
   const periodOT = Number(period?.overtime_hours || 0);
   const periodGross = Number(period?.gross || 0);
 
-  // Ring geometry
-  const R = 112; // radius
-  const C = 2 * Math.PI * R; // circumference
-  const ringColor = clockedIn ? '#22C55E' : '#6B7280';
+  const R = 98;
+  const C = 2 * Math.PI * R;
+  const ringColor = clockedIn ? '#f97316' : '#F0F0F2';
+  const ringOffset = clockedIn ? C * 0.35 : C;
+
+  const shiftStartTime = openShift?.clock_in_at
+    ? new Date(openShift.clock_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '';
 
   return (
-    <main className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#0A0A0B' }}>
-      {/* Floating glass header bar */}
-      <header className="glass-bar sticky top-0 z-20 mx-4 mt-3 rounded-2xl px-4 py-3 flex items-center justify-between"
-        style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="status-dot flex-shrink-0" style={{ background: clockedIn ? '#22C55E' : '#6B7280' }} />
-          <div className="min-w-0">
-            <div className="font-bold text-sm truncate" style={{ color: 'rgba(255,255,255,0.90)' }}>{emp?.name || 'Crew'}</div>
-            <div className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.40)' }}>{emp?.email}</div>
-          </div>
+    <div className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+        <div>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: '#1a1a1a' }}>{emp?.name || 'Crew'}</div>
+          <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.5)' }}>{emp?.email}</div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <HeaderBtn icon={Clock} label="Today" onClick={() => router.push('/portal/schedule')} />
-          <HeaderBtn icon={FileText} label="Docs" onClick={() => router.push('/portal/documents')} />
-          <HeaderBtn icon={Wallet} label="Pay" onClick={() => router.push('/portal/paystubs')} />
-          <HeaderBtn icon={LogOut} label="Logout" onClick={logout} />
+        <div style={{ display: 'flex', gap: 6 }}>
+          <HeaderBtn icon={Calendar} onClick={() => router.push('/portal/schedule')} />
+          <HeaderBtn icon={FileText} onClick={() => router.push('/portal/documents')} />
+          <HeaderBtn icon={Wallet} onClick={() => router.push('/portal/paystubs')} />
+          <HeaderBtn icon={LogOut} onClick={logout} />
         </div>
-      </header>
+      </div>
 
-      {/* Ring + timer */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-        <div className="relative" style={{ width: 240, height: 240 }}>
-          <svg width={240} height={240} className="absolute inset-0">
-            {/* Track */}
-            <circle cx={120} cy={120} r={R} fill="none"
-              stroke="rgba(255,255,255,0.06)" strokeWidth={8} />
-            {/* Progress ring */}
-            <circle cx={120} cy={120} r={R} fill="none"
-              stroke={ringColor} strokeWidth={8} strokeLinecap="round"
-              strokeDasharray={C}
-              strokeDashoffset={clockedIn ? 0 : C}
-              transform="rotate(-90 120 120)"
-              style={{
-                transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease',
-                filter: clockedIn ? 'drop-shadow(0 0 8px rgba(34,197,94,0.6))' : 'none',
-              }}
-            />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ position: 'relative', width: 220, height: 220, marginBottom: 24 }}>
+          <svg width={220} height={220} viewBox="0 0 220 220" style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx={110} cy={110} r={R} fill="none" stroke="#F0F0F2" strokeWidth={14} />
+            <circle cx={110} cy={110} r={R} fill="none" stroke={ringColor} strokeWidth={14} strokeLinecap="round"
+              strokeDasharray={C} strokeDashoffset={ringOffset}
+              style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease' }} />
           </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {clockedIn ? (
               <>
-                <div className="tabular font-bold" style={{ fontSize: 34, color: 'rgba(255,255,255,0.90)', lineHeight: 1.1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: 999, background: '#22C55E' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: '#22C55E' }}>ON SHIFT</span>
+                </div>
+                <div style={{ fontSize: 32, fontWeight: 800, color: '#1a1a1a', fontVariantNumeric: 'tabular-nums' }}>
                   {String(hh).padStart(2, '0')}:{String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}
                 </div>
-                <div className="mt-2 text-xs font-semibold tracking-wide" style={{ color: '#22C55E' }}>ON SHIFT</div>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,.5)' }}>since {shiftStartTime}</div>
               </>
             ) : (
               <>
-                <div className="text-2xl font-bold" style={{ color: 'rgba(255,255,255,0.60)' }}>OFF SHIFT</div>
-                <div className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.40)' }}>Start a job to clock in</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: 999, background: 'rgba(0,0,0,.2)' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: 'rgba(0,0,0,.4)' }}>OFF SHIFT</span>
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: 'rgba(0,0,0,.4)' }}>00:00:00</div>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,.4)' }}>Start a job to clock in</div>
               </>
             )}
           </div>
         </div>
 
-        {clockedIn && openShift && (
-          <div className="mt-6 text-center">
-            <div className="text-sm" style={{ color: 'rgba(255,255,255,0.60)' }}>
-              on shift since {new Date(openShift.clock_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </div>
+        <div style={{ width: '100%', background: '#fff', border: '1px solid rgba(0,0,0,.06)', borderRadius: 16, padding: 18 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginBottom: 14 }}>Pay period summary</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Regular hours</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', fontVariantNumeric: 'tabular-nums' }}>{periodHours.toFixed(1)}</span>
           </div>
-        )}
-
-        {error && <div className="mt-6 text-sm text-center" style={{ color: '#EF4444' }}>{error}</div>}
-      </div>
-
-      {/* Pay period card */}
-      <div className="px-6 pb-4">
-        <div className="dark-card p-5">
-          <div className="text-xs mb-4" style={{ color: 'rgba(255,255,255,0.60)' }}>This Pay Period</div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <StatBlock value={periodHours.toFixed(1)} label="hours" />
-            <StatBlock value={periodOT.toFixed(1)} label="OT hours" />
-            <StatBlock value={`$${periodGross.toFixed(2)}`} label="gross" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Overtime hours</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', fontVariantNumeric: 'tabular-nums' }}>{periodOT.toFixed(1)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid rgba(0,0,0,.06)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>Gross pay (est.)</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#f97316', fontVariantNumeric: 'tabular-nums' }}>${periodGross.toFixed(2)}</span>
           </div>
         </div>
+        <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.4)', textAlign: 'center', marginTop: 16, lineHeight: 1.5 }}>
+          Clock in/out is automatic based on job activity
+        </div>
       </div>
-
-      {/* Caption */}
-      <div className="px-6 pb-6 text-center text-xs" style={{ color: 'rgba(255,255,255,0.40)' }}>
-        Clock in/out is automatic — it starts when your first job begins and ends when your last job ends.
-      </div>
-    </main>
+    </div>
   );
 }
 
-function HeaderBtn({ icon: Icon, label, onClick }) {
+function HeaderBtn({ icon: Icon, onClick }) {
   return (
-    <button onClick={onClick} aria-label={label}
-      className="glass-btn flex items-center justify-center rounded-full"
-      style={{ width: 40, height: 40, color: 'rgba(255,255,255,0.60)' }}>
-      <Icon size={18} />
-    </button>
-  );
-}
-
-function StatBlock({ value, label }) {
-  return (
-    <div>
-      <div className="tabular font-bold" style={{ fontSize: 34, color: 'rgba(255,255,255,0.90)', lineHeight: 1.1 }}>{value}</div>
-      <div className="mt-1" style={{ fontSize: 13, color: 'rgba(255,255,255,0.60)' }}>{label}</div>
+    <div onClick={onClick} style={{ width: 34, height: 34, borderRadius: 999, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+      <Icon size={16} color="#1a1a1a" />
     </div>
   );
 }

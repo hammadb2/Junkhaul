@@ -9,6 +9,7 @@ import {
 
 // ============================================================
 // /portal/documents — view/fill/sign/upload onboarding docs.
+// Light theme per designer spec.
 // ============================================================
 
 const DOC_LABELS = {
@@ -31,13 +32,12 @@ const DOC_ICONS = {
   other: FileText,
 };
 
-// Document expiry helpers
 function expiryColor(expiresAt) {
-  if (!expiresAt) return 'rgba(255,255,255,0.4)';
+  if (!expiresAt) return 'rgba(0,0,0,.4)';
   const days = Math.floor((new Date(expiresAt) - new Date()) / 86400000);
   if (days < 0) return '#EF4444';
   if (days <= 30) return '#F59E0B';
-  return 'rgba(255,255,255,0.4)';
+  return 'rgba(0,0,0,.4)';
 }
 function expiryLabel(expiresAt) {
   if (!expiresAt) return '';
@@ -49,10 +49,10 @@ function expiryLabel(expiresAt) {
 }
 
 const STATUS_STYLES = {
-  verified: { label: 'Verified', bg: 'rgba(34,197,94,0.16)', color: '#22C55E', filled: true },
-  uploaded: { label: 'Uploaded', bg: 'transparent', color: '#F59E0B', filled: false },
-  rejected: { label: 'Rejected', bg: 'transparent', color: '#EF4444', filled: false },
-  pending: { label: 'Pending', bg: 'transparent', color: '#6B7280', filled: false },
+  verified: { label: 'Verified', bg: 'rgba(34,197,94,.15)', color: '#22C55E' },
+  uploaded: { label: 'Uploaded', bg: 'rgba(245,158,11,.15)', color: '#F59E0B' },
+  rejected: { label: 'Rejected', bg: 'rgba(239,68,68,.15)', color: '#EF4444' },
+  pending: { label: 'Pending', bg: 'rgba(0,0,0,.06)', color: 'rgba(0,0,0,.5)' },
 };
 
 export default function DocumentsPage() {
@@ -93,9 +93,9 @@ export default function DocumentsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-dvh flex items-center justify-center safe-top" style={{ background: '#0A0A0B' }}>
-        <span style={{ color: 'rgba(255,255,255,0.40)' }}>Loading…</span>
-      </main>
+      <div className="min-h-dvh flex items-center justify-center safe-top" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+        <span style={{ color: 'rgba(0,0,0,.4)' }}>Loading…</span>
+      </div>
     );
   }
 
@@ -103,108 +103,112 @@ export default function DocumentsPage() {
   const onboarding = data?.onboarding || { complete: false, missing: [] };
 
   return (
-    <main className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#0A0A0B' }}>
-      {/* Floating glass header bar */}
-      <header className="glass-bar sticky top-0 z-20 mx-4 mt-3 rounded-2xl px-4 py-3 flex items-center justify-between"
-        style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-        <button onClick={() => router.push('/portal/schedule')} aria-label="Back"
-          className="glass-btn flex items-center justify-center rounded-full"
-          style={{ width: 40, height: 40, color: 'rgba(255,255,255,0.60)' }}>
-          <ArrowLeft size={18} />
-        </button>
-        <span className="font-bold text-sm" style={{ color: 'rgba(255,255,255,0.90)' }}>Documents</span>
-        <button onClick={logout} aria-label="Logout"
-          className="glass-btn flex items-center justify-center rounded-full"
-          style={{ width: 40, height: 40, color: 'rgba(255,255,255,0.60)' }}>
-          <ArrowLeft size={18} style={{ transform: 'rotate(180deg)' }} />
-        </button>
-      </header>
+    <div className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+        <div onClick={() => router.push('/portal/schedule')} style={{ width: 38, height: 38, borderRadius: 999, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <ArrowLeft size={17} color="#1a1a1a" />
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1a1a' }}>Documents</div>
+        <div onClick={logout} style={{ width: 38, height: 38, borderRadius: 999, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <ArrowLeft size={17} color="#1a1a1a" style={{ transform: 'rotate(180deg)' }} />
+        </div>
+      </div>
 
-      <div className="flex-1 px-6 pt-4 pb-6 max-w-md w-full mx-auto space-y-3">
-        {/* Slim status strip */}
-        <div className="rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm"
-          style={onboarding.complete
-            ? { background: 'rgba(34,197,94,0.12)', color: '#22C55E' }
-            : { background: 'rgba(245,158,11,0.12)', color: '#F59E0B' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        {/* Status strip */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 12, padding: '12px 14px', marginBottom: 16,
+          ...(onboarding.complete
+            ? { background: 'rgba(34,197,94,.10)' }
+            : { background: 'rgba(245,158,11,.10)' }) }}>
           {onboarding.complete
-            ? <><CheckCircle size={16} /><span>All onboarding documents received. You&apos;re onboarded.</span></>
-            : <><AlertCircle size={16} /><span>Remaining: {onboarding.missing.map((m) => DOC_LABELS[m] || m).join(', ')}</span></>}
+            ? <><CheckCircle size={15} color="#22C55E" /><span style={{ fontSize: 13, color: '#16A34A', fontWeight: 500 }}>All onboarding documents received</span></>
+            : <><Clock size={15} color="#F59E0B" /><span style={{ fontSize: 13, color: '#B45309', fontWeight: 500 }}>Missing: {onboarding.missing.map((m) => DOC_LABELS[m] || m).join(', ')}</span></>}
         </div>
 
         {error && (
-          <div className="rounded-xl px-4 py-2.5 flex items-start gap-2 text-sm"
-            style={{ background: 'rgba(239,68,68,0.12)', color: '#FCA5A5' }}>
-            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span>{error}</span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(239,68,68,.10)', borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
+            <AlertCircle size={15} color="#EF4444" style={{ flexShrink: 0, marginTop: 1 }} />
+            <span style={{ fontSize: 13, color: '#EF4444' }}>{error}</span>
           </div>
         )}
 
-        {docs.map((d) => {
-          const Icon = DOC_ICONS[d.doc_type] || FileText;
-          const st = STATUS_STYLES[d.status] || STATUS_STYLES.pending;
-          const showReason = revealedReason === d.doc_type && d.status === 'rejected' && d.notes;
-          return (
-            <div key={d.doc_type} className="dark-card p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center rounded-xl flex-shrink-0"
-                  style={{ width: 44, height: 44, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.60)' }}>
-                  <Icon size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate" style={{ color: 'rgba(255,255,255,0.90)' }}>
-                    {DOC_LABELS[d.doc_type] || d.doc_type}
+        {/* Document cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {docs.map((d) => {
+            const Icon = DOC_ICONS[d.doc_type] || FileText;
+            const st = STATUS_STYLES[d.status] || STATUS_STYLES.pending;
+            const showReason = revealedReason === d.doc_type && d.status === 'rejected' && d.notes;
+            return (
+              <div key={d.doc_type} style={{ background: '#fff', border: '1px solid rgba(0,0,0,.06)', borderRadius: 16, padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={19} color="#1a1a1a" />
                   </div>
-                  <button
-                    onClick={() => d.status === 'rejected' && setRevealedReason(showReason ? null : d.doc_type)}
-                    className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-                    style={{
-                      background: st.filled ? st.bg : 'transparent',
-                      border: `1px solid ${st.color}`,
-                      color: st.color,
-                    }}
-                  >
-                    {d.status === 'verified' && <CheckCircle size={11} />}
-                    {d.status === 'rejected' && <AlertCircle size={11} />}
-                    {d.status === 'pending' && <Clock size={11} />}
-                    {st.label}
-                  </button>
-                </div>
-                {/* Upload icon button */}
-                <label className="flex-shrink-0 cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    className="hidden"
-                    onChange={(e) => upload(d.doc_type, e.target.files?.[0])}
-                    disabled={uploading === d.doc_type}
-                  />
-                  <span
-                    className="glass-btn flex items-center justify-center rounded-full"
-                    style={{ width: 48, height: 48, color: 'rgba(255,255,255,0.60)', opacity: uploading === d.doc_type ? 0.5 : 1 }}
-                  >
-                    {uploading === d.doc_type ? (
-                      <span className="block w-4 h-4 rounded-full border-2 border-white/30 border-t-white/80 animate-spin" />
-                    ) : (
-                      <Upload size={18} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14.5, fontWeight: 600, color: '#1a1a1a' }}>
+                      {DOC_LABELS[d.doc_type] || d.doc_type}
+                    </div>
+                    {d.expires_at && (
+                      <div style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2, color: expiryColor(d.expires_at) }}>
+                        {expiryLabel(d.expires_at)}
+                      </div>
                     )}
-                  </span>
-                </label>
+                  </div>
+                  <div style={{ padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: st.bg, color: st.color, whiteSpace: 'nowrap' }}>
+                    {d.status === 'verified' && <CheckCircle size={11} style={{ display: 'inline', marginRight: 2 }} />}
+                    {d.status === 'rejected' && <AlertCircle size={11} style={{ display: 'inline', marginRight: 2 }} />}
+                    {d.status === 'pending' && <Clock size={11} style={{ display: 'inline', marginRight: 2 }} />}
+                    {st.label}
+                  </div>
+                </div>
+
+                {showReason && (
+                  <div style={{ marginTop: 10, fontSize: 12.5, color: '#EF4444', lineHeight: 1.4 }}>
+                    Reason: {d.notes}
+                  </div>
+                )}
+
+                {d.status === 'rejected' && (
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, color: '#1a1a1a', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => upload(d.doc_type, e.target.files?.[0])}
+                        disabled={uploading === d.doc_type}
+                      />
+                      <Upload size={14} color="#1a1a1a" />
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>Reupload</span>
+                    </label>
+                  </div>
+                )}
+
+                {d.status !== 'rejected' && (
+                  <label style={{ display: 'flex', marginTop: 10, cursor: 'pointer' }}>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={(e) => upload(d.doc_type, e.target.files?.[0])}
+                      disabled={uploading === d.doc_type}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#1a1a1a', opacity: uploading === d.doc_type ? 0.5 : 1 }}>
+                      {uploading === d.doc_type ? (
+                        <span style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(0,0,0,.2)', borderTopColor: '#f97316', animation: 'spin 1s linear infinite' }} />
+                      ) : (
+                        <Upload size={14} color="#1a1a1a" />
+                      )}
+                      {uploading === d.doc_type ? 'Uploading...' : 'Upload'}
+                    </div>
+                  </label>
+                )}
               </div>
-              {showReason && (
-                <div className="mt-2 text-xs slide-up" style={{ color: '#FCA5A5' }}>
-                  Reason: {d.notes}
-                </div>
-              )}
-              {d.expires_at && (
-                <div className="mt-2 text-xs flex items-center gap-1" style={{ color: expiryColor(d.expires_at) }}>
-                  <Clock size={11} />
-                  {expiryLabel(d.expires_at)}
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

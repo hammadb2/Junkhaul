@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Wallet, ChevronDown, ChevronUp, TrendingUp, Calendar, LogOut } from 'lucide-react';
 
 // ============================================================
-// /portal/paystubs — employee pay stub history.
-// Dark theme redesign. Keeps all existing API calls & logic.
+// /portal/paystubs — employee pay stub history. Light theme.
 // ============================================================
 
 export default function PayStubsPage() {
@@ -16,7 +15,6 @@ export default function PayStubsPage() {
   const [expanded, setExpanded] = useState(null);
 
   const load = useCallback(async () => {
-    // Check onboarding status first
     const meRes = await fetch('/api/employee/me');
     if (meRes.status === 401) { router.push('/portal'); return; }
     const meData = await meRes.json();
@@ -36,53 +34,40 @@ export default function PayStubsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center" style={{ background: 'var(--bg-base)' }}>
-        <div className="w-8 h-8 border-3 rounded-full animate-spin" style={{ borderColor: 'rgba(255,255,255,0.1)', borderTopColor: 'var(--accent)' }} />
+      <div className="min-h-dvh flex items-center justify-center" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid #F0F0F2', borderTopColor: '#f97316', animation: 'spin 1s linear infinite' }} />
       </div>
     );
   }
 
   const depositPill = (status) => {
     const s = (status || '').toLowerCase();
-    if (s === 'sent' || s === 'paid' || s === 'completed') return { label: 'Sent', color: 'var(--status-green)' };
-    if (s === 'failed' || s === 'error') return { label: 'Failed', color: 'var(--status-red)' };
-    return { label: 'Pending', color: 'var(--status-amber)' };
+    if (s === 'sent' || s === 'paid' || s === 'completed') return { label: 'Sent', bg: 'rgba(34,197,94,.15)', color: '#22C55E' };
+    if (s === 'failed' || s === 'error') return { label: 'Failed', bg: 'rgba(239,68,68,.15)', color: '#EF4444' };
+    return { label: 'Pending', bg: 'rgba(245,158,11,.15)', color: '#F59E0B' };
   };
 
   return (
-    <main className="min-h-dvh safe-top safe-bottom" style={{ background: 'var(--bg-base)' }}>
-      {/* Floating glass header */}
-      <header className="glass-bar sticky top-0 z-20 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <Wallet size={20} style={{ color: 'var(--accent)' }} />
-          <span className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Pay Stubs</span>
+    <div className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+        <div onClick={() => router.push('/portal/schedule')} style={{ width: 38, height: 38, borderRadius: 999, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <Calendar size={17} color="#1a1a1a" />
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push('/portal/schedule')}
-            className="glass-btn w-11 h-11 rounded-full flex items-center justify-center"
-            aria-label="Today"
-          >
-            <Calendar size={18} style={{ color: 'var(--text-secondary)' }} />
-          </button>
-          <button
-            onClick={logout}
-            className="glass-btn w-11 h-11 rounded-full flex items-center justify-center"
-            aria-label="Log out"
-          >
-            <LogOut size={18} style={{ color: 'var(--text-secondary)' }} />
-          </button>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1a1a' }}>Pay Stubs</div>
+        <div onClick={logout} style={{ width: 38, height: 38, borderRadius: 999, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <LogOut size={17} color="#1a1a1a" />
         </div>
-      </header>
+      </div>
 
-      <div className="max-w-md mx-auto px-6 py-5 space-y-3">
+      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {stubs.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-24 fade-in">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'var(--bg-card)' }}>
-              <Wallet size={28} style={{ color: 'var(--text-disabled)' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 96 }}>
+            <div style={{ width: 64, height: 64, borderRadius: 16, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <Wallet size={28} color="rgba(0,0,0,.3)" />
             </div>
-            <div className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No pay stubs yet</div>
-            <div className="text-sm text-center" style={{ color: 'var(--text-secondary)' }}>Your earnings will appear here once you get paid.</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', marginBottom: 4 }}>No pay stubs yet</div>
+            <div style={{ fontSize: 14, color: 'rgba(0,0,0,.5)', textAlign: 'center' }}>Your earnings will appear here once you get paid.</div>
           </div>
         )}
 
@@ -90,76 +75,67 @@ export default function PayStubsPage() {
           const isOpen = expanded === s.id;
           const pill = depositPill(s.direct_deposit_status);
           return (
-            <div key={s.id} className="dark-card overflow-hidden fade-in">
-              {/* Collapsed header row */}
-              <button
-                onClick={() => setExpanded(isOpen ? null : s.id)}
-                className="w-full px-5 py-4 flex items-center justify-between text-left"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div key={s.id} style={{ background: '#fff', border: '1px solid rgba(0,0,0,.06)', borderRadius: 16, padding: 16, marginBottom: 12 }}>
+              {/* Collapsed header */}
+              <div onClick={() => setExpanded(isOpen ? null : s.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontSize: 14.5, fontWeight: 700, color: '#1a1a1a' }}>
                       {new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
-                    <span
-                      className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
-                      style={{ color: pill.color, background: `${pill.color}1A` }}
-                    >
+                    <span style={{ padding: '4px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, background: pill.bg, color: pill.color }}>
                       {pill.label}
                     </span>
                   </div>
-                  <div className="text-sm tabular" style={{ color: 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: 12.5, color: 'rgba(0,0,0,.5)', fontVariantNumeric: 'tabular-nums' }}>
                     {Number(s.total_hours).toFixed(1)} hrs
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-[34px] font-bold tabular leading-none" style={{ color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 19, fontWeight: 800, color: '#1a1a1a', fontVariantNumeric: 'tabular-nums' }}>
                       ${Number(s.net_pay).toFixed(2)}
                     </div>
-                    <div className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>net pay</div>
                   </div>
-                  {isOpen
-                    ? <ChevronUp size={20} style={{ color: 'var(--text-secondary)' }} />
-                    : <ChevronDown size={20} style={{ color: 'var(--text-secondary)' }} />}
+                  {isOpen ? <ChevronUp size={16} color="rgba(0,0,0,.4)" /> : <ChevronDown size={16} color="rgba(0,0,0,.4)" />}
                 </div>
-              </button>
+              </div>
 
               {/* Expanded breakdown */}
               {isOpen && (
-                <div className="px-5 pb-5 pt-1 slide-up">
-                  <div className="h-px my-2" style={{ background: 'var(--border-subtle)' }} />
-
+                <div style={{ marginTop: 14 }}>
                   {/* Earnings */}
-                  <SectionLabel>Earnings</SectionLabel>
-                  <BreakRow label="Regular pay" sub={`${Number(s.regular_hours).toFixed(1)} hrs`} value={`$${Number(s.regular_pay).toFixed(2)}`} />
-                  <BreakRow label="Overtime pay" sub={`${Number(s.overtime_hours).toFixed(1)} hrs`} value={`$${Number(s.overtime_pay).toFixed(2)}`} />
-                  <BreakRow label="Vacation pay (4%)" value={`$${Number(s.vacation_pay).toFixed(2)}`} />
-                  <BreakRow label="Gross" value={`$${Number(s.gross_pay).toFixed(2)}`} bold />
-
-                  <div className="h-px my-3" style={{ background: 'var(--border-subtle)' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                    <BreakRow label={`Regular · ${Number(s.regular_hours).toFixed(1)} hrs`} value={`$${Number(s.regular_pay).toFixed(2)}`} />
+                    <BreakRow label={`Overtime · ${Number(s.overtime_hours).toFixed(1)} hrs`} value={`$${Number(s.overtime_pay).toFixed(2)}`} />
+                    <BreakRow label="Vacation (4%)" value={`$${Number(s.vacation_pay).toFixed(2)}`} />
+                    <BreakRow label="Gross" value={`$${Number(s.gross_pay).toFixed(2)}`} bold border />
+                  </div>
 
                   {/* Deductions */}
-                  <SectionLabel>Deductions</SectionLabel>
-                  <BreakRow label="CPP" value={`-$${Number(s.cpp).toFixed(2)}`} />
-                  {Number(s.cpp2) > 0 && <BreakRow label="CPP2" value={`-$${Number(s.cpp2).toFixed(2)}`} />}
-                  <BreakRow label="EI" value={`-$${Number(s.ei).toFixed(2)}`} />
-                  <BreakRow label="Income tax" value={`-$${Number(s.fed_tax).toFixed(2)}`} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                    <BreakRow label="CPP" value={`-$${Number(s.cpp).toFixed(2)}`} />
+                    {Number(s.cpp2) > 0 && <BreakRow label="CPP2" value={`-$${Number(s.cpp2).toFixed(2)}`} />}
+                    <BreakRow label="EI" value={`-$${Number(s.ei).toFixed(2)}`} />
+                    <BreakRow label="Income tax" value={`-$${Number(s.fed_tax).toFixed(2)}`} />
+                  </div>
 
-                  <div className="h-px my-3" style={{ background: 'var(--border-subtle)' }} />
+                  {/* Net pay highlight */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(249,115,22,.08)', borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1a1a1a' }}>Net pay</span>
+                    <span style={{ fontSize: 19, fontWeight: 800, color: '#f97316', fontVariantNumeric: 'tabular-nums' }}>${Number(s.net_pay).toFixed(2)}</span>
+                  </div>
 
-                  <BreakRow label="Net pay" value={`$${Number(s.net_pay).toFixed(2)}`} bold />
-
-                  {/* YTD card */}
-                  <div className="dark-card mt-4 p-4" style={{ background: 'var(--bg-elevated)' }}>
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <TrendingUp size={14} style={{ color: 'var(--text-secondary)' }} />
-                      <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Year to Date</span>
-                    </div>
-                    <YtdRow label="YTD gross" value={`$${Number(s.ytd_gross).toFixed(2)}`} />
-                    <YtdRow label="YTD CPP" value={`$${Number(s.ytd_cpp).toFixed(2)}`} />
-                    <YtdRow label="YTD EI" value={`$${Number(s.ytd_ei).toFixed(2)}`} />
-                    <YtdRow label="YTD income tax" value={`$${Number(s.ytd_fed_tax).toFixed(2)}`} />
+                  {/* YTD */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <TrendingUp size={14} color="rgba(0,0,0,.5)" />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(0,0,0,.5)', textTransform: 'uppercase', letterSpacing: '.03em' }}>Year to date</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, color: 'rgba(0,0,0,.6)' }}>
+                    <div>Gross: <b style={{ color: '#1a1a1a' }}>${Number(s.ytd_gross).toFixed(0)}</b></div>
+                    <div>CPP: <b style={{ color: '#1a1a1a' }}>${Number(s.ytd_cpp).toFixed(0)}</b></div>
+                    <div>EI: <b style={{ color: '#1a1a1a' }}>${Number(s.ytd_ei).toFixed(0)}</b></div>
+                    <div>Tax: <b style={{ color: '#1a1a1a' }}>${Number(s.ytd_fed_tax).toFixed(0)}</b></div>
                   </div>
                 </div>
               )}
@@ -167,40 +143,15 @@ export default function PayStubsPage() {
           );
         })}
       </div>
-    </main>
-  );
-}
-
-function SectionLabel({ children }) {
-  return (
-    <div className="text-[11px] font-bold uppercase tracking-wide mb-2 mt-1" style={{ color: 'var(--text-secondary)' }}>
-      {children}
     </div>
   );
 }
 
-function BreakRow({ label, value, sub, bold }) {
+function BreakRow({ label, value, bold, border }) {
   return (
-    <div className="flex items-center justify-between py-1.5">
-      <span className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
-        {label}
-        {sub && <span className="ml-1.5 text-[12px]" style={{ color: 'var(--text-disabled)' }}>({sub})</span>}
-      </span>
-      <span
-        className="text-base tabular"
-        style={{ color: bold ? 'var(--text-primary)' : 'var(--text-primary)', fontWeight: bold ? 700 : 400 }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function YtdRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between py-1">
-      <span className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-      <span className="text-sm tabular" style={{ color: 'var(--text-secondary)' }}>{value}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: border ? 8 : 0, borderTop: border ? '1px solid rgba(0,0,0,.06)' : 'none' }}>
+      <span style={{ fontSize: 12.5, color: bold ? '#1a1a1a' : 'rgba(0,0,0,.6)', fontWeight: bold ? 600 : 400 }}>{label}</span>
+      <span style={{ fontSize: bold ? 13.5 : 13, fontWeight: bold ? 700 : 600, color: '#1a1a1a', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
     </div>
   );
 }

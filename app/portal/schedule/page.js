@@ -189,7 +189,7 @@ export default function SchedulePage() {
     window.mapboxgl.accessToken = MAPBOX_TOKEN;
     const map = new window.mapboxgl.Map({
       container: mapRef.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
+      style: 'mapbox://styles/mapbox/streets-v12',
       center: [-114.0719, 51.0447],
       zoom: 11,
     });
@@ -450,8 +450,8 @@ export default function SchedulePage() {
   // ---------- Loading state ----------
   if (loading) {
     return (
-      <main className="min-h-dvh flex items-center justify-center" style={{ background: '#0A0A0B' }}>
-        <div style={{ color: 'rgba(255,255,255,0.4)' }}>Loading...</div>
+      <main className="min-h-dvh flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+        <div style={{ color: 'rgba(0,0,0,.4)' }}>Loading...</div>
       </main>
     );
   }
@@ -459,18 +459,18 @@ export default function SchedulePage() {
   // ---------- Location required gate ----------
   if (locPerm === 'denied') {
     return (
-      <main className="min-h-dvh flex flex-col items-center justify-center px-6 safe-top safe-bottom" style={{ background: '#0A0A0B' }}>
+      <main className="min-h-dvh flex flex-col items-center justify-center px-6 safe-top safe-bottom" style={{ background: '#FAFAFA' }}>
         <div className="max-w-sm w-full text-center">
           <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
             <MapPinOff size={40} color="#EF4444" />
           </div>
-          <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Location Required</div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 24, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>Location Required</div>
+          <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginBottom: 24, lineHeight: 1.5 }}>
             Junk Haul Crew needs your location to track jobs, navigate to customers, and share ETA with clients. Without location access, the app cannot function.
           </div>
           <div className="dark-card p-5 text-left space-y-3">
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>To enable location:</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>To enable location:</div>
+            <div style={{ fontSize: 12, color: 'rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div><strong style={{ color: 'rgba(255,255,255,0.8)' }}>iPhone:</strong> Settings &rarr; JunkHaul &rarr; Location &rarr; Allow</div>
               <div><strong style={{ color: 'rgba(255,255,255,0.8)' }}>Android:</strong> Settings &rarr; Apps &rarr; JunkHaul &rarr; Permissions &rarr; Location &rarr; Allow</div>
             </div>
@@ -487,7 +487,7 @@ export default function SchedulePage() {
             </button>
             <button
               onClick={logout}
-              style={{ width: '100%', color: 'rgba(255,255,255,0.4)', fontWeight: 500, padding: '8px 0', fontSize: 14, background: 'transparent', border: 'none' }}
+              style={{ width: '100%', color: 'rgba(0,0,0,.4)', fontWeight: 500, padding: '8px 0', fontSize: 14, background: 'transparent', border: 'none' }}
             >
               Log out
             </button>
@@ -531,7 +531,7 @@ export default function SchedulePage() {
   const sheetHeight = sheetHeights[sheetState];
 
   return (
-    <main className="min-h-dvh flex flex-col" style={{ background: '#0A0A0B' }}>
+    <main className="min-h-dvh flex flex-col" style={{ background: '#FAFAFA' }}>
       {/* ===== Map (top ~55%) ===== */}
       <div className="relative" style={{ height: '55vh', minHeight: 300 }}>
         {MAPBOX_TOKEN && mapReady ? (
@@ -546,12 +546,12 @@ export default function SchedulePage() {
                   position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)',
                   background: 'rgba(22,22,24,0.9)', backdropFilter: 'blur(20px)',
                   borderRadius: 999, padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10,
-                  border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                  border: '1px solid rgba(0,0,0,.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
                   cursor: 'pointer',
                 }}
               >
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Next: {nextJob.name}</span>
-                <span className="tabular" style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>
+                <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Next: {nextJob.name}</span>
+                <span className="tabular" style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a' }}>
                   {routeInfo.eta} min · {routeInfo.distance} km
                 </span>
                 <Navigation size={18} color="#f97316" />
@@ -559,20 +559,20 @@ export default function SchedulePage() {
             )}
           </>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center" style={{ background: '#161618' }}>
+          <div className="w-full h-full flex flex-col items-center justify-center" style={{ background: '#fff' }}>
             {showLocPrompt ? (
               <div className="text-center px-6">
                 <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                   <MapPin size={28} color="#f97316" />
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>Enable Location</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>See your route and navigate to jobs.</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', marginBottom: 4 }}>Enable Location</div>
+                <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 16 }}>See your route and navigate to jobs.</div>
                 <button onClick={enableLocation} className="btn-primary" style={{ minHeight: 48, padding: '12px 24px' }}>
                   Enable Location
                 </button>
               </div>
             ) : (
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>Loading map...</div>
+              <div style={{ fontSize: 14, color: 'rgba(0,0,0,.4)' }}>Loading map...</div>
             )}
           </div>
         )}
@@ -582,34 +582,34 @@ export default function SchedulePage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="status-dot" style={{ background: clockedIn ? '#22C55E' : '#6B7280' }} />
             <div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 6 }}>
                 {emp?.name || 'Crew'}
                 {!isOnline && <span style={{ fontSize: 10, fontWeight: 600, color: '#F59E0B', background: 'rgba(245,158,11,0.15)', padding: '2px 6px', borderRadius: 4 }}>OFFLINE</span>}
               </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.2 }}>{today}</div>
+              <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', lineHeight: 1.2 }}>{today}</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => router.push('/portal/notifications')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }} aria-label="Notifications">
-              <Bell size={20} color="rgba(255,255,255,0.7)" />
+              <Bell size={20} color="rgba(0,0,0,.6)" />
               {unreadNotifs > 0 && (
                 <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, borderRadius: 8, background: '#f97316', color: 'white', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</span>
               )}
             </button>
             <button onClick={() => router.push('/portal/clock')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Shift status">
-              <Clock size={20} color="rgba(255,255,255,0.7)" />
+              <Clock size={20} color="rgba(0,0,0,.6)" />
             </button>
             <button onClick={() => router.push('/portal/documents')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Docs">
-              <FileText size={20} color="rgba(255,255,255,0.7)" />
+              <FileText size={20} color="rgba(0,0,0,.6)" />
             </button>
             <button onClick={() => router.push('/portal/paystubs')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Pay">
-              <Wallet size={20} color="rgba(255,255,255,0.7)" />
+              <Wallet size={20} color="rgba(0,0,0,.6)" />
             </button>
             <button onClick={() => router.push('/portal/incidents')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Incidents">
-              <AlertTriangle size={20} color="rgba(255,255,255,0.5)" />
+              <AlertTriangle size={20} color="rgba(0,0,0,.5)" />
             </button>
             <button onClick={logout} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Logout">
-              <LogOut size={20} color="rgba(255,255,255,0.5)" />
+              <LogOut size={20} color="rgba(0,0,0,.5)" />
             </button>
           </div>
         </header>
@@ -622,9 +622,9 @@ export default function SchedulePage() {
           position: 'relative',
           marginTop: -20,
           zIndex: 20,
-          background: '#0A0A0B',
+          background: '#FAFAFA',
           borderRadius: '20px 20px 0 0',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          borderTop: '1px solid rgba(0,0,0,.06)',
           maxHeight: sheetHeight,
           transition: dragY !== null ? 'none' : 'max-height 0.3s cubic-bezier(0.16,1,0.3,1)',
           display: 'flex',
@@ -646,9 +646,9 @@ export default function SchedulePage() {
           <div className="max-w-md mx-auto px-6 space-y-3">
 
             {/* View toggle: Today / Week */}
-            <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <button onClick={() => setShowWeekly(false)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: !showWeekly ? '#f97316' : 'transparent', color: !showWeekly ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer' }}>Today</button>
-              <button onClick={() => setShowWeekly(true)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: showWeekly ? '#f97316' : 'transparent', color: showWeekly ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer' }}>This Week</button>
+            <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)' }}>
+              <button onClick={() => setShowWeekly(false)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: !showWeekly ? '#f97316' : 'transparent', color: !showWeekly ? 'white' : 'rgba(0,0,0,.5)', border: 'none', cursor: 'pointer' }}>Today</button>
+              <button onClick={() => setShowWeekly(true)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: showWeekly ? '#f97316' : 'transparent', color: showWeekly ? 'white' : 'rgba(0,0,0,.5)', border: 'none', cursor: 'pointer' }}>This Week</button>
             </div>
 
             {/* Weekly view */}
@@ -658,16 +658,16 @@ export default function SchedulePage() {
                   const hasJobs = day.bookings.length > 0;
                   const hasAssignment = !!day.assignment;
                   return (
-                    <div key={day.date} className="dark-card" style={{ padding: 12, opacity: day.date < new Date().toISOString().slice(0, 10) && !hasJobs ? 0.5 : 1, borderLeft: day.isToday ? '3px solid #f97316' : '1px solid rgba(255,255,255,0.06)' }}>
+                    <div key={day.date} className="dark-card" style={{ padding: 12, opacity: day.date < new Date().toISOString().slice(0, 10) && !hasJobs ? 0.5 : 1, borderLeft: day.isToday ? '3px solid #f97316' : '1px solid rgba(0,0,0,.06)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasJobs ? 8 : 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 36, height: 36, borderRadius: 10, background: day.isToday ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{day.dayName}</span>
-                            <span className="tabular" style={{ fontSize: 14, fontWeight: 700, color: day.isToday ? '#f97316' : 'rgba(255,255,255,0.9)' }}>{day.dayNum}</span>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: day.isToday ? 'rgba(249,115,22,0.15)' : 'rgba(0,0,0,.03)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: 10, color: 'rgba(0,0,0,.5)', textTransform: 'uppercase' }}>{day.dayName}</span>
+                            <span className="tabular" style={{ fontSize: 14, fontWeight: 700, color: day.isToday ? '#f97316' : '#1a1a1a' }}>{day.dayNum}</span>
                           </div>
                           <div>
-                            {hasAssignment && <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{day.assignment.uhaul_location || 'Assigned'}</div>}
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{hasJobs ? `${day.bookings.length} job${day.bookings.length > 1 ? 's' : ''}` : hasAssignment ? 'No jobs' : 'Off'}</div>
+                            {hasAssignment && <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>{day.assignment.uhaul_location || 'Assigned'}</div>}
+                            <div style={{ fontSize: 12, color: 'rgba(0,0,0,.5)' }}>{hasJobs ? `${day.bookings.length} job${day.bookings.length > 1 ? 's' : ''}` : hasAssignment ? 'No jobs' : 'Off'}</div>
                           </div>
                         </div>
                         {hasJobs && (
@@ -675,11 +675,11 @@ export default function SchedulePage() {
                         )}
                       </div>
                       {hasJobs && (
-                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,.06)', display: 'flex', flexDirection: 'column', gap: 4 }}>
                           {day.bookings.map((b) => (
                             <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                              <span style={{ color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{b.time_slot || ''} {b.name}</span>
-                              <span style={{ color: b.status === 'completed' ? '#22C55E' : 'rgba(255,255,255,0.4)', fontSize: 11, marginLeft: 8, flexShrink: 0 }}>{b.status}</span>
+                              <span style={{ color: 'rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{b.time_slot || ''} {b.name}</span>
+                              <span style={{ color: b.status === 'completed' ? '#22C55E' : 'rgba(0,0,0,.4)', fontSize: 11, marginLeft: 8, flexShrink: 0 }}>{b.status}</span>
                             </div>
                           ))}
                         </div>
@@ -699,9 +699,9 @@ export default function SchedulePage() {
             {/* No assignment */}
             {!assignment && !showWeekly && (
               <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-                <Calendar size={64} color="rgba(255,255,255,0.4)" style={{ margin: '0 auto 16px' }} />
-                <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>No assignment scheduled for today</div>
-                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>Your shift starts automatically when you begin a job.</div>
+                <Calendar size={64} color="rgba(0,0,0,.4)" style={{ margin: '0 auto 16px' }} />
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', marginBottom: 4 }}>No assignment scheduled for today</div>
+                <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)' }}>Your shift starts automatically when you begin a job.</div>
               </div>
             )}
 
@@ -710,20 +710,20 @@ export default function SchedulePage() {
               <div className="dark-card p-4">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Today&apos;s Pickup</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>{assignment.uhaul_location || assignment.pickup_location || '—'}</div>
+                    <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Today&apos;s Pickup</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: '#1a1a1a', marginTop: 2 }}>{assignment.uhaul_location || assignment.pickup_location || '—'}</div>
                   </div>
                 </div>
                 {partner && (
-                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Partner</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>
+                      <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Partner</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
                         {partner.name || `${partner.first_name || ''} ${partner.last_name || ''}`.trim()}
                       </div>
                     </div>
                     {partner.phone && (
-                      <a href={`tel:${partner.phone}`} className="glass-btn" style={{ minHeight: 40, padding: '8px 16px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)', textDecoration: 'none' }}>
+                      <a href={`tel:${partner.phone}`} className="glass-btn" style={{ minHeight: 40, padding: '8px 16px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#1a1a1a', textDecoration: 'none' }}>
                         <Phone size={16} color="#f97316" /> Call
                       </a>
                     )}
@@ -736,8 +736,8 @@ export default function SchedulePage() {
             {assignment && !showWeekly && (
               <div className="dark-card p-4">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <Truck size={18} color="rgba(255,255,255,0.6)" />
-                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Truck Check</span>
+                  <Truck size={18} color="rgba(0,0,0,.6)" />
+                  <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Truck Check</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <button
@@ -763,7 +763,7 @@ export default function SchedulePage() {
             {/* Job cards */}
             {assignment && bookings.length > 0 && !showWeekly && (
               <div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, paddingLeft: 4 }}>
+                <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, paddingLeft: 4 }}>
                   Jobs ({bookings.length})
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -785,7 +785,7 @@ export default function SchedulePage() {
                         key={b.id}
                         className="dark-card p-4"
                         style={{
-                          borderLeft: isNext && !completed ? '3px solid #f97316' : '1px solid rgba(255,255,255,0.06)',
+                          borderLeft: isNext && !completed ? '3px solid #f97316' : '1px solid rgba(0,0,0,.06)',
                         }}
                       >
                         {/* Top row: number badge + customer + status pill */}
@@ -794,7 +794,7 @@ export default function SchedulePage() {
                             {idx + 1}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</div>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</div>
                           </div>
                           <span style={{ fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 999, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
                             {b.status}
@@ -803,16 +803,16 @@ export default function SchedulePage() {
 
                         {/* Second row: address + price */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                          <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                             {b.address || '—'}
                           </div>
-                          <div className="tabular" style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', flexShrink: 0 }}>
+                          <div className="tabular" style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', flexShrink: 0 }}>
                             ${Number(b.total_price || 0).toFixed(2)}
                           </div>
                         </div>
 
                         {/* Time slot */}
-                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+                        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 8 }}>
                           {b.time_slot || 'Time TBD'} · {b.load_size || '—'}
                         </div>
 
@@ -821,12 +821,12 @@ export default function SchedulePage() {
                           <div style={{ marginBottom: 8 }}>
                             <button
                               onClick={() => setExpandedItems((p) => ({ ...p, [b.id]: !p[b.id] }))}
-                              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: 0 }}
+                              style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,.6)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: 0 }}
                             >
                               {items.length} items <ChevronDown size={14} style={{ transform: itemsExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                             </button>
                             {itemsExpanded && (
-                              <ul style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 8, paddingLeft: 16, listStyle: 'disc' }}>
+                              <ul style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 8, paddingLeft: 16, listStyle: 'disc' }}>
                                 {items.map((it, i) => (
                                   <li key={i} style={{ marginBottom: 2 }}>
                                     {typeof it === 'string' ? it : `${it.qty || it.quantity || 1}x ${it.name || it.item || it.description || ''}`}
@@ -848,7 +848,7 @@ export default function SchedulePage() {
                               <ChevronDown size={14} style={{ transform: notesExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                             </button>
                             {notesExpanded && (
-                              <div style={{ marginTop: 8, padding: 12, background: 'rgba(245,158,11,0.05)', borderRadius: 8, fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+                              <div style={{ marginTop: 8, padding: 12, background: 'rgba(245,158,11,0.05)', borderRadius: 8, fontSize: 13, color: 'rgba(0,0,0,.6)' }}>
                                 {b.notes}
                               </div>
                             )}
@@ -861,7 +861,7 @@ export default function SchedulePage() {
                             <div className="tabular" style={{ fontSize: 28, fontWeight: 700, color: '#F59E0B', letterSpacing: 1 }}>
                               {fmtDuration(now - new Date(open.clock_in_at).getTime())}
                             </div>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>job in progress</div>
+                            <div style={{ fontSize: 12, color: 'rgba(0,0,0,.4)' }}>job in progress</div>
                           </div>
                         )}
 
@@ -882,7 +882,7 @@ export default function SchedulePage() {
                               onClick={() => jobClock(b.id, 'out')}
                               disabled={busy === b.id}
                               className="btn-primary"
-                              style={{ flex: 1, minHeight: 48, fontSize: 15, background: '#1E1E22', color: 'rgba(255,255,255,0.9)' }}
+                              style={{ flex: 1, minHeight: 48, fontSize: 15, background: '#F5F5F7', color: '#1a1a1a' }}
                             >
                               {busy === b.id ? '...' : 'End Job'}
                             </button>
@@ -926,15 +926,15 @@ export default function SchedulePage() {
             {allDone && !showWeekly && (
               <div className="dark-card slide-up p-6" style={{ textAlign: 'center', border: '1px solid rgba(34,197,94,0.2)' }}>
                 <CheckCircle size={48} color="#22C55E" className="celebrate" style={{ margin: '0 auto 12px' }} />
-                <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>Great work today!</div>
+                <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a1a', marginBottom: 4 }}>Great work today!</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
                   <div>
-                    <div className="tabular" style={{ fontSize: 34, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{jobsCompleted}</div>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>jobs done</div>
+                    <div className="tabular" style={{ fontSize: 34, fontWeight: 700, color: '#1a1a1a' }}>{jobsCompleted}</div>
+                    <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>jobs done</div>
                   </div>
                   <div>
-                    <div className="tabular" style={{ fontSize: 34, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{totalHours}</div>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>hours</div>
+                    <div className="tabular" style={{ fontSize: 34, fontWeight: 700, color: '#1a1a1a' }}>{totalHours}</div>
+                    <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>hours</div>
                   </div>
                 </div>
               </div>
@@ -943,24 +943,24 @@ export default function SchedulePage() {
             {/* Earnings estimator */}
             {assignment && !showWeekly && (
               <div className="dark-card" style={{ padding: 16, marginTop: 12 }}>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Estimated Earnings</div>
+                <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Estimated Earnings</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, textAlign: 'center' }}>
                   <div>
                     <div className="tabular" style={{ fontSize: 22, fontWeight: 700, color: '#f97316' }}>${(totalMinutes / 60 * (emp?.pay_rate || 18)).toFixed(0)}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Today</div>
+                    <div style={{ fontSize: 11, color: 'rgba(0,0,0,.4)', marginTop: 2 }}>Today</div>
                   </div>
                   <div>
-                    <div className="tabular" style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{totalHours}h</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Worked</div>
+                    <div className="tabular" style={{ fontSize: 22, fontWeight: 700, color: '#1a1a1a' }}>{totalHours}h</div>
+                    <div style={{ fontSize: 11, color: 'rgba(0,0,0,.4)', marginTop: 2 }}>Worked</div>
                   </div>
                   <div>
-                    <div className="tabular" style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>${emp?.pay_rate || 18}/hr</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Rate</div>
+                    <div className="tabular" style={{ fontSize: 22, fontWeight: 700, color: '#1a1a1a' }}>${emp?.pay_rate || 18}/hr</div>
+                    <div style={{ fontSize: 11, color: 'rgba(0,0,0,.4)', marginTop: 2 }}>Rate</div>
                   </div>
                 </div>
                 {clockedIn && data?.open_shift?.clock_in_at && (
-                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Current shift</span>
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Current shift</span>
                     <span className="tabular" style={{ fontSize: 16, fontWeight: 600, color: '#22C55E' }}>{fmtDuration(now - new Date(data.open_shift.clock_in_at).getTime())}</span>
                   </div>
                 )}

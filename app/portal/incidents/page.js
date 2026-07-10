@@ -2,15 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, AlertTriangle, Camera, CheckCircle, ChevronRight } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle, ChevronRight } from 'lucide-react';
 
-const D = '#0A0A0B';
-const CARD = '#161618';
-const INPUT = '#1A1A1E';
-const ORANGE = '#f97316';
-const TXT = 'rgba(255,255,255,0.9)';
-const TXT2 = 'rgba(255,255,255,0.6)';
-const TXT3 = 'rgba(255,255,255,0.4)';
+// ============================================================
+// /portal/incidents — incident reporting and history. Light theme.
+// ============================================================
 
 const INCIDENT_TYPES = [
   { value: 'injury', label: 'Injury', icon: '🩹' },
@@ -28,6 +24,12 @@ const SEVERITIES = [
   { value: 'critical', label: 'Critical', color: '#EF4444' },
 ];
 
+const STATUS_STYLES = {
+  reported: { bg: 'rgba(245,158,11,.15)', color: '#F59E0B' },
+  investigating: { bg: 'rgba(59,130,246,.15)', color: '#3B82F6' },
+  resolved: { bg: 'rgba(34,197,94,.15)', color: '#22C55E' },
+};
+
 export default function IncidentsPage() {
   const router = useRouter();
   const [incidents, setIncidents] = useState([]);
@@ -35,7 +37,6 @@ export default function IncidentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // Form state
   const [type, setType] = useState('injury');
   const [severity, setSeverity] = useState('medium');
   const [description, setDescription] = useState('');
@@ -74,118 +75,159 @@ export default function IncidentsPage() {
   };
 
   return (
-    <main className="min-h-dvh safe-top safe-bottom" style={{ background: D }}>
-      <header className="glass-bar" style={{ position: 'sticky', top: 0, zIndex: 20, padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => router.push('/portal/schedule')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ArrowLeft size={20} color={TXT2} />
-          </button>
-          <div style={{ fontSize: 18, fontWeight: 700, color: TXT }}>Incident Reports</div>
+    <div className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+        <div onClick={() => router.push('/portal/schedule')} style={{ width: 38, height: 38, borderRadius: 999, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <ArrowLeft size={17} color="#1a1a1a" />
         </div>
-        {!showForm && (
-          <button onClick={() => setShowForm(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: 14, fontWeight: 600, minHeight: 40 }}>
-            + Report
-          </button>
-        )}
-      </header>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1a1a' }}>Incidents</div>
+        <div onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 999, background: 'rgba(239,68,68,.10)', cursor: 'pointer' }}>
+          <AlertTriangle size={13} color="#EF4444" />
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#EF4444' }}>Report</span>
+        </div>
+      </div>
 
-      <div style={{ maxWidth: 448, margin: '0 auto', padding: '16px 24px' }}>
-        {showForm ? (
-          submitted ? (
-            <div className="dark-card" style={{ padding: 32, textAlign: 'center' }}>
-              <CheckCircle size={48} color="#22C55E" style={{ margin: '0 auto 16px' }} />
-              <div style={{ fontSize: 18, fontWeight: 700, color: TXT }}>Report Filed</div>
-              <div style={{ fontSize: 14, color: TXT2, marginTop: 4 }}>Your supervisor has been notified.</div>
-            </div>
-          ) : (
-            <div className="dark-card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 12, color: TXT3, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>New Incident Report</div>
-
-              {/* Type selection */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: TXT2, marginBottom: 8 }}>Type</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        {/* Form */}
+        {showForm && (
+          <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,.06)', borderRadius: 16, padding: 18, marginBottom: 20 }}>
+            {submitted ? (
+              <div style={{ textAlign: 'center', padding: 20 }}>
+                <CheckCircle size={48} color="#22C55E" style={{ margin: '0 auto 16px' }} />
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>Report Filed</div>
+                <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>Your supervisor has been notified.</div>
+              </div>
+            ) : (
+              <>
+                {/* Type */}
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(0,0,0,.5)', marginBottom: 8 }}>INCIDENT TYPE</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                   {INCIDENT_TYPES.map((t) => (
-                    <button key={t.value} onClick={() => setType(t.value)} className="dark-card" style={{ padding: 12, textAlign: 'left', cursor: 'pointer', border: type === t.value ? `2px solid ${ORANGE}` : '1px solid rgba(255,255,255,0.06)', background: type === t.value ? 'rgba(249,115,22,0.08)' : CARD }}>
-                      <div style={{ fontSize: 18 }}>{t.icon}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: type === t.value ? ORANGE : TXT, marginTop: 4 }}>{t.label}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Severity */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: TXT2, marginBottom: 8 }}>Severity</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {SEVERITIES.map((s) => (
-                    <button key={s.value} onClick={() => setSeverity(s.value)} className="dark-card" style={{ flex: 1, padding: '10px 8px', textAlign: 'center', cursor: 'pointer', border: severity === s.value ? `2px solid ${s.color}` : '1px solid rgba(255,255,255,0.06)', background: severity === s.value ? `${s.color}15` : CARD }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: severity === s.value ? s.color : TXT }}>{s.label}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Description */}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: TXT2, marginBottom: 8 }}>What happened? *</div>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the incident in detail..." className="dark-input" style={{ width: '100%', padding: '12px 16px', fontSize: 14, color: TXT, background: INPUT, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, resize: 'none' }} />
-              </div>
-
-              {/* Location */}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: TXT2, marginBottom: 8 }}>Location (optional)</div>
-                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. 123 Main St NE, Calgary" className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 14, color: TXT, background: INPUT, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
-              </div>
-
-              {/* Reported to */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: TXT2, marginBottom: 8 }}>Reported to (optional)</div>
-                <input value={reportedTo} onChange={(e) => setReportedTo(e.target.value)} placeholder="e.g. Supervisor, 911" className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 14, color: TXT, background: INPUT, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
-              </div>
-
-              {error && <div style={{ color: '#EF4444', fontSize: 14, marginBottom: 12 }}>{error}</div>}
-
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setShowForm(false)} className="dark-card" style={{ flex: 1, minHeight: 48, fontWeight: 600, color: TXT2, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={submit} disabled={submitting} className="btn-primary" style={{ flex: 2, minHeight: 48 }}>{submitting ? 'Submitting...' : 'Submit Report'}</button>
-              </div>
-            </div>
-          )
-        ) : loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-            <div style={{ width: 32, height: 32, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: ORANGE, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-          </div>
-        ) : incidents.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 64 }}>
-            <AlertTriangle size={48} color="rgba(255,255,255,0.15)" style={{ margin: '0 auto 16px' }} />
-            <div style={{ color: TXT2, fontSize: 16, fontWeight: 600 }}>No incidents reported</div>
-            <div style={{ color: TXT3, fontSize: 14, marginTop: 4 }}>Report any injuries, accidents, or safety hazards here.</div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {incidents.map((inc) => {
-              const sev = SEVERITIES.find((s) => s.value === inc.severity) || SEVERITIES[1];
-              return (
-                <div key={inc.id} className="dark-card" style={{ padding: 16, borderLeft: `3px solid ${sev.color}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ fontSize: 15, fontWeight: 600, color: TXT }}>{inc.incident_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
-                      <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 8, background: `${sev.color}20`, color: sev.color, fontWeight: 600, textTransform: 'uppercase' }}>{inc.severity}</span>
+                    <div key={t.value} onClick={() => setType(t.value)} style={{
+                      padding: '9px 14px', borderRadius: 999, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                      ...(type === t.value
+                        ? { background: '#f97316', color: '#fff' }
+                        : { background: '#F0F0F2', color: 'rgba(0,0,0,.6)' }),
+                    }}>
+                      {t.icon} {t.label}
                     </div>
-                    <span style={{ fontSize: 12, color: TXT3 }}>{new Date(inc.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}</span>
+                  ))}
+                </div>
+
+                {/* Severity */}
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(0,0,0,.5)', marginBottom: 8 }}>SEVERITY</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  {SEVERITIES.map((s) => (
+                    <div key={s.value} onClick={() => setSeverity(s.value)} style={{
+                      flex: 1, textAlign: 'center', padding: '9px 0', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      ...(severity === s.value
+                        ? { background: s.color, color: '#fff' }
+                        : { background: '#F0F0F2', color: 'rgba(0,0,0,.5)' }),
+                    }}>
+                      {s.label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Description */}
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  placeholder="Describe what happened…"
+                  style={{
+                    width: '100%', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12,
+                    padding: '14px 16px', fontSize: 14, color: '#1a1a1a', fontFamily: 'inherit', resize: 'none',
+                    marginBottom: 12, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+
+                {/* Location */}
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Location (optional)"
+                  style={{
+                    width: '100%', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12,
+                    padding: '0 16px', height: 48, fontSize: 14, color: '#1a1a1a', fontFamily: 'inherit',
+                    marginBottom: 12, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+
+                {/* Reported to */}
+                <input
+                  value={reportedTo}
+                  onChange={(e) => setReportedTo(e.target.value)}
+                  placeholder="Reported to (optional)"
+                  style={{
+                    width: '100%', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12,
+                    padding: '0 16px', height: 48, fontSize: 14, color: '#1a1a1a', fontFamily: 'inherit',
+                    marginBottom: 16, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+
+                {error && <div style={{ color: '#EF4444', fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div onClick={() => setShowForm(false)} style={{ flex: 1, height: 48, borderRadius: 14, border: '1px solid rgba(0,0,0,.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, color: '#1a1a1a', cursor: 'pointer' }}>
+                    Cancel
                   </div>
-                  <div style={{ fontSize: 14, color: TXT2, marginTop: 8 }}>{inc.description}</div>
-                  {inc.location && <div style={{ fontSize: 13, color: TXT3, marginTop: 4 }}>📍 {inc.location}</div>}
-                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: inc.status === 'resolved' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: inc.status === 'resolved' ? '#22C55E' : '#F59E0B', fontWeight: 600, textTransform: 'uppercase' }}>{inc.status}</span>
+                  <div onClick={submit} style={{ flex: 1, height: 48, borderRadius: 14, background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: '#fff', cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>
+                    {submitting ? 'Submitting...' : 'Submit Report'}
                   </div>
                 </div>
-              );
-            })}
+              </>
+            )}
           </div>
+        )}
+
+        {/* History */}
+        {!showForm && (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(0,0,0,.4)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 10 }}>History</div>
+
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+                <div style={{ width: 28, height: 28, border: '3px solid #F0F0F2', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              </div>
+            ) : incidents.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 64 }}>
+                <AlertTriangle size={48} color="rgba(0,0,0,.15)" style={{ margin: '0 auto 16px' }} />
+                <div style={{ color: '#1a1a1a', fontSize: 16, fontWeight: 600 }}>No incidents reported</div>
+                <div style={{ color: 'rgba(0,0,0,.4)', fontSize: 14, marginTop: 4 }}>Report any injuries, accidents, or safety hazards here.</div>
+              </div>
+            ) : (
+              incidents.map((inc) => {
+                const sev = SEVERITIES.find((s) => s.value === inc.severity) || SEVERITIES[1];
+                const st = STATUS_STYLES[inc.status] || STATUS_STYLES.reported;
+                return (
+                  <div key={inc.id} style={{ background: '#fff', border: '1px solid rgba(0,0,0,.06)', borderRadius: 16, padding: 16, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                    <div style={{ width: 8, alignSelf: 'stretch', borderRadius: 4, background: sev.color, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ marginBottom: 2 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>
+                          {inc.incident_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12.5, color: 'rgba(0,0,0,.6)', marginBottom: 4 }}>{inc.description}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: 'rgba(0,0,0,.4)' }}>
+                          {new Date(inc.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                        </span>
+                        <span style={{ padding: '3px 8px', borderRadius: 999, fontSize: 10.5, fontWeight: 700, background: st.bg, color: st.color }}>
+                          {inc.status}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight size={15} color="rgba(0,0,0,.3)" />
+                  </div>
+                );
+              })
+            )}
+          </>
         )}
       </div>
-    </main>
+    </div>
   );
 }

@@ -4,19 +4,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, ArrowLeft, CheckCheck, Info, AlertTriangle, CheckCircle, Radio, Calendar, ChevronRight } from 'lucide-react';
 
-const D = '#0A0A0B';
-const CARD = '#161618';
-const ORANGE = '#f97316';
-const TXT = 'rgba(255,255,255,0.9)';
-const TXT2 = 'rgba(255,255,255,0.6)';
-const TXT3 = 'rgba(255,255,255,0.4)';
+// ============================================================
+// /portal/notifications — employee notification center. Light theme.
+// ============================================================
 
 const TYPE_ICONS = {
-  info: { icon: Info, color: '#60A5FA' },
+  info: { icon: Info, color: '#3B82F6' },
   warning: { icon: AlertTriangle, color: '#F59E0B' },
   success: { icon: CheckCircle, color: '#22C55E' },
-  assignment: { icon: Calendar, color: '#60A5FA' },
-  broadcast: { icon: Radio, color: ORANGE },
+  assignment: { icon: Calendar, color: '#3B82F6' },
+  broadcast: { icon: Radio, color: '#f97316' },
 };
 
 function timeAgo(iso) {
@@ -65,73 +62,69 @@ export default function NotificationsPage() {
   };
 
   return (
-    <main className="min-h-dvh safe-top safe-bottom" style={{ background: D }}>
+    <div className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
       {/* Header */}
-      <header className="glass-bar" style={{ position: 'sticky', top: 0, zIndex: 20, padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => router.push('/portal/schedule')} className="glass-btn" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ArrowLeft size={20} color={TXT2} />
-          </button>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: TXT }}>Notifications</div>
-            {unread > 0 && <div style={{ fontSize: 13, color: ORANGE }}>{unread} unread</div>}
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+        <div onClick={() => router.push('/portal/schedule')} style={{ width: 38, height: 38, borderRadius: 999, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <ArrowLeft size={17} color="#1a1a1a" />
         </div>
-        {unread > 0 && (
-          <button onClick={markAllRead} className="glass-btn" style={{ padding: '8px 12px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: ORANGE }}>
-            <CheckCheck size={16} /> Mark all
-          </button>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1a1a' }}>Notifications</div>
+          {unread > 0 && <div style={{ fontSize: 11, color: 'rgba(0,0,0,.5)' }}>{unread} unread</div>}
+        </div>
+        {unread > 0 ? (
+          <div onClick={markAllRead} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', width: 38, height: 38, justifyContent: 'center' }}>
+            <CheckCheck size={15} color="#f97316" />
+          </div>
+        ) : (
+          <div style={{ width: 38 }} />
         )}
-      </header>
+      </div>
 
-      <div style={{ maxWidth: 448, margin: '0 auto', padding: '16px 24px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-            <div style={{ width: 32, height: 32, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: ORANGE, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <div style={{ width: 28, height: 28, border: '3px solid #F0F0F2', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
           </div>
         ) : notifications.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 64 }}>
-            <Bell size={48} color="rgba(255,255,255,0.15)" style={{ margin: '0 auto 16px' }} />
-            <div style={{ color: TXT2, fontSize: 16, fontWeight: 600 }}>No notifications yet</div>
-            <div style={{ color: TXT3, fontSize: 14, marginTop: 4 }}>You&apos;ll see job assignments, updates, and broadcasts here.</div>
+            <Bell size={48} color="rgba(0,0,0,.15)" style={{ margin: '0 auto 16px' }} />
+            <div style={{ color: '#1a1a1a', fontSize: 16, fontWeight: 600 }}>No notifications yet</div>
+            <div style={{ color: 'rgba(0,0,0,.4)', fontSize: 14, marginTop: 4 }}>You&apos;ll see job assignments, updates, and broadcasts here.</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div>
             {notifications.map((n) => {
               const tc = TYPE_ICONS[n.type] || TYPE_ICONS.info;
               const Icon = tc.icon;
               const isUnread = !n.read_at;
               return (
-                <button
+                <div
                   key={n.id}
                   onClick={() => markRead(n.id, n.link)}
-                  className="dark-card"
-                  style={{
-                    padding: 16, textAlign: 'left', cursor: 'pointer',
-                    borderLeft: isUnread ? `3px solid ${tc.color}` : '3px solid transparent',
-                    background: isUnread ? 'rgba(249,115,22,0.04)' : CARD,
-                  }}
+                  style={{ display: 'flex', gap: 12, padding: '14px 4px', borderBottom: '1px solid rgba(0,0,0,.06)', cursor: 'pointer', position: 'relative' }}
                 >
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `${tc.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon size={18} color={tc.color} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: TXT }}>{n.title}</span>
-                        <span style={{ fontSize: 12, color: TXT3, whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(n.created_at)}</span>
-                      </div>
-                      {n.body && <div style={{ fontSize: 14, color: TXT2, marginTop: 4 }}>{n.body}</div>}
-                      {n.link && <div style={{ fontSize: 13, color: ORANGE, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>Open <ChevronRight size={14} /></div>}
-                    </div>
-                    {isUnread && <div style={{ width: 8, height: 8, borderRadius: '50%', background: ORANGE, flexShrink: 0, marginTop: 6 }} />}
+                  {/* Unread dot */}
+                  <div style={{ width: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {isUnread && <div style={{ width: 7, height: 7, borderRadius: 999, background: '#f97316' }} />}
                   </div>
-                </button>
+                  {/* Icon circle */}
+                  <div style={{ width: 38, height: 38, borderRadius: 999, background: '#F5F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={17} color={tc.color} />
+                  </div>
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 2 }}>{n.title}</div>
+                    {n.body && <div style={{ fontSize: 12.5, color: 'rgba(0,0,0,.6)', lineHeight: 1.4, marginBottom: 4 }}>{n.body}</div>}
+                    <div style={{ fontSize: 11, color: 'rgba(0,0,0,.4)' }}>{timeAgo(n.created_at)}</div>
+                  </div>
+                  {n.link && <ChevronRight size={15} color="rgba(0,0,0,.3)" style={{ flexShrink: 0, marginTop: 14 }} />}
+                </div>
               );
             })}
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

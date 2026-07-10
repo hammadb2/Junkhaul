@@ -310,8 +310,8 @@ function OnboardInner() {
       <div className="progress-line" style={{ borderRadius: 0 }}>
         <div className="progress-line-fill" style={{ width: `${(step / 8) * 100}%` }} />
       </div>
-      <div style={{ padding: '6px 24px 0', background: '#0A0A0B' }}>
-        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Step {step} of 8 · {STEP_LABELS[step]}</span>
+      <div style={{ padding: '6px 24px 0', background: '#FAFAFA' }}>
+        <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Step {step} of 8 · {STEP_LABELS[step]}</span>
       </div>
     </div>
   );
@@ -322,7 +322,7 @@ function OnboardInner() {
       className="glass-btn"
       style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, zIndex: 20, width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
-      <ArrowLeft size={20} color="rgba(255,255,255,0.7)" />
+      <ArrowLeft size={20} color="rgba(0,0,0,.6)" />
     </button>
   );
 
@@ -356,19 +356,19 @@ function OnboardInner() {
 
   const Headline = ({ title, subtitle }) => (
     <div style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>{subtitle}</div>}
+      <div style={{ fontSize: 20, fontWeight: 600, color: '#1a1a1a' }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 16, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>{subtitle}</div>}
     </div>
   );
 
   const DarkInput = ({ label, value, onChange, ...props }) => (
     <div style={{ marginBottom: 16 }}>
-      {label && <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>{label}</label>}
+      {label && <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>{label}</label>}
       <input
         value={value}
         onChange={onChange}
         className="dark-input"
-        style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}
+        style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }}
         {...props}
       />
     </div>
@@ -381,7 +381,7 @@ function OnboardInner() {
         <Shell>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: 40, height: 40, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 16 }} />
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>Validating your invite...</div>
+            <div style={{ color: 'rgba(0,0,0,.4)', fontSize: 14 }}>Validating your invite...</div>
           </div>
         </Shell>
       );
@@ -393,13 +393,13 @@ function OnboardInner() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
             <div style={{ textAlign: 'center', maxWidth: 400 }}>
               <img src="/crew-logo.png" alt="Junk Haul Crew" style={{ width: 72, height: 72, borderRadius: 16, margin: '0 auto 16px' }} />
-              <div style={{ fontSize: 24, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>Junk Haul Crew</div>
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 24 }}>Onboarding Portal</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>Junk Haul Crew</div>
+              <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginBottom: 24 }}>Onboarding Portal</div>
               <div className="dark-card" style={{ padding: 24, textAlign: 'center', border: '1px solid rgba(239,68,68,0.2)' }}>
                 <AlertTriangle size={32} color="#EF4444" style={{ margin: '0 auto 12px' }} />
                 <div style={{ color: '#EF4444', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Invite problem</div>
-                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>{inviteError}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 16 }}>Contact your manager for a new invite link.</div>
+                <div style={{ color: 'rgba(0,0,0,.6)', fontSize: 14 }}>{inviteError}</div>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,.4)', marginTop: 16 }}>Contact your manager for a new invite link.</div>
               </div>
             </div>
           </div>
@@ -424,20 +424,20 @@ function OnboardInner() {
         <StepShell showProgress={false}>
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
             <img src="/crew-logo.png" alt="Junk Haul Crew" style={{ width: 72, height: 72, borderRadius: 16, margin: '0 auto 12px' }} />
-            <div style={{ fontSize: 24, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>Welcome to the crew</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>Welcome to the crew</div>
           </div>
 
           {/* Invite card */}
           {invite && (
             <div className="dark-card" style={{ padding: 16, marginBottom: 24, border: '1px solid rgba(249,115,22,0.2)' }}>
               <div style={{ fontSize: 12, color: '#f97316', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>You&apos;re invited to join</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{invite.first_name} {invite.last_name}</div>
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>{invite.email}</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>{invite.first_name} {invite.last_name}</div>
+              <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)' }}>{invite.email}</div>
               {invite.pay_rate != null && (
-                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: '4px 12px', fontSize: 14 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>Pay rate</span>
-                  <span className="tabular" style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>${Number(invite.pay_rate).toFixed(2)}</span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>/hr</span>
+                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,.06)', borderRadius: 999, padding: '4px 12px', fontSize: 14 }}>
+                  <span style={{ color: 'rgba(0,0,0,.6)' }}>Pay rate</span>
+                  <span className="tabular" style={{ fontWeight: 700, color: '#1a1a1a' }}>${Number(invite.pay_rate).toFixed(2)}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(0,0,0,.4)' }}>/hr</span>
                 </div>
               )}
             </div>
@@ -446,8 +446,8 @@ function OnboardInner() {
           {isStandalone ? (
             <div className="dark-card" style={{ padding: 24, textAlign: 'center', marginBottom: 16 }}>
               <CheckCircle size={40} color="#22C55E" style={{ margin: '0 auto 12px' }} />
-              <div style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>App installed!</div>
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>You&apos;re ready to continue.</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>App installed!</div>
+              <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>You&apos;re ready to continue.</div>
             </div>
           ) : (
             <>
@@ -461,9 +461,9 @@ function OnboardInner() {
                         <Icon size={24} color="#f97316" />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Step {i + 1}</div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{frame.title}</div>
-                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{frame.sub}</div>
+                        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.4)', marginBottom: 2 }}>Step {i + 1}</div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a' }}>{frame.title}</div>
+                        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 2 }}>{frame.sub}</div>
                       </div>
                     </div>
                   );
@@ -476,7 +476,7 @@ function OnboardInner() {
           <div style={{ marginTop: 24 }}>
             <ContinueBtn label="Continue" onClick={() => setStep(1)} />
             {!isStandalone && (
-              <button onClick={() => setStep(1)} style={{ width: '100%', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 14, padding: '12px 0', marginTop: 8 }}>Skip for now</button>
+              <button onClick={() => setStep(1)} style={{ width: '100%', background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 14, padding: '12px 0', marginTop: 8 }}>Skip for now</button>
             )}
           </div>
         </StepShell>
@@ -497,8 +497,8 @@ function OnboardInner() {
                 <User size={20} color="#f97316" />
               </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{invite.first_name} {invite.last_name}</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{invite.email}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>{invite.first_name} {invite.last_name}</div>
+                <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>{invite.email}</div>
               </div>
             </div>
           )}
@@ -514,8 +514,8 @@ function OnboardInner() {
                   { check: /[^A-Za-z0-9]/.test(accountForm.password), label: '1 special character' },
                 ].map((req, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    {req.check ? <Check size={14} color="#22C55E" /> : <X size={14} color="rgba(255,255,255,0.3)" />}
-                    <span style={{ color: req.check ? '#22C55E' : 'rgba(255,255,255,0.4)' }}>{req.label}</span>
+                    {req.check ? <Check size={14} color="#22C55E" /> : <X size={14} color="rgba(0,0,0,.3)" />}
+                    <span style={{ color: req.check ? '#22C55E' : 'rgba(0,0,0,.4)' }}>{req.label}</span>
                   </div>
                 ))}
               </div>
@@ -524,7 +524,7 @@ function OnboardInner() {
             <DarkInput label="Mobile phone" type="tel" value={accountForm.phone} onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })} placeholder="(587) 555-0123" required autoComplete="tel" />
 
             <div style={{ marginBottom: 16, position: 'relative' }}>
-              <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Home address</label>
+              <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Home address</label>
               <input
                 value={accountForm.address}
                 onChange={(e) => onAddressChange(e.target.value)}
@@ -534,12 +534,12 @@ function OnboardInner() {
                 required
                 autoComplete="street-address"
                 className="dark-input"
-                style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}
+                style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16, color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12 }}
               />
               {addressFocused && addressSuggestions.length > 0 && (
-                <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, marginTop: 4, background: '#161618', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', maxHeight: 240, overflowY: 'auto' }}>
+                <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, marginTop: 4, background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.06)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', maxHeight: 240, overflowY: 'auto' }}>
                   {addressSuggestions.map((s, i) => (
-                    <button key={i} type="button" onClick={() => { setAccountForm({ ...accountForm, address: s }); setAddressSuggestions([]); setAddressFocused(false); }} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', fontSize: 14, color: 'rgba(255,255,255,0.7)', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <button key={i} type="button" onClick={() => { setAccountForm({ ...accountForm, address: s }); setAddressSuggestions([]); setAddressFocused(false); }} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', fontSize: 14, color: 'rgba(0,0,0,.6)', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(0,0,0,.04)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                       <MapPin size={14} color="#f97316" /> {s}
                     </button>
                   ))}
@@ -551,7 +551,7 @@ function OnboardInner() {
             <ContinueBtn label="Create account & continue" />
           </form>
 
-          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             <Lock size={12} /> Your data is encrypted and stored securely.
           </div>
         </StepShell>
@@ -566,7 +566,7 @@ function OnboardInner() {
       const isDone = file && (docType ? docStatus[docType] === 'uploaded' : selfieUrl);
       return (
         <div className="dark-card" style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 14, background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ width: 64, height: 64, borderRadius: 14, background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
             {isDone ? (
               <>
                 {selfieUrl && uploadKey === 'selfie' ? (
@@ -581,12 +581,12 @@ function OnboardInner() {
             ) : isUploading ? (
               <div style={{ width: 24, height: 24, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
             ) : (
-              <Icon size={24} color="rgba(255,255,255,0.3)" />
+              <Icon size={24} color="rgba(0,0,0,.3)" />
             )}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{label}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>{label}</div>
+            <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 2 }}>
               {isDone ? 'Uploaded' : isUploading ? 'Uploading...' : 'Tap to capture'}
             </div>
           </div>
@@ -602,7 +602,7 @@ function OnboardInner() {
               }}
               disabled={isUploading}
             />
-            <div className="glass-btn" style={{ minHeight: 40, padding: '8px 16px', borderRadius: 12, fontSize: 14, fontWeight: 600, color: isDone ? 'rgba(255,255,255,0.6)' : '#f97316', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="glass-btn" style={{ minHeight: 40, padding: '8px 16px', borderRadius: 12, fontSize: 14, fontWeight: 600, color: isDone ? 'rgba(0,0,0,.6)' : '#f97316', display: 'flex', alignItems: 'center', gap: 6 }}>
               {isDone ? 'Retake' : 'Capture'}
             </div>
           </label>
@@ -624,11 +624,11 @@ function OnboardInner() {
 
           <div className="dark-card" style={{ padding: 16, marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <User size={16} color="rgba(255,255,255,0.6)" />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Personal Info</span>
+              <User size={16} color="rgba(0,0,0,.6)" />
+              <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', textTransform: 'uppercase', letterSpacing: 1 }}>Personal Info</span>
             </div>
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>{personal.name}</div>
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>{personal.email}</div>
+            <div style={{ fontSize: 14, color: '#1a1a1a', marginBottom: 4 }}>{personal.name}</div>
+            <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginBottom: 12 }}>{personal.email}</div>
             <DarkInput label="Address" value={personal.address} onChange={(e) => setPersonal({ ...personal, address: e.target.value })} placeholder="Street, city, province, postal code" />
           </div>
 
@@ -678,8 +678,8 @@ function OnboardInner() {
         <StepShell onBack={() => setStep(4)}>
           <Headline title="Sign your contract" subtitle="Read and sign below" />
           <form onSubmit={submitContract}>
-            <div className="dark-card" style={{ padding: 16, marginBottom: 20, maxHeight: 260, overflowY: 'auto', fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
-              <p style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Junk Haul Crew — Employment Agreement (v1.0)</p>
+            <div className="dark-card" style={{ padding: 16, marginBottom: 20, maxHeight: 260, overflowY: 'auto', fontSize: 14, color: 'rgba(0,0,0,.6)', lineHeight: 1.6 }}>
+              <p style={{ fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>Junk Haul Crew — Employment Agreement (v1.0)</p>
               <p style={{ marginBottom: 8 }}>This agreement is between Junk Haul (&ldquo;the Company&rdquo;) and the undersigned employee (&ldquo;you&rdquo;).</p>
               <p style={{ marginBottom: 8 }}><strong>1. Role.</strong> You are hired as a crew member responsible for junk removal services, including driving, loading, and customer interaction.</p>
               <p style={{ marginBottom: 8 }}><strong>2. Pay.</strong> You will be paid at the agreed hourly rate. Overtime applies per provincial employment standards.</p>
@@ -691,13 +691,13 @@ function OnboardInner() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 }}>Type your full legal name as your signature</label>
+              <label style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 }}>Type your full legal name as your signature</label>
               <input
                 value={contract.signature_typed}
                 onChange={(e) => setContract({ ...contract, signature_typed: e.target.value })}
                 placeholder="Sign here"
                 className="dark-input"
-                style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 18, fontStyle: 'italic', color: 'rgba(255,255,255,0.9)', background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, borderBottom: '2px solid rgba(255,255,255,0.2)' }}
+                style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 18, fontStyle: 'italic', color: '#1a1a1a', background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12, borderBottom: '2px solid rgba(0,0,0,.15)' }}
               />
             </div>
 
@@ -705,12 +705,12 @@ function OnboardInner() {
               type="button"
               onClick={() => setContract({ ...contract, agreed: !contract.agreed })}
               className="dark-card"
-              style={{ width: '100%', padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', border: contract.agreed ? '1px solid rgba(249,115,22,0.3)' : '1px solid rgba(255,255,255,0.06)', background: contract.agreed ? 'rgba(249,115,22,0.08)' : '#161618', borderRadius: 14, marginBottom: 16 }}
+              style={{ width: '100%', padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', border: contract.agreed ? '1px solid rgba(249,115,22,0.3)' : '1px solid rgba(0,0,0,.06)', background: contract.agreed ? 'rgba(249,115,22,0.08)' : '#fff', borderRadius: 14, marginBottom: 16 }}
             >
-              <div style={{ width: 24, height: 24, borderRadius: 6, border: contract.agreed ? 'none' : '2px solid rgba(255,255,255,0.2)', background: contract.agreed ? '#f97316' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 24, height: 24, borderRadius: 6, border: contract.agreed ? 'none' : '2px solid rgba(0,0,0,.15)', background: contract.agreed ? '#f97316' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {contract.agreed && <Check size={16} color="white" />}
               </div>
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>I have read and agree to the employment contract above.</span>
+              <span style={{ fontSize: 14, color: '#1a1a1a' }}>I have read and agree to the employment contract above.</span>
             </button>
 
             <ErrorBanner />
@@ -733,7 +733,7 @@ function OnboardInner() {
             <DarkInput label="Transit number (5 digits)" value={banking.transit_number} onChange={(e) => setBanking({ ...banking, transit_number: e.target.value.replace(/\D/g, '').slice(0, 5) })} placeholder="e.g. 01234" inputMode="numeric" />
             <DarkInput label="Account number" value={banking.account_number} onChange={(e) => setBanking({ ...banking, account_number: e.target.value.replace(/\s/g, '') })} placeholder="Your bank account number" inputMode="numeric" />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'rgba(0,0,0,.4)', marginBottom: 16 }}>
               <Lock size={12} /> Your account details are encrypted at rest.
             </div>
 
@@ -765,12 +765,12 @@ function OnboardInner() {
                   type="button"
                   onClick={() => setAcks({ ...acks, [it.key]: !acks[it.key] })}
                   className="dark-card"
-                  style={{ width: '100%', padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', border: acks[it.key] ? '1px solid rgba(249,115,22,0.3)' : '1px solid rgba(255,255,255,0.06)', background: acks[it.key] ? 'rgba(249,115,22,0.08)' : '#161618', borderRadius: 14 }}
+                  style={{ width: '100%', padding: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', border: acks[it.key] ? '1px solid rgba(249,115,22,0.3)' : '1px solid rgba(0,0,0,.06)', background: acks[it.key] ? 'rgba(249,115,22,0.08)' : '#fff', borderRadius: 14 }}
                 >
-                  <div style={{ width: 24, height: 24, borderRadius: 6, border: acks[it.key] ? 'none' : '2px solid rgba(255,255,255,0.2)', background: acks[it.key] ? '#f97316' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 6, border: acks[it.key] ? 'none' : '2px solid rgba(0,0,0,.15)', background: acks[it.key] ? '#f97316' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     {acks[it.key] && <Check size={16} color="white" />}
                   </div>
-                  <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', flex: 1 }}>{it.text}</span>
+                  <span style={{ fontSize: 14, color: '#1a1a1a', flex: 1 }}>{it.text}</span>
                 </button>
               ))}
             </div>
@@ -794,7 +794,7 @@ function OnboardInner() {
             <>
               <div className="dark-card" style={{ padding: 24, textAlign: 'center', marginBottom: 16 }}>
                 <CheckCircle size={40} color="#22C55E" style={{ margin: '0 auto 12px' }} />
-                <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)' }}>Everything looks good. Click below to finish.</div>
+                <div style={{ fontSize: 16, color: '#1a1a1a' }}>Everything looks good. Click below to finish.</div>
               </div>
               <ErrorBanner />
               <ContinueBtn label="Complete onboarding" onClick={completeOnboarding} />
@@ -805,8 +805,8 @@ function OnboardInner() {
             <div className="dark-card" style={{ padding: 24, border: '1px solid rgba(239,68,68,0.2)' }}>
               <AlertTriangle size={32} color="#EF4444" style={{ margin: '0 auto 12px' }} />
               <div style={{ fontSize: 18, fontWeight: 600, color: '#EF4444', textAlign: 'center', marginBottom: 8 }}>Not quite done</div>
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>Some items still need attention:</div>
-              <ul style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', listStyle: 'disc', paddingLeft: 20, marginBottom: 16 }}>
+              <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginBottom: 12 }}>Some items still need attention:</div>
+              <ul style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', listStyle: 'disc', paddingLeft: 20, marginBottom: 16 }}>
                 {completeData.missing.map((m, i) => <li key={i} style={{ marginBottom: 4 }}>{m}</li>)}
               </ul>
               <button onClick={() => { setCompleteData(null); setError(''); }} className="btn-ghost" style={{ width: '100%', minHeight: 48 }}>Go back to fix</button>
@@ -818,8 +818,8 @@ function OnboardInner() {
               <div className="celebrate" style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                 <CheckCircle size={48} color="#22C55E" />
               </div>
-              <div style={{ fontSize: 34, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>You&apos;re all set, {invite?.first_name || 'Crew'}!</div>
-              <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)', marginBottom: 32 }}>Welcome to the crew</div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>You&apos;re all set, {invite?.first_name || 'Crew'}!</div>
+              <div style={{ fontSize: 16, color: 'rgba(0,0,0,.6)', marginBottom: 32 }}>Welcome to the crew</div>
               <button onClick={() => router.push('/portal/schedule')} className="btn-primary safe-bottom" style={{ width: '100%', minHeight: 52, fontSize: 16 }}>
                 Continue to app
               </button>
@@ -840,10 +840,10 @@ function Td1FieldsDark({ form, setForm, basic, spousalDefault }) {
 
   const inputStyle = {
     width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 16,
-    color: 'rgba(255,255,255,0.9)', background: '#1A1A1E',
-    border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12,
+    color: '#1a1a1a', background: '#F0F0F2',
+    border: '1px solid rgba(0,0,0,.06)', borderRadius: 12,
   };
-  const labelStyle = { fontSize: 13, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 6 };
+  const labelStyle = { fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'block', marginBottom: 6 };
 
   return (
     <div>
@@ -866,7 +866,7 @@ function Td1FieldsDark({ form, setForm, basic, spousalDefault }) {
 
       {/* Live-updating total claim card */}
       <div className="dark-card" style={{ padding: 20, marginBottom: 16, border: '1px solid rgba(249,115,22,0.3)', textAlign: 'center' }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Total claim amount (auto-calculated)</div>
+        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginBottom: 4 }}>Total claim amount (auto-calculated)</div>
         <div className="tabular" style={{ fontSize: 34, fontWeight: 700, color: '#f97316' }}>
           ${autoTotal.toLocaleString()}
         </div>
@@ -875,7 +875,7 @@ function Td1FieldsDark({ form, setForm, basic, spousalDefault }) {
       <div style={{ marginBottom: 16 }}>
         <label style={labelStyle}>Override total claim (optional)</label>
         <input value={form.total_claim} onChange={set('total_claim')} placeholder={`Auto: $${autoTotal.toLocaleString()}`} inputMode="numeric" className="dark-input" style={inputStyle} />
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Leave blank to use auto-calculated amount.</div>
+        <div style={{ fontSize: 12, color: 'rgba(0,0,0,.4)', marginTop: 4 }}>Leave blank to use auto-calculated amount.</div>
       </div>
     </div>
   );
@@ -883,12 +883,12 @@ function Td1FieldsDark({ form, setForm, basic, spousalDefault }) {
 
 // ============ shell wrapper ============
 function Shell({ children }) {
-  return <main className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#0A0A0B' }}>{children}</main>;
+  return <main className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#FAFAFA' }}>{children}</main>;
 }
 
 export default function OnboardPage() {
   return (
-    <Suspense fallback={<Shell><div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: 48 }}>Loading...</div></Shell>}>
+    <Suspense fallback={<Shell><div style={{ textAlign: 'center', color: 'rgba(0,0,0,.4)', padding: 48 }}>Loading...</div></Shell>}>
       <OnboardInner />
     </Suspense>
   );

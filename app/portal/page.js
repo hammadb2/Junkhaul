@@ -3,11 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, User, Phone, MapPin, FileText, AlertCircle } from 'lucide-react';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 
 // ============================================================
-// /portal — employee login + signup landing.
-// If there's a pending onboarding token in localStorage (from
-// Add to Home Screen), redirect to onboarding automatically.
+// /portal — employee login + signup landing. Light theme.
 // ============================================================
 
 export default function PortalLogin() {
@@ -18,7 +17,6 @@ export default function PortalLogin() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', sin: '', address: '' });
 
   useEffect(() => {
-    // Check for pending onboarding token (PWA resume after Add to Home Screen)
     const onboardToken = localStorage.getItem('jh-onboard-token');
     if (onboardToken) {
       router.push(`/portal/onboard?token=${onboardToken}`);
@@ -40,7 +38,6 @@ export default function PortalLogin() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) { setError(data.error || 'Something went wrong'); return; }
-    // If onboarding is not complete, redirect to onboarding
     if (data.employee && !data.employee.onboarding_complete) {
       router.push('/portal/onboard');
     } else {
@@ -49,119 +46,97 @@ export default function PortalLogin() {
   };
 
   return (
-    <main className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#0A0A0B' }}>
-      {/* Logo centered ~1/3 down */}
-      <div className="flex flex-col items-center justify-center" style={{ paddingTop: '33vh' }}>
-        <img src="/crew-logo.png" alt="Junk Haul" className="w-24 h-24 rounded-2xl object-cover" />
-        <div className="mt-4 text-center">
-          <div className="text-xl font-bold" style={{ color: 'rgba(255,255,255,0.90)' }}>Junk Haul</div>
-          <div className="text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>Employee Portal</div>
-        </div>
-      </div>
+    <div className="min-h-dvh flex flex-col items-center safe-top safe-bottom" style={{ background: '#FAFAFA', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+      <div className="w-full max-w-md flex-1 flex flex-col overflow-y-auto" style={{ padding: '64px 28px 40px' }}>
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,.10)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 12, padding: '12px 14px', marginBottom: 18 }}>
+            <AlertCircle size={16} color="#EF4444" />
+            <span style={{ fontSize: 13, color: '#EF4444', fontWeight: 500 }}>{error}</span>
+          </div>
+        )}
 
-      {/* Error banner slides down */}
-      {error && (
-        <div className="slide-up mx-6 mt-6 rounded-xl p-3 flex items-start gap-2"
-          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)' }}>
-          <AlertCircle size={18} style={{ color: '#EF4444', flexShrink: 0, marginTop: 1 }} />
-          <span className="text-sm" style={{ color: '#FCA5A5' }}>{error}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 32 }}>
+          <img src="/crew-logo.png" alt="JunkHaul" style={{ width: 104, height: 104, objectFit: 'contain' }} />
+          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '.04em', color: 'rgba(0,0,0,.5)', textTransform: 'uppercase' }}>Employee Portal</div>
         </div>
-      )}
 
-      {/* Form area */}
-      <div className="flex-1 flex flex-col px-6 mt-8">
-        {/* Pill tabs */}
-        <div className="flex gap-2 p-1 rounded-full mb-6"
-          style={{ background: '#1A1A1E', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', background: '#F0F0F2', borderRadius: 999, padding: 4, marginBottom: 24 }}>
           <button
             type="button"
             onClick={() => { setMode('login'); setError(''); }}
-            className="flex-1 py-3 rounded-full text-sm font-semibold transition-all"
-            style={mode === 'login'
-              ? { background: '#f97316', color: 'white' }
-              : { background: 'transparent', color: 'rgba(255,255,255,0.60)' }}
+            style={{ flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 999, fontWeight: 600, fontSize: 14, cursor: 'pointer', border: 'none', transition: 'all .15s',
+              ...(mode === 'login' ? { background: '#f97316', color: '#fff' } : { background: 'transparent', color: 'rgba(0,0,0,.5)' }) }}
           >Log In</button>
           <button
             type="button"
             onClick={() => { setMode('signup'); setError(''); }}
-            className="flex-1 py-3 rounded-full text-sm font-semibold transition-all"
-            style={mode === 'signup'
-              ? { background: '#f97316', color: 'white' }
-              : { background: 'transparent', color: 'rgba(255,255,255,0.60)' }}
+            style={{ flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 999, fontWeight: 600, fontSize: 14, cursor: 'pointer', border: 'none', transition: 'all .15s',
+              ...(mode === 'signup' ? { background: '#f97316', color: '#fff' } : { background: 'transparent', color: 'rgba(0,0,0,.5)' }) }}
           >Sign Up</button>
         </div>
 
-        <form onSubmit={submit} className="space-y-3 flex-1">
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {mode === 'signup' && (
-            <FloatingField icon={User} label="Full name" value={form.name} onChange={set('name')} required />
+            <InputField icon={User} label="Full name" value={form.name} onChange={set('name')} required />
           )}
-          <FloatingField icon={Mail} label="Email" type="email" value={form.email} onChange={set('email')} required />
+          <InputField icon={Mail} label="Email" type="email" value={form.email} onChange={set('email')} required />
           {mode === 'signup' && (
-            <FloatingField icon={Phone} label="Phone" value={form.phone} onChange={set('phone')} />
+            <InputField icon={Phone} label="Phone number" value={form.phone} onChange={set('phone')} />
           )}
-          <FloatingField icon={Lock} label="Password" type="password" value={form.password} onChange={set('password')} required />
+          <InputField icon={Lock} label="Password" type="password" value={form.password} onChange={set('password')} required />
           {mode === 'signup' && (
             <>
-              <FloatingField icon={FileText} label="SIN (optional, can add later)" value={form.sin} onChange={set('sin')} />
-              <FloatingField icon={MapPin} label="Address" value={form.address} onChange={set('address')} />
-              <p className="text-xs px-1" style={{ color: 'rgba(255,255,255,0.40)' }}>
-                Your SIN and banking info are encrypted at rest and stored only in a private Google Drive folder.
-              </p>
+              <InputField icon={FileText} label="SIN (optional)" value={form.sin} onChange={set('sin')} />
+              <AddressAutocomplete
+                value={form.address}
+                onChange={(v) => setForm({ ...form, address: v })}
+                placeholder="Home address"
+                dark={false}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
+                <Lock size={12} color="rgba(0,0,0,.4)" />
+                <span style={{ fontSize: 11.5, color: 'rgba(0,0,0,.4)' }}>SIN and banking info are encrypted</span>
+              </div>
             </>
           )}
         </form>
       </div>
 
-      {/* Primary action pinned above safe-area bottom */}
-      <div className="px-6 pb-6 safe-bottom">
+      <div style={{ padding: '0 28px 40px', width: '100%', maxWidth: 445 }}>
         <button
           type="button"
           onClick={submit}
           disabled={loading}
-          className="btn-primary w-full flex items-center justify-center gap-2"
-          style={{ minHeight: 56, fontSize: 16 }}
+          style={{
+            width: '100%', height: 52, borderRadius: 14, background: '#f97316',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 700, fontSize: 16, cursor: loading ? 'default' : 'pointer',
+            border: 'none', boxShadow: '0 8px 20px rgba(249,115,22,.28)',
+            opacity: loading ? 0.6 : 1, transition: 'opacity .15s',
+          }}
         >
           {loading ? '…' : mode === 'login' ? 'Log In' : 'Create Account'}
         </button>
       </div>
-    </main>
+    </div>
   );
 }
 
-// Floating-label input field (Material-style) with leading icon
-function FloatingField({ icon: Icon, label, value, onChange, type = 'text', required }) {
-  const [focused, setFocused] = useState(false);
-  const active = focused || (value && value.length > 0);
+function InputField({ icon: Icon, label, value, onChange, type = 'text', required }) {
   return (
-    <div className="relative">
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10"
-        style={{ color: active ? '#f97316' : 'rgba(255,255,255,0.40)' }}>
-        <Icon size={18} />
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#F0F0F2', border: '1px solid rgba(0,0,0,.06)', borderRadius: 12, padding: '0 16px', height: 52 }}>
+      <Icon size={18} color="rgba(0,0,0,.4)" />
       <input
         type={type}
         value={value}
         onChange={onChange}
         required={required}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        placeholder={active ? '' : label}
-        className="dark-input w-full"
+        placeholder={label}
         style={{
-          minHeight: 56,
-          paddingLeft: 44,
-          paddingRight: 16,
-          paddingTop: active ? 20 : 16,
-          paddingBottom: active ? 8 : 16,
-          fontSize: 16,
+          flex: 1, border: 'none', outline: 'none', background: 'transparent',
+          fontSize: 15, color: '#1a1a1a', fontFamily: 'inherit',
         }}
       />
-      {active && (
-        <span className="absolute left-11 top-2 text-xs transition-all"
-          style={{ color: '#f97316' }}>
-          {label}
-        </span>
-      )}
     </div>
   );
 }
