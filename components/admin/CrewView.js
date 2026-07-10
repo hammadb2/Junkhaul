@@ -749,6 +749,37 @@ function EmployeeDetailSlideOver({ id, onClose, onSaved, flash }) {
               </div>
             )}
 
+            {/* Selfie */}
+            {detail.employee.selfie_url && (
+              <Section title="Crew Selfie">
+                <div className="flex items-start gap-4">
+                  <img
+                    src={detail.employee.selfie_url}
+                    alt="Crew selfie"
+                    className="w-24 h-24 rounded-2xl object-cover border-2 border-[#22C55E]/30 shadow-sm"
+                  />
+                  <div className="flex-1 text-sm text-black/50">
+                    <p>This photo was taken during onboarding and is used for crew identification on the customer tracking page.</p>
+                  </div>
+                </div>
+              </Section>
+            )}
+
+            {/* Extracted license data */}
+            {detail.employee.license_data && Object.keys(detail.employee.license_data).length > 0 && (
+              <Section title="License Data (OCR)">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {detail.employee.license_data.firstName && <DetailRow label="First name" value={detail.employee.license_data.firstName} />}
+                  {detail.employee.license_data.lastName && <DetailRow label="Last name" value={detail.employee.license_data.lastName} />}
+                  {detail.employee.license_data.dateOfBirth && <DetailRow label="DOB" value={detail.employee.license_data.dateOfBirth} />}
+                  {detail.employee.license_data.driversLicenseId && <DetailRow label="License #" value={detail.employee.license_data.driversLicenseId} />}
+                  {detail.employee.license_data.expirationDate && <DetailRow label="Expiry" value={detail.employee.license_data.expirationDate} />}
+                  {detail.employee.license_data.city && <DetailRow label="City" value={detail.employee.license_data.city} />}
+                  {detail.employee.license_data.state && <DetailRow label="Province" value={detail.employee.license_data.state} />}
+                </div>
+              </Section>
+            )}
+
             {/* Documents with images and per-doc verify/reject */}
             <Section title={`Documents (${docs.length})`}>
               {loadingDocs ? (

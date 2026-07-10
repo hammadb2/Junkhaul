@@ -81,7 +81,8 @@ export async function GET(req, { params }) {
       onboarded_at, onboarding_completed_at, created_at, updated_at,
       contract_signed, contract_signed_at, contract_data,
       td1_federal_data, td1_ab_data, acknowledgments,
-      drive_folder_id, invite_id, address
+      drive_folder_id, invite_id, address,
+      selfie_url, license_data, verification_notes, verified_at, verified_by
     `)
     .eq('id', id)
     .maybeSingle();
