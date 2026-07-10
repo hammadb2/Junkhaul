@@ -30,6 +30,14 @@ export async function POST(req) {
   try {
     const { photos, description } = await req.json();
 
+    // Log what we received for debugging
+    console.log('Analyze request:', {
+      hasPhotos: Array.isArray(photos) && photos.length > 0,
+      photoCount: Array.isArray(photos) ? photos.length : 0,
+      hasDescription: !!description,
+      groqKeySet: !!process.env.GROQ_API_KEY,
+    });
+
     let analysis;
     let photoUrls = [];
 
@@ -75,9 +83,9 @@ export async function POST(req) {
       photoUrls,
     });
   } catch (err) {
-    console.error('Analyze error:', err);
+    console.error('Analyze error:', err.message, err.stack);
     return NextResponse.json(
-      { error: 'Could not analyse right now. Please pick your load size manually.' },
+      { error: 'Could not analyse right now. Please pick your load size manually.', debug: err.message },
       { status: 500 }
     );
   }
