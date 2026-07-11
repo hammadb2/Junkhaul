@@ -97,11 +97,11 @@ function OnboardInner() {
   const [resumeStep, setResumeStep] = useState(1);
 
   // PWA gate state
+  const [isStandalone, setIsStandalone] = useState(false);
   const [notifPermission, setNotifPermission] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
   );
 
-  const isStandalone = typeof window !== 'undefined' && (window.navigator?.standalone || window.matchMedia?.('(display-mode: standalone)')?.matches);
   const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   const pwaReady = isStandalone && (typeof window === 'undefined' || !('Notification' in window) || notifPermission === 'granted');
 
@@ -248,6 +248,45 @@ function OnboardInner() {
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     setNotifPermission(Notification.permission);
+  }, []);
+
+  // Force the onboarding flow to stay in light mode regardless of OS theme.
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const root = document.documentElement;
+    const prevTheme = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', 'light');
+    return () => {
+      if (prevTheme === null) root.removeAttribute('data-theme');
+      else root.setAttribute('data-theme', prevTheme);
+    };
+  }, []);
+
+  // Robust install detection for iOS + Android PWAs.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const detectStandalone = () => {
+      const isPwaWindow =
+        window.matchMedia?.('(display-mode: standalone)')?.matches ||
+        window.navigator?.standalone === true ||
+        document.referrer?.startsWith('android-app://');
+      setIsStandalone(!!isPwaWindow);
+    };
+
+    detectStandalone();
+    const mql = window.matchMedia?.('(display-mode: standalone)');
+    const onChange = () => detectStandalone();
+    if (mql?.addEventListener) mql.addEventListener('change', onChange);
+    else if (mql?.addListener) mql.addListener(onChange);
+    window.addEventListener('appinstalled', onChange);
+    window.addEventListener('focus', onChange);
+
+    return () => {
+      if (mql?.removeEventListener) mql.removeEventListener('change', onChange);
+      else if (mql?.removeListener) mql.removeListener(onChange);
+      window.removeEventListener('appinstalled', onChange);
+      window.removeEventListener('focus', onChange);
+    };
   }, []);
 
   // If account/password step is already complete, do not show it again.
@@ -1090,7 +1129,14 @@ function Td1FieldsDark({ form, setForm, basic, spousalDefault }) {
 
 // ============ shell wrapper ============
 function Shell({ children }) {
-  return <main className="min-h-dvh flex flex-col safe-top safe-bottom" style={{ background: '#FAFAFA' }}>{children}</main>;
+  return (
+    <main
+      className="min-h-dvh flex flex-col safe-top safe-bottom"
+      style={{ background: '#FAFAFA', color: '#1a1a1a' }}
+    >
+      {children}
+    </main>
+  );
 }
 
 export default function OnboardPage() {
