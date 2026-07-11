@@ -1907,3 +1907,880 @@ Crew app uses these environment variables:
 ---
 
 *End of crew app documentation. Additions can be appended below.*
+
+---
+
+## 29. PWA / Service Worker / Offline Support
+
+### `public/manifest.json`
+
+The PWA manifest declares the app as installable.
+
+```json
+{
+  "name": "Junk Haul Crew",
+  "short_name": "JunkHaul",
+  "description": "Junk Haul Calgary Crew Portal",
+  "start_url": "/portal",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAFA",
+  "theme_color": "#f97316",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/crew-logo.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" }
+  ]
+}
+```
+
+**Behavior:**
+- When a user installs the app from the browser, it opens in full-screen standalone mode with no browser chrome.
+- Start URL is `/portal`.
+- Theme color is orange (`#f97316`), background is light gray (`#FAFAFA`).
+
+### `public/sw.js` — Service Worker
+
+**Responsibilities:**
+1. Push notification display.
+2. Push notification click handling (focus existing window or open new).
+3. Offline shell cache.
+
+**Push Event (`self.addEventListener('push')`):**
+- Receives push payload `{ title, body, url, actions }`.
+- Displays notification with:
+  - `title` (default: "Junk Haul Crew")
+  - `body`
+  - `icon`: `/icon-192.png`
+  - `badge`: `/icon-192.png`
+  - `vibrate`: `[100, 50, 100]`
+  - `data.url`: deep link to `/portal/schedule` or provided URL
+  - `actions`: any action buttons included in payload
+
+**Notification Click (`notificationclick`):**
+- Closes the notification.
+- Tries to find an open window on `junkhaul.ca`.
+- If found, focuses it and navigates to `data.url`.
+- If not found, opens a new window to `data.url`.
+
+**Cache Strategy:**
+- Cache name: `junkhaul-portal-v3`.
+- Pre-cached on install:
+  - `/portal`
+  - `/portal/schedule`
+  - `/portal/clock`
+  - `/portal/onboard`
+  - `/manifest.json`
+  - `/favicon-32.png`
+  - `/crew-logo.png`
+- On `fetch`:
+  - Only handles same-origin GET requests.
+  - Cache-first: if in cache, return cached; otherwise fetch, cache a copy, and return.
+  - If fetch fails, return cached if available.
+- On `activate`: deletes all old caches.
+
+### `components/PWARegister.js`
+
+**Responsibilities:**
+- Registers `/sw.js`.
+- Detects iOS Safari not in standalone mode.
+- Shows an "Add to Home Screen" prompt on portal pages (not onboarding).
+- Auto-subscribes to push notifications after login.
+
+**iOS Prompt Logic:**
+- `isIOS` = user agent matches `iPhone|iPad|iPod`.
+- `isStandalone` = `navigator.standalone` or `display-mode: standalone`.
+- `isPortal` = path starts with `/portal`.
+- `isOnboarding` = path includes `/portal/onboard`.
+- If iOS + not standalone + portal + not onboarding, and user hasn't dismissed it, show prompt after 2 seconds.
+- Dismiss button stores `jh-ios-prompt-dismissed` in `localStorage`.
+
+**Push Subscription Logic:**
+- Runs on portal pages (not onboarding).
+- Waits 2 seconds after mount.
+- Requests notification permission if `default`.
+- If denied, stops.
+- If granted, gets service worker registration.
+- Gets existing push subscription.
+- If none, converts VAPID public key from base64url to Uint8Array and subscribes via `PushManager.subscribe`.
+- Posts subscription to `/api/employee/push-subscribe`.
+
+### `lib/offlineQueue.js`
+
+**Functions:**
+- `getOfflineQueue()` — reads `jh-offline-queue` from `localStorage`.
+- `addToOfflineQueue(action, payload)` — appends action to queue.
+- `removeFromOfflineQueue(index)` — removes item by index.
+- `clearOfflineQueue()` — removes key.
+- `syncOfflineQueue()` — iterates queue, POSTs each to `/api/crew/${action}`, keeps failed items.
+- `isOnline()` — returns `navigator.onLine`.
+
+**Usage:**
+- `schedule/page.js` tracks `navigator.onLine` and shows an "OFFLINE" badge.
+- The offline queue is not yet automatically wired into every action in the current code, but the utility exists for crew actions (`item-conditions`, `job-clock`, `storage-drop`, etc.).
+
+### Current PWA / Offline Behavior
+
+- The app is installable on both iOS (Add to Home Screen) and Android (Add to Home screen / Install).
+- The onboarding flow is intentionally not behind an install gate (removed).
+- The portal pages are cached for offline shell display.
+- Real-time data (schedule, notifications) requires network.
+- Push notifications work when the app is in the background or closed.
+
+---
+
+## 30. Mapbox Navigation (In-App)
+
+### Map Implementation
+
+**Library:** Mapbox GL JS (`mapbox-gl` / `mapbox-gl/dist/mapbox-gl.css`).
+**Token:** `process.env.NEXT_PUBLIC_MAPBOX_TOKEN`.
+**Style:** `mapbox://styles/mapbox/streets-v12`.
+**Default Center:** Calgary `[ -114.0719, 51.0447 ]`.
+
+### Map Elements
+
+1. **Crew Marker**
+   - Custom HTML element (`truck-marker` CSS class).
+   - Rotated by `liveHeading` degrees.
+   - Centered on `crewPos`.
+
+2. **Job Markers**
+   - Numbered circular markers (`1`, `2`, `3`, ...).
+   - Placed at geocoded coordinates.
+   - Numbers match the order shown in the bottom sheet.
+
+3. **Route Line**
+   - Fetched from Mapbox Directions API.
+   - Orange (`#f97316`) 5px line.
+   - `overview=full`, `geometries=geojson`.
+   - Includes `steps=true`, `voice_instructions=true`, `annotations=duration,distance,speed`.
+   - `alternatives=true` for alternative routes.
+
+4. **Camera**
+   - When `crewPos` is known, centers on crew.
+   - When `jobCoords` are known, fits bounds to include crew + all jobs.
+   - Follows the crew in top-view with rotation.
+
+### Directions API Request
+
+**Parameters used:**
+- `profile`: `mapbox/driving`
+- `coordinates`: `[crewLng, crewLat];[jobLng, jobLat]`
+- `overview=full`
+- `geometries=geojson`
+- `steps=true`
+- `voice_instructions=true`
+- `annotations=duration,distance,speed`
+- `alternatives=true`
+- `language=en`
+
+### Turn-by-Turn Instruction Panel
+
+**Displayed:**
+- Maneuver text (e.g., "Turn right onto 17 Ave SW").
+- Distance to next maneuver.
+- Current speed (km/h from GPS).
+- Speed limit (from Mapbox annotations).
+- Voice toggle (mute/unmute).
+- Support button (dials `(587) 325-0751`).
+
+**Voice Guidance:**
+- Uses `window.speechSynthesis` and `SpeechSynthesisUtterance`.
+- Speaks the next maneuver text when it changes.
+- Only speaks if `voiceEnabled` is true and page is visible (`document.visibilityState === 'visible'`).
+- Uses `speechSynthesis.cancel()` to stop previous utterance.
+
+### Off-Route Rerouting
+
+- Computes distance from current position to the route polyline.
+- If distance > 120 meters for two consecutive checks, it fetches a new route from the current position.
+- Prevents excessive rerouting by checking time since last reroute.
+
+### Speed Limit Warning
+
+- If `liveSpeedKmh > speed_limit + 10`, a warning is shown.
+- Uses `speed` annotation from Mapbox Directions.
+- If no speed limit data, warning is not shown.
+
+### Alternative Routes
+
+- When `alternatives` are returned, badges are shown with route summaries.
+- Tapping a badge switches the active route.
+- Only the active route is highlighted; alternatives are gray.
+
+---
+
+## 31. Push Notifications in Detail
+
+### Subscription Flow
+
+1. `PWARegister` mounts on a portal page.
+2. Registers service worker at `/sw.js`.
+3. After 2 seconds, calls `requestPermissionAndSubscribe()`.
+4. `Notification.requestPermission()` is called.
+5. If granted, `PushManager.subscribe()` is called with VAPID key.
+6. Subscription object is POSTed to `/api/employee/push-subscribe`.
+7. Server stores endpoint in `push_subscriptions`.
+
+### Sending Notifications
+
+**Admin sends:**
+- `POST /api/admin/crew/push` with `{ target: 'all' | 'individual', title, body, url }`.
+- `lib/pushNotifications.js` uses `web-push` with VAPID keys.
+- For each subscription, sends a payload.
+- Expired subscriptions (HTTP 410/404) are removed from `push_subscriptions`.
+
+### Payload Format
+
+```json
+{
+  "title": "New Job",
+  "body": "You have a new assignment for tomorrow.",
+  "url": "/portal/schedule",
+  "actions": []
+}
+```
+
+### What Triggers Push Notifications
+
+- New crew assignment created (`/api/admin/crew/assignments` POST).
+- Admin broadcast (`/api/admin/crew/push` POST).
+- Some server-side events (e.g., job status changes) may also trigger pushes through `sendPushToEmployee`.
+
+### Notification Click
+
+- Service worker receives `notificationclick`.
+- Focuses existing window or opens `/portal/schedule` (or provided URL).
+
+---
+
+## 32. Schedule Page Deep Dive
+
+### Header / Glass Bar
+
+**Left side:**
+- Crew name and status dot.
+- Date in `MMMM d, yyyy` format.
+
+**Right side:**
+- Offline badge (when `!isOnline`).
+- Notifications button with badge (unread count).
+- Clock button → `/portal/clock`.
+- Documents button → `/portal/documents`.
+- Paystubs button → `/portal/paystubs`.
+- Incidents button → `/portal/incidents`.
+- Logout button → calls `/api/employee/logout`, redirects to `/portal`.
+
+### Bottom Sheet
+
+**Three snap states:**
+- `collapsed` — only drag handle and ETA pill visible.
+- `half` — shows assignments and first few job cards.
+- `full` — shows full list and weekly view toggle.
+
+**Drag logic:**
+- Pointer events (mouse/touch) on the drag handle.
+- `handleDragStart`, `handleDragMove`, `handleDragEnd`.
+- Snap to nearest threshold based on `dragY`.
+
+### Today View
+
+- Assignment card (U-Haul pickup location, partner info).
+- Truck check buttons (pickup/return).
+- Job cards sorted by `job_time` then `created_at`.
+- Each job card:
+  - Number badge (1, 2, 3...)
+  - Customer name and status pill
+  - Address and phone link
+  - Time slot and load size
+  - Price
+  - Items list (expandable)
+  - Notes (expandable)
+  - Live timer (if `in_progress`)
+  - Start/End Job button
+  - View Details button
+
+### Weekly View
+
+- 7-day horizontal scroll.
+- Each day: day name, date, job count.
+- Today highlighted with orange left border.
+- Past days without jobs dimmed.
+- Tap a day to load that day's schedule.
+
+### Job Card Actions
+
+**Start Job:**
+- Calls `/api/employee/job-clock` with `action='in'`.
+- Sets `busy` state to the booking ID.
+- On success, refetches schedule.
+
+**End Job:**
+- Calls `/api/employee/job-clock` with `action='out'`.
+- On success, refetches schedule.
+- If no more jobs, shows EOD celebration.
+
+**View Details:**
+- Navigates to `/portal/job?booking_id=...`.
+
+### Live Timer
+
+- For `in_progress` jobs, computes elapsed time from `clock_in_at` to `now`.
+- Updates every second.
+
+### End of Day (EOD) Celebration
+
+- Triggered when all `bookings` have `crew_status` in `['awaiting_payment', 'complete', 'completed']`.
+- Shows a success overlay with confetti.
+- Title: "All done!".
+- Close button returns to schedule.
+
+### Location Permission
+
+- `navigator.geolocation.watchPosition` with `enableHighAccuracy: true`.
+- Sends `POST /api/employee/location` every 30 seconds.
+- If permission denied, shows location-denied screen with iPhone/Android instructions.
+- User must enable location and tap "Try again".
+
+### Online / Offline
+
+- Listens to `window.online` and `window.offline` events.
+- `isOnline` state shown in header as "OFFLINE" badge when offline.
+- Map and route still display cached data; API calls will fail until online.
+
+---
+
+## 33. Job Page Deep Dive
+
+### URL Parameters
+
+- `booking_id` (required) — loads the booking.
+- `check=pickup` — shows truck pickup check.
+- `check=return` — shows truck return check.
+
+### Step Determination
+
+Based on `booking.crew_status`:
+- `scheduled` → Step 0
+- `en_route` → Step 0
+- `arrived` → Step 1
+- `in_progress` → Step 1
+- `awaiting_payment` or `complete` → Step 6
+- `payment_link_sent` → Step 2
+
+### Step 0: En Route
+
+- Shows list of `itemized_items`.
+- "DONATE" tag for items with `is_donate=true`.
+- "FREON" tag for items with `is_freon=true`.
+- "Mark En Route" button calls `/api/employee/job-clock` with `action='in'`.
+- Moves to Step 1.
+
+### Step 1: Arrived / Item Conditions
+
+- Shows load size and itemized items.
+- Each item has Good / Damaged / Missing buttons.
+- Damaged reveals a note input.
+- "Confirm & Continue" disabled until all items have a condition.
+- Calls `/api/crew/item-conditions`.
+- Moves to Step 2.
+
+### Step 2: Payment
+
+- Payment method toggle: Card / Cash.
+- "Amount confirmed" input (defaults to `booking.total_price`).
+- "Resend payment link" calls `/api/crew/resend-payment-link`.
+- For Card, customer pays via link; crew confirms amount.
+- For Cash, crew collects cash and confirms amount.
+- "Confirm Payment" moves to Step 3.
+
+### Step 3: Load Truck
+
+- Shows itemized items with checkboxes.
+- "Load Confirmed" disabled until all items checked.
+- Moves to Step 4.
+
+### Step 4: Route Decision
+
+- Fetches landfill recommendation (`/api/employee/landfill?lat=&lng=`).
+- Fetches storage facilities (`/api/employee/storage-drop`).
+- Shows landfill card with distance and directions link.
+- Shows storage facility count.
+- "Continue to Drop Flow" moves to Step 5.
+
+### Step 5: Drop Flow
+
+- Storage facility dropdown.
+- Multiple item photo captures (stored as base64 data URLs).
+- Capacity photo capture.
+- Capacity estimate percentage input.
+- "Record Drop" calls `/api/employee/storage-drop`.
+- "No storage drop — landfill only" skips to Step 6.
+
+### Step 6: Signature
+
+- Customer name input.
+- Crew name display.
+- Amount confirmed input.
+- Signature canvas (draw with mouse/touch).
+- "Clear" button resets canvas.
+- "Complete Job" calls `/api/employee/signature`.
+- On success, shows success overlay and `jobComplete=true`.
+
+### EOD / Truck Check
+
+- `check=pickup` or `check=return`.
+- Dashboard photo capture.
+- Odometer input (km).
+- Fuel level selector: Empty, 1/4, 1/2, 3/4, Full.
+- For return: gas receipt photo + amount, dump receipt photo + amount.
+- "Submit Return Check" calls `/api/employee/truck-check` and `/api/employee/receipts`.
+- Returns to `/portal/schedule`.
+
+### Issue Flag Overlay
+
+- Triggered from top-right flag button on any step.
+- Issue type: access, damage, safety, customer, vehicle, other.
+- Severity: low, medium, high.
+- Description textarea.
+- "Report Issue" calls `/api/employee/issues`.
+- Vibration feedback on submit.
+
+---
+
+## 34. Operations & Field Features
+
+### Truck Checks (`/api/employee/truck-check`)
+
+**Pickup Check:**
+- Dashboard photo.
+- Odometer reading.
+- Fuel level.
+- Truck photos.
+- Damage notes.
+
+**Return Check:**
+- Dashboard photo.
+- Odometer reading.
+- Fuel level.
+- Gas receipt + amount.
+- Dump receipt + amount.
+- Damage notes.
+
+**Database:** `truck_checks` table.
+
+### Receipts (`/api/employee/receipts`)
+
+**Types:** `gas`, `dump`, `uhaul`, `other`.
+**Fields:** `assignment_id`, `receipt_type`, `vendor`, `amount_cad`, `receipt_photo_url`, `notes`.
+**Database:** `transaction_receipts` table.
+
+### Storage Drops (`/api/employee/storage-drop`)
+
+**Flow:**
+1. Crew selects storage facility from dropdown.
+2. Takes photos of items being stored.
+3. Takes photo of storage unit capacity.
+4. Estimates capacity percentage used.
+5. Submits to `/api/employee/storage-drop`.
+6. Server creates `storage_drops` record and updates `storage_facilities.current_usage_pct`.
+
+**Database:** `storage_drops`, `storage_facilities`.
+
+### Donation Centers (`/api/employee/donation-centers`)
+
+- Admin CRUD at `/api/admin/crew/donation-centers`.
+- Crew app can view donation centers for donation runs.
+- **Database:** `donation_centers`.
+
+### Landfills (`/api/employee/landfill`)
+
+- Server filters by `day_of_week` and season.
+- Sunday: East Calgary landfill only (April–October).
+- Calculates distance using Haversine formula.
+- Returns recommended landfill, all options, and warnings.
+- **Database:** `landfills`.
+
+### Customer Signature (`/api/employee/signature`)
+
+- Captures customer name (typed) and drawn signature.
+- Confirms payment amount.
+- Updates `bookings.payment_status` and `status`.
+- Creates `customer_signatures` record.
+- If paid, sends review request SMS.
+
+### Customer Tracking (Public)
+
+- `/track/[token]` is a public tracking page.
+- Uses `booking.tracking_token`.
+- Calls `/api/employee/location?booking_id=...` to get crew location.
+- Shows "en route" if location updated within 5 minutes.
+- Shows crew first names and selfies.
+
+### Incident Reports (`/api/employee/incidents`)
+
+- Types: `injury`, `vehicle_accident`, `property_damage`, `near_miss`, `safety_hazard`, `other`.
+- Severity: `low`, `medium`, `high`, `critical`.
+- Creates `incident_reports` and `crew_notifications`.
+
+### Job Issues (`/api/employee/issues`)
+
+- Types: `access`, `damage`, `safety`, `customer`, `vehicle`, `other`.
+- Severity: `low`, `medium`, `high`.
+- Creates `job_issues` and `crew_notifications`.
+
+### Notifications (`/api/employee/notifications`)
+
+- In-app notifications for crew.
+- Types: `info`, `warning`, `success`, `assignment`, `broadcast`.
+- Unread dot, mark all read, deep links.
+- Polled every 30 seconds.
+
+---
+
+## 35. Payroll & Financial Features
+
+### Pay Rate
+
+- Stored in `employees.pay_rate` (hourly CAD).
+- Default from `system_config.default_pay_rate`.
+
+### Shift Calculation
+
+- `calcShiftGross` in `lib/payroll.js`:
+  - Regular hours: hours up to 8/day or 44/week, whichever gives less OT.
+  - Overtime hours: 1.5× rate for hours >8/day or >44/week.
+  - 3-hour minimum for short shifts.
+  - Vacation pay: 4% of gross.
+
+### Paycheque Calculation
+
+- `calculatePaycheque` in `lib/payroll.js`:
+  - CPP (first additional + CPP2).
+  - EI premiums.
+  - Federal income tax (CRA T4127 Steps 1-3).
+  - Alberta income tax (CRA T4127 Steps 4-5).
+  - YTD caps for CPP, CPP2, EI.
+
+### Pay Stubs
+
+- Stored in `pay_stubs` table.
+- `pay_run_id` groups multiple pay stubs.
+- Status: `pending`, `sent`, `failed`.
+- Crew views in `/portal/paystubs`.
+
+### Admin Payroll
+
+- `/api/admin/payroll/preview` — preview payroll for a period.
+- `/api/admin/payroll/run` — creates pay run and pay stubs.
+- `/api/admin/payroll/approve` — approves pay run for payment.
+- `/api/admin/t4s` — generates T4s.
+- `/api/admin/remittance` — CRA remittance summary.
+
+### Direct Deposit / Remittance
+
+- `direct_deposits` table tracks bank transfer status.
+- `remittances` table tracks CRA remittance amounts (CPP, EI, tax).
+
+---
+
+## 36. Growth Engine (Opportunistic Pickups)
+
+### `/api/crew/nearby-opportunities`
+
+**Inputs:** `lat`, `lng`, `truck_fill`, `bookings_today`, `hour`.
+**Sources:**
+1. `waitlist` entries within 3km.
+2. Future `bookings` within 3km.
+3. `leads` (quoted but unbooked) within 3km.
+
+**Logic:**
+- Computes truck fill from today's jobs.
+- Applies discount curve based on truck fill, detour distance, hour of day, and bookings today.
+- Ranks by profitability score.
+- Returns deadhead leads first, then by distance.
+
+### `/api/crew/offer-nearby`
+
+**Types:** `waitlist`, `future_booking`, `deadhead`.
+**Flow:**
+1. Creates `nearby_offers` record with 5-minute expiry.
+2. Sends SMS to customer with offer details.
+3. Marks `waitlist` entry as `offered_today` or `leads` with 24-hour cooldown.
+
+---
+
+## 37. System Config / Kill Switches
+
+The `system_config` table contains runtime toggles. Crew-relevant keys include:
+
+- `default_pay_rate`
+- `storage_facility_id`
+- `donation_center_id`
+- `uhaul_tank_capacity_litres`
+- `oilpriceapi_key`
+- `kill_switch_*` flags for various features
+
+### Kill Switches (sample)
+
+- `kill_switch_ai_narrator`
+- `kill_switch_ai_agent`
+- `kill_switch_lead_followup`
+- `kill_switch_review_requests_edge`
+- `kill_switch_risk_reminders`
+- `kill_switch_day_summary`
+- `kill_switch_generate_slots`
+- Many pricing/surge/discount kill switches
+
+**Usage:** Admin toggles these in the control center to disable features without deploying code.
+
+---
+
+## 38. Cron Jobs (Relevant to Crew)
+
+- `crew-location-cleanup` — hourly cleanup of old `crew_location` records.
+- `abandonment-followup` — follows up abandoned leads.
+- `opportunistic-offer-live` / `opportunistic-offer-proactive` — sends nearby offers.
+- `review-request` — sends review requests after completed jobs.
+- `demand-snapshot` — every 6 hours, records slot fill rates for surge pricing.
+- `ai-narrator` — refreshes AI briefings.
+
+---
+
+## 39. Admin Dashboard Integration
+
+### Crew List (`/admin` → Crew tab)
+
+- Calls `/api/admin/crew` (GET).
+- Shows all employees, clock status, onboarding progress, hours, pending invites.
+- Actions: invite, approve/reject, resend invite, edit, terminate.
+
+### Employee Detail
+
+- Calls `/api/admin/crew/[id]` (GET).
+- Shows full profile, documents, invite, sessions, assignments.
+- Admin can verify/reject documents.
+
+### Crew Assignments
+
+- Calls `/api/admin/crew/assignments`.
+- Schedule who works which day.
+- Assigns driver and secondary crew.
+- Sets U-Haul pickup location.
+
+### Push Notifications
+
+- Calls `/api/admin/crew/push`.
+- Broadcast or individual push.
+
+### Payroll Panel
+
+- Calls `/api/admin/payroll/*`, `/api/admin/t4s`, `/api/admin/remittance`.
+- Preview, run, approve payroll.
+- Generate T4s.
+- View remittance.
+
+### Command Center
+
+- Calls `/api/admin/command-center`.
+- Shows live crew status, job photos, dispatch actions.
+- Mark arrived, upload crew photos, get job photos.
+
+---
+
+## 40. Every Little Detail
+
+### Login / Signup
+
+- The `/portal` page is both login and signup.
+- Mode toggle persists in component state.
+- Auto-redirect to onboarding if `jh-onboard-token` exists in `localStorage`.
+- Password visibility toggle? Not in current code; password is type="password".
+- Address autocomplete uses the `AddressAutocomplete` component (presumably Mapbox or similar).
+
+### Onboarding
+
+- Invite email is sent via Resend.
+- Link expires in 7 days.
+- Employee can resume from the first incomplete step.
+- Documents are stored in Supabase Storage `employee-documents` bucket.
+- Selfie is stored in `crew-photos` bucket.
+- Driver's license OCR extracts DOB, expiry, license number, province.
+- TD1 forms are stored as JSON in `employees.td1_federal_data` and `td1_ab_data`.
+- Contract is stored in `employees.contract_data`.
+- Banking is encrypted and stored as `employee_documents` with `doc_type='banking_info'`.
+- Acknowledgments are stored in `employees.acknowledgments`.
+- On completion, status is `pending_verification`.
+- Admin approves → `active`.
+
+### Schedule
+
+- Map is interactive with pinch zoom, pan, rotate.
+- Crew marker rotates with heading.
+- Route line is orange.
+- Job markers are numbered.
+- Bottom sheet is draggable.
+- Today/Week toggle.
+- Weekly view shows 7 days.
+- Assignment card shows U-Haul pickup location.
+- Partner info with call button.
+- Truck check buttons for pickup/return.
+- Job cards show status, price, time, load size.
+- Items and notes are expandable.
+- Live timer for in-progress jobs.
+- Start/End buttons.
+- View Details navigates to job page.
+- EOD celebration when all done.
+- Location permission gate.
+- Offline badge.
+- Logout.
+
+### Job Execution
+
+- 7 steps + EOD.
+- En Route → Arrived → Payment → Load → Route → Drop → Signature.
+- EOD for truck return.
+- Issue flag available on any step.
+- Item conditions (good/damaged/missing).
+- Payment method (card/cash).
+- Resend payment link.
+- Load checklist.
+- Landfill recommendation.
+- Storage drop with photos and capacity.
+- Customer signature.
+- Truck return with odometer, fuel, gas, dump receipts.
+
+### Clock
+
+- Shows live shift duration.
+- Pay period summary.
+- Clock is automatic via job clock.
+- Manual clock-in/out also possible via `/api/employee/clock-in` and `/api/employee/clock-out`.
+
+### Documents
+
+- Lists all onboarding documents.
+- Shows status (verified/uploaded/rejected/pending).
+- Shows expiry dates.
+- Reupload rejected docs.
+- View rejection reasons.
+
+### Paystubs
+
+- List of pay stubs.
+- Expand for full breakdown.
+- Earnings, deductions, net pay, YTD.
+
+### Notifications
+
+- In-app list.
+- Unread dot.
+- Mark all read.
+- Deep links.
+- Push notifications.
+
+### Incidents
+
+- Report incidents.
+- View history.
+- Severity levels.
+- Status tracking.
+
+### Verification
+
+- Pending approval screen.
+- Polls every 10 seconds.
+- Auto-redirect when approved.
+- Rejected state with phone number.
+
+### Reset Password
+
+- Token-based.
+- Validates token.
+- Sets new password.
+- Invalid/expired states.
+
+---
+
+## 41. Files & Assets
+
+### Public Assets (PWA)
+- `/public/manifest.json` — PWA manifest.
+- `/public/sw.js` — service worker.
+- `/public/icon-192.png` — app icon.
+- `/public/icon-512.png` — app icon.
+- `/public/crew-logo.png` — crew logo.
+- `/public/apple-touch-icon.png` — iOS icon.
+- `/public/favicon-32.png` — favicon.
+
+### Portal Components
+- `app/portal/page.js` — login/signup.
+- `app/portal/onboard/page.js` — onboarding.
+- `app/portal/verification/page.js` — verification pending.
+- `app/portal/schedule/page.js` — schedule dashboard.
+- `app/portal/job/page.js` — job execution.
+- `app/portal/clock/page.js` — shift status.
+- `app/portal/documents/page.js` — document viewing.
+- `app/portal/paystubs/page.js` — pay stubs.
+- `app/portal/notifications/page.js` — notifications.
+- `app/portal/incidents/page.js` — incidents.
+- `app/portal/reset-password/page.js` — password reset.
+- `app/portal/layout.js` — force light theme.
+
+### Shared Components
+- `components/PWARegister.js` — PWA registration, iOS prompt, push subscription.
+- `components/portal/DocumentScanner.js` — document upload UI.
+- `components/portal/SelfieCapture.js` — selfie upload UI.
+
+### Libraries
+- `lib/employeeAuth.js` — auth, encryption, session.
+- `lib/payroll.js` — payroll calculations.
+- `lib/pushNotifications.js` — push sending.
+- `lib/offlineQueue.js` — offline action queue.
+
+---
+
+## 42. Current Known Flows
+
+### New Crew Member Flow
+1. Admin invites via `/api/admin/crew` POST.
+2. Employee receives email with `/portal/onboard?token=...`.
+3. Employee creates password, uploads docs, fills TD1, signs contract, enters banking, accepts acknowledgments.
+4. Employee lands on `/portal/verification`.
+5. Admin approves via `/api/admin/crew/[id]/approve`.
+6. Employee auto-redirects to `/portal/schedule`.
+
+### Daily Work Flow
+1. Employee logs in at `/portal`.
+2. Redirected to `/portal/schedule`.
+3. Allows location permission.
+4. Sees assignment and jobs.
+5. Taps "Start Job" on first job.
+6. Navigates to job using in-app Mapbox navigation.
+7. Marks arrived, verifies item conditions.
+8. Handles payment.
+9. Loads truck.
+10. Goes to landfill/storage.
+11. Records storage drop if applicable.
+12. Gets customer signature.
+13. Returns to schedule.
+14. At end of day, submits truck return check.
+
+### Clock Flow
+1. Job clock `in` auto-creates a `timesheets` shift.
+2. Job clock `out` ends the job session.
+3. Last job clock `out` auto-clocks out the shift.
+4. `timesheets` row has regular/overtime hours and gross pay.
+
+### Payroll Flow
+1. Admin runs payroll preview.
+2. Admin runs payroll.
+3. `pay_runs` and `pay_stubs` records created.
+4. Pay stubs appear in `/portal/paystubs`.
+5. Admin can generate T4s and remittance.
+
+---
+
+*Documentation continues below. More sections can be added as needed.*
