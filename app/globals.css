@@ -43,6 +43,20 @@
   }
 }
 
+/* Explicit light theme override — used by the crew portal layout to force
+   light mode regardless of OS preference. */
+:root[data-theme="light"] {
+  --bg-base: #FAFAFA;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #F5F5F7;
+  --bg-input: #F0F0F2;
+  --text-primary: rgba(0,0,0,0.90);
+  --text-secondary: rgba(0,0,0,0.60);
+  --text-disabled: rgba(0,0,0,0.40);
+  --border-subtle: rgba(0,0,0,0.08);
+  --border-card: rgba(0,0,0,0.06);
+}
+
 html,
 body {
   padding: 0;
@@ -124,6 +138,10 @@ button {
     border: 1px solid rgba(255, 255, 255, 0.5);
   }
 }
+:root[data-theme="light"] .glass-bar {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
 
 /* Glass button (circular, translucent) */
 .glass-btn {
@@ -145,19 +163,26 @@ button {
     background: rgba(0, 0, 0, 0.04);
   }
 }
+:root[data-theme="light"] .glass-btn {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+:root[data-theme="light"] .glass-btn:active {
+  background: rgba(0, 0, 0, 0.04);
+}
 
-/* Dark card */
+/* Card — always light (portal pages use hardcoded light text) */
 .dark-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 16px;
 }
 
-/* Dark input field */
+/* Input field — always light (portal pages use hardcoded light text) */
 .dark-input {
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
+  background: #F0F0F2;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #1a1a1a;
   border-radius: 12px;
   transition: border-color 0.2s;
 }
@@ -166,7 +191,7 @@ button {
   border-color: var(--accent);
 }
 .dark-input::placeholder {
-  color: var(--text-disabled);
+  color: rgba(0, 0, 0, 0.4);
 }
 
 /* Primary orange button */

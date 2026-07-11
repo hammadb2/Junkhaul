@@ -96,19 +96,10 @@ function OnboardInner() {
   const [completeData, setCompleteData] = useState(null);
   const [resumeStep, setResumeStep] = useState(1);
 
-  // PWA gate state
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [notifPermission, setNotifPermission] = useState(
-    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
-  );
-
-  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const pwaReady = isStandalone && (typeof window === 'undefined' || !('Notification' in window) || notifPermission === 'granted');
-
   const getStartStep = useCallback((inferred) => {
-    if (inferred <= 1) return 1; // password/account always first
-    return pwaReady ? inferred : 0; // force PWA gate before rest of onboarding
-  }, [pwaReady]);
+    // Always start from account creation at minimum; no install gate.
+    return Math.max(1, inferred || 1);
+  }, []);
 
   // ---- Save onboarding progress so user can resume later ----
   const saveStep = useCallback(async (s) => {
@@ -245,64 +236,12 @@ function OnboardInner() {
 
   useEffect(() => { validateInvite(); }, [validateInvite]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
-    setNotifPermission(Notification.permission);
-  }, []);
-
-  // Force the onboarding flow to stay in light mode regardless of OS theme.
-  useEffect(() => {
-    if (typeof document === 'undefined') return undefined;
-    const root = document.documentElement;
-    const prevTheme = root.getAttribute('data-theme');
-    root.setAttribute('data-theme', 'light');
-    return () => {
-      if (prevTheme === null) root.removeAttribute('data-theme');
-      else root.setAttribute('data-theme', prevTheme);
-    };
-  }, []);
-
-  // Robust install detection for iOS + Android PWAs.
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const detectStandalone = () => {
-      const isPwaWindow =
-        window.matchMedia?.('(display-mode: standalone)')?.matches ||
-        window.navigator?.standalone === true ||
-        document.referrer?.startsWith('android-app://');
-      setIsStandalone(!!isPwaWindow);
-    };
-
-    detectStandalone();
-    const mql = window.matchMedia?.('(display-mode: standalone)');
-    const onChange = () => detectStandalone();
-    if (mql?.addEventListener) mql.addEventListener('change', onChange);
-    else if (mql?.addListener) mql.addListener(onChange);
-    window.addEventListener('appinstalled', onChange);
-    window.addEventListener('focus', onChange);
-
-    return () => {
-      if (mql?.removeEventListener) mql.removeEventListener('change', onChange);
-      else if (mql?.removeListener) mql.removeListener(onChange);
-      window.removeEventListener('appinstalled', onChange);
-      window.removeEventListener('focus', onChange);
-    };
-  }, []);
-
   // If account/password step is already complete, do not show it again.
   useEffect(() => {
     if (step === 1 && resumeStep > 1) {
       setStep(getStartStep(resumeStep));
     }
   }, [step, resumeStep, getStartStep]);
-
-  // Hard gate: once account exists, remaining onboarding must happen in installed PWA
-  // with notifications enabled.
-  useEffect(() => {
-    if (resumeStep > 1 && !pwaReady && step !== 0) {
-      setStep(0);
-    }
-  }, [resumeStep, pwaReady, step]);
 
   // ---- Password validation ----
   const validatePw = (pw) => {
@@ -318,46 +257,6 @@ function OnboardInner() {
     setPwErrors(validatePw(val));
   };
 
-  const requestNotifications = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return true;
-    if (Notification.permission === 'granted') return true;
-    if (Notification.permission === 'denied') return false;
-    const permission = await Notification.requestPermission();
-    setNotifPermission(permission);
-    if (permission !== 'granted') return false;
-
-    // Best effort: create a push subscription immediately while in onboarding.
-    try {
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        const reg = await navigator.serviceWorker.ready;
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-          if (vapidKey) {
-            const padding = '='.repeat((4 - (vapidKey.length % 4)) % 4);
-            const base64 = (vapidKey + padding).replace(/-/g, '+').replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            const convertedKey = new Uint8Array(rawData.length);
-            for (let i = 0; i < rawData.length; ++i) convertedKey[i] = rawData.charCodeAt(i);
-            sub = await reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: convertedKey,
-            });
-          }
-        }
-        if (sub) {
-          await fetch('/api/employee/push-subscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sub),
-          });
-        }
-      }
-    } catch {
-      // non-blocking: permission has already been granted
-    }
-    return true;
-  };
 
   // ---- Address autocomplete via Mapbox ----
   const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -408,7 +307,7 @@ function OnboardInner() {
     const nextResume = Math.max(2, resumeStep || 1);
     setResumeStep(nextResume);
     setPersonal((p) => ({ ...p, address: accountForm.address }));
-    setStep(pwaReady ? nextResume : 0);
+    setStep(nextResume);
   };
 
   // ---- Step 2: document uploads ----
@@ -618,126 +517,14 @@ function OnboardInner() {
     </div>
   );
 
-  // ============ STEP 0: Save to Home Screen ============
+  // ============ STEP 0: Loading / fallback (install gate removed) ============
   if (step === 0) {
-    if (loading) {
-      return (
-        <Shell>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 40, height: 40, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 16 }} />
-            <div style={{ color: 'rgba(0,0,0,.4)', fontSize: 14 }}>Validating your invite...</div>
-          </div>
-        </Shell>
-      );
-    }
-
-    if (inviteError && !invite) {
-      return (
-        <Shell>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <div style={{ textAlign: 'center', maxWidth: 400 }}>
-              <img src="/crew-logo.png" alt="Junk Haul Crew" style={{ width: 72, height: 72, borderRadius: 16, margin: '0 auto 16px' }} />
-              <div style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>Junk Haul Crew</div>
-              <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginBottom: 24 }}>Onboarding Portal</div>
-              <div className="dark-card" style={{ padding: 24, textAlign: 'center', border: '1px solid rgba(239,68,68,0.2)' }}>
-                <AlertTriangle size={32} color="#EF4444" style={{ margin: '0 auto 12px' }} />
-                <div style={{ color: '#EF4444', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Invite problem</div>
-                <div style={{ color: 'rgba(0,0,0,.6)', fontSize: 14 }}>{inviteError}</div>
-                <div style={{ fontSize: 12, color: 'rgba(0,0,0,.4)', marginTop: 16 }}>Contact your manager for a new invite link.</div>
-              </div>
-            </div>
-          </div>
-        </Shell>
-      );
-    }
-
-    const carouselFrames = isIOS
-      ? [
-          { icon: Share, title: 'Tap the Share button', sub: 'In Safari, tap the share icon at the bottom' },
-          { icon: Plus, title: 'Add to Home Screen', sub: 'Scroll down and tap "Add to Home Screen"' },
-          { icon: Check, title: 'Tap Add', sub: 'Confirm by tapping "Add" in the top right' },
-        ]
-      : [
-          { icon: Plus, title: 'Open browser menu', sub: 'Tap the three dots menu icon' },
-          { icon: Plus, title: 'Add to Home screen', sub: 'Select "Add to Home screen"' },
-          { icon: Check, title: 'Tap Add', sub: 'Confirm the installation' },
-        ];
-
     return (
       <Shell>
-        <StepShell showProgress={false}>
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <img src="/crew-logo.png" alt="Junk Haul Crew" style={{ width: 72, height: 72, borderRadius: 16, margin: '0 auto 12px' }} />
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>Welcome to the crew</div>
-          </div>
-
-          {/* Invite card */}
-          {invite && (
-            <div className="dark-card" style={{ padding: 16, marginBottom: 24, border: '1px solid rgba(249,115,22,0.2)' }}>
-              <div style={{ fontSize: 12, color: '#f97316', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>You&apos;re invited to join</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>{invite.first_name} {invite.last_name}</div>
-              <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)' }}>{invite.email}</div>
-              {invite.pay_rate != null && (
-                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,.06)', borderRadius: 999, padding: '4px 12px', fontSize: 14 }}>
-                  <span style={{ color: 'rgba(0,0,0,.6)' }}>Pay rate</span>
-                  <span className="tabular" style={{ fontWeight: 700, color: '#1a1a1a' }}>${Number(invite.pay_rate).toFixed(2)}</span>
-                  <span style={{ fontSize: 12, color: 'rgba(0,0,0,.4)' }}>/hr</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {isStandalone ? (
-            <div className="dark-card" style={{ padding: 24, textAlign: 'center', marginBottom: 16 }}>
-              <CheckCircle size={40} color="#22C55E" style={{ margin: '0 auto 12px' }} />
-              <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>App installed!</div>
-              <div style={{ fontSize: 14, color: 'rgba(0,0,0,.6)', marginTop: 4 }}>You&apos;re ready to continue.</div>
-            </div>
-          ) : (
-            <>
-              <Headline title="Save to your Home Screen" subtitle="Install the app for the best experience — works offline, push notifications, and full-screen." />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {carouselFrames.map((frame, i) => {
-                  const Icon = frame.icon;
-                  return (
-                    <div key={i} className="dark-card" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
-                      <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Icon size={24} color="#f97316" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.4)', marginBottom: 2 }}>Step {i + 1}</div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a' }}>{frame.title}</div>
-                        <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', marginTop: 2 }}>{frame.sub}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          <ErrorBanner />
-          <div style={{ marginTop: 24 }}>
-            <ContinueBtn
-              label={!isStandalone ? 'I installed the app' : (notifPermission !== 'granted' ? 'Allow notifications' : 'Continue')}
-              onClick={async () => {
-                setError('');
-                if (!isStandalone) {
-                  setError('Install the app to Home Screen first, then tap this button.');
-                  return;
-                }
-                if (notifPermission !== 'granted') {
-                  const ok = await requestNotifications();
-                  if (!ok) {
-                    setError('Please allow notifications to continue.');
-                    return;
-                  }
-                }
-                setStep(Math.max(1, resumeStep || 1));
-              }}
-            />
-          </div>
-        </StepShell>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 40, height: 40, border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 16 }} />
+          <div style={{ color: 'rgba(0,0,0,.4)', fontSize: 14 }}>Loading...</div>
+        </div>
       </Shell>
     );
   }
@@ -746,7 +533,7 @@ function OnboardInner() {
   if (step === 1) {
     return (
       <Shell>
-        <StepShell onBack={() => setStep(0)}>
+        <StepShell>
           <Headline title="Set up your account" subtitle="Create your password and contact info" />
 
           {invite && (

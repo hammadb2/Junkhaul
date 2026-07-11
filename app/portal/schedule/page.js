@@ -596,8 +596,8 @@ export default function SchedulePage() {
           <div className="dark-card p-5 text-left space-y-3">
             <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>To enable location:</div>
             <div style={{ fontSize: 12, color: 'rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div><strong style={{ color: 'rgba(255,255,255,0.8)' }}>iPhone:</strong> Settings &rarr; JunkHaul &rarr; Location &rarr; Allow</div>
-              <div><strong style={{ color: 'rgba(255,255,255,0.8)' }}>Android:</strong> Settings &rarr; Apps &rarr; JunkHaul &rarr; Permissions &rarr; Location &rarr; Allow</div>
+              <div><strong style={{ color: '#1a1a1a' }}>iPhone:</strong> Settings &rarr; JunkHaul &rarr; Location &rarr; Allow</div>
+              <div><strong style={{ color: '#1a1a1a' }}>Android:</strong> Settings &rarr; Apps &rarr; JunkHaul &rarr; Permissions &rarr; Location &rarr; Allow</div>
             </div>
             <button
               onClick={() => {
