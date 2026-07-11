@@ -11,14 +11,13 @@ import DocumentScanner from '@/components/portal/DocumentScanner';
 import SelfieCapture from '@/components/portal/SelfieCapture';
 
 // ============================================================
-// /portal/onboard — multi-step crew onboarding flow (dark theme).
+// /portal/onboard — multi-step crew onboarding flow (light theme).
 // Entry via invite link: /portal/onboard?token=XXX
-// Steps 0–8: install app → account → documents → TD1 Federal →
+// Steps 1–8: account → documents → TD1 Federal →
 // TD1AB → contract e-sign → banking → acknowledgments → complete.
 // ============================================================
 
 const STEP_LABELS = [
-  'Install App',
   'Account',
   'Documents',
   'TD1 Federal',
@@ -454,7 +453,7 @@ function OnboardInner() {
         <div className="progress-line-fill" style={{ width: `${(step / 8) * 100}%` }} />
       </div>
       <div style={{ padding: '6px 24px 0', background: '#FAFAFA' }}>
-        <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Step {step} of 8 · {STEP_LABELS[step]}</span>
+        <span style={{ fontSize: 13, color: 'rgba(0,0,0,.6)' }}>Step {step} of 8 · {STEP_LABELS[step - 1]}</span>
       </div>
     </div>
   );
