@@ -86,150 +86,212 @@ export default function AdminDashboard() {
     await load();
   };
 
+  const NAV = [
+    { id: 'home', label: 'Dashboard', icon: '◉' },
+    { id: 'dispatch', label: 'Dispatch', icon: '▦' },
+    { id: 'schedule', label: 'Schedule', icon: '☰' },
+    { id: 'earnings', label: 'Earnings', icon: '$' },
+    { id: 'crew', label: 'Crew', icon: '👥' },
+    { id: 'waitlist', label: 'Waitlist', icon: '⏳' },
+    { id: 'leads', label: 'Leads', icon: '📋' },
+    { id: 'growth', label: 'Growth', icon: '↗' },
+    { id: 'calls', label: 'Calls', icon: '📞' },
+    { id: 'intel', label: 'Intel', icon: '◆' },
+    { id: 'referrals', label: 'Referrals', icon: '🔗' },
+    { id: 'config', label: 'Config', icon: '⚙' },
+    { id: 'audit', label: 'Audit', icon: '◷' },
+  ];
+
   return (
-    <main className="min-h-dvh bg-[#FAFAFA]">
-      <header className="bg-white border-b border-black/[0.06] px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <Logo className="h-7" />
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1 text-xs overflow-x-auto">
-            {['home', 'dispatch', 'schedule', 'earnings', 'waitlist', 'leads', 'growth', 'calls', 'intel', 'referrals', 'crew', 'config', 'audit'].map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={`px-3 py-1.5 rounded-lg capitalize font-medium whitespace-nowrap ${
-                  view === v ? 'bg-[#f97316] text-white' : 'bg-[#F5F5F7] text-black/60'
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          <button onClick={logout} className="text-sm text-black/40 underline">
-            Log out
+    <div style={{ display: 'flex', minHeight: '100dvh', background: '#FAFAFA' }}>
+      {/* Sidebar */}
+      <aside style={{
+        width: 220, minWidth: 220, background: '#fff', borderRight: '1px solid rgba(0,0,0,.06)',
+        display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100dvh',
+        overflowY: 'auto',
+      }}>
+        <div style={{ padding: '20px 16px 12px' }}>
+          <Logo className="h-6" />
+        </div>
+        <nav style={{ flex: 1, padding: '0 8px' }}>
+          {NAV.map(({ id, label, icon }) => (
+            <button
+              key={id}
+              onClick={() => setView(id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                padding: '10px 12px', borderRadius: 10, marginBottom: 2,
+                border: 'none', cursor: 'pointer', textAlign: 'left',
+                fontSize: 14, fontWeight: view === id ? 600 : 500,
+                background: view === id ? 'rgba(249,115,22,0.08)' : 'transparent',
+                color: view === id ? '#f97316' : 'rgba(0,0,0,.65)',
+                transition: 'background 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>{icon}</span>
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(0,0,0,.06)' }}>
+          <button
+            onClick={logout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '10px 12px', borderRadius: 10,
+              border: 'none', cursor: 'pointer', textAlign: 'left',
+              fontSize: 13, fontWeight: 500, background: 'transparent',
+              color: 'rgba(0,0,0,.45)',
+            }}
+          >
+            ← Log out
           </button>
         </div>
-      </header>
+      </aside>
 
-      <div className="max-w-3xl mx-auto p-4 space-y-4">
-        {view === 'dispatch' && (
-          <>
-            <DayOfSummary bookings={bookings} />
-            {stats && (
-              <div className="grid grid-cols-4 gap-2">
-                <Stat label="Jobs" value={stats.jobs} />
-                <Stat label="Revenue" value={`$${stats.revenue}`} />
-                <Stat label="Flagged" value={stats.flagged} accent={stats.flagged > 0} />
-                <Stat label="High risk" value={stats.high_risk} accent={stats.high_risk > 0} />
-              </div>
-            )}
+      {/* Main content */}
+      <main style={{ flex: 1, minWidth: 0 }}>
+        {/* Top bar */}
+        <div style={{
+          background: '#fff', borderBottom: '1px solid rgba(0,0,0,.06)',
+          padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          position: 'sticky', top: 0, zIndex: 5,
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', textTransform: 'capitalize' }}>
+            {view}
+          </div>
+          {stats && (
+            <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'rgba(0,0,0,.5)' }}>
+              <span><strong style={{ color: '#1a1a1a' }}>{stats.jobs}</strong> jobs</span>
+              <span><strong style={{ color: '#1a1a1a' }}>${stats.revenue}</strong> revenue</span>
+              {stats.flagged > 0 && <span style={{ color: '#EF4444' }}>{stats.flagged} flagged</span>}
+            </div>
+          )}
+        </div>
 
-            {loading ? (
-              <p className="text-black/50 text-center py-10">Loading…</p>
-            ) : dates.length === 0 ? (
-              <p className="text-black/50 text-center py-10">No upcoming jobs.</p>
-            ) : (
-              <>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                  {dates.map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => {
-                        setActiveDate(d);
-                        setRouteOrder(null);
-                      }}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap ${
-                        activeDate === d ? 'bg-[#f97316] text-white' : 'bg-white border border-black/[0.06] text-black/70'
-                      }`}
-                    >
-                      {formatDateLong(d)}
-                    </button>
-                  ))}
+        <div style={{ padding: 20, maxWidth: 960 }}>
+          {view === 'dispatch' && (
+            <>
+              {stats && (
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  <MiniStat label="Jobs" value={stats.jobs} />
+                  <MiniStat label="Revenue" value={`$${stats.revenue}`} color="#22C55E" />
+                  <MiniStat label="Flagged" value={stats.flagged} color={stats.flagged > 0 ? '#EF4444' : undefined} />
+                  <MiniStat label="High risk" value={stats.high_risk} color={stats.high_risk > 0 ? '#EF4444' : undefined} />
                 </div>
+              )}
 
-                <button
-                  onClick={optimise}
-                  disabled={optimising}
-                  className="w-full bg-[#f97316] text-white font-semibold py-3 rounded-xl disabled:bg-[#f97316]/50"
-                >
-                  {optimising ? 'Optimising route…' : '🗺️ Optimise route for this day'}
-                </button>
-
-                {routeOrder && routeOrder.length > 0 && (
-                  <div className="space-y-2">
-                    <RouteMap stops={routeOrder} />
-                    {routeSummary && (
-                      <div className="bg-white rounded-xl border border-black/[0.06] p-3 grid grid-cols-4 gap-2 text-center text-xs">
-                        <div><div className="font-bold text-[#1a1a1a]">{routeSummary.jobs}</div><div className="text-black/40">Jobs</div></div>
-                        <div><div className="font-bold text-[#1a1a1a]">${routeSummary.total_revenue}</div><div className="text-black/40">Revenue</div></div>
-                        <div><div className="font-bold text-[#1a1a1a]">${routeSummary.total_est_profit}</div><div className="text-black/40">Est. Profit</div></div>
-                        <div><div className="font-bold text-[#1a1a1a]">{routeSummary.avg_margin}</div><div className="text-black/40">Margin</div></div>
-                      </div>
-                    )}
-                    <ol className="bg-white rounded-xl border border-black/[0.06] divide-y">
-                      {routeOrder.map((s) => (
-                        <li key={s.id} className="px-3 py-2 flex items-center gap-3 text-sm">
-                          <span className="w-6 h-6 rounded-full bg-[#f97316] text-white flex items-center justify-center text-xs font-bold">
-                            {s.position}
-                          </span>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{s.name}</span>
-                              <span className="text-black/40">{s.quadrant}</span>
-                            </div>
-                            <div className="text-xs text-black/50">{s.address}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold">${s.total_price}</div>
-                            {s.est_profit !== undefined && (
-                              <div className="text-xs text-[#22C55E]">~${s.est_profit} profit</div>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
+              {loading ? (
+                <p className="text-black/50 text-center py-10">Loading…</p>
+              ) : dates.length === 0 ? (
+                <p className="text-black/50 text-center py-10">No upcoming jobs.</p>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto' }} className="no-scrollbar">
+                    {dates.map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => { setActiveDate(d); setRouteOrder(null); }}
+                        style={{
+                          padding: '8px 16px', borderRadius: 10, border: activeDate === d ? 'none' : '1px solid rgba(0,0,0,.08)',
+                          background: activeDate === d ? '#f97316' : '#fff',
+                          color: activeDate === d ? '#fff' : 'rgba(0,0,0,.7)',
+                          fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {formatDateLong(d)}
+                      </button>
+                    ))}
                   </div>
-                )}
 
-                <div className="space-y-3">
-                  {dayBookings.map((b) => (
-                    <JobCard key={b.id} b={b} act={act} />
-                  ))}
-                </div>
-              </>
-            )}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                    <button
+                      onClick={optimise}
+                      disabled={optimising}
+                      style={{
+                        flex: 1, padding: '12px 0', borderRadius: 12, border: 'none',
+                        background: optimising ? 'rgba(249,115,22,.4)' : '#f97316',
+                        color: '#fff', fontSize: 14, fontWeight: 600, cursor: optimising ? 'default' : 'pointer',
+                      }}
+                    >
+                      {optimising ? 'Optimising route…' : 'Optimise route for this day'}
+                    </button>
+                    <ManualBookingButton onCreated={load} />
+                    <AddCustomDateButton onAdded={load} />
+                  </div>
 
-            <ManualBookingButton onCreated={load} />
-            <AddCustomDateButton onAdded={load} />
-          </>
-        )}
+                  {routeOrder && routeOrder.length > 0 && (
+                    <div className="space-y-3 mb-4">
+                      <RouteMap stops={routeOrder} />
+                      {routeSummary && (
+                        <div className="grid grid-cols-4 gap-2">
+                          <MiniStat label="Jobs" value={routeSummary.jobs} />
+                          <MiniStat label="Revenue" value={`$${routeSummary.total_revenue}`} color="#22C55E" />
+                          <MiniStat label="Est. Profit" value={`$${routeSummary.total_est_profit}`} color="#3B82F6" />
+                          <MiniStat label="Margin" value={routeSummary.avg_margin} />
+                        </div>
+                      )}
+                      <ol className="bg-white rounded-xl border border-black/[0.06] divide-y">
+                        {routeOrder.map((s) => (
+                          <li key={s.id} className="px-4 py-3 flex items-center gap-3 text-sm">
+                            <span className="w-7 h-7 rounded-full bg-[#f97316] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                              {s.position}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold truncate">{s.name}</span>
+                                <span className="text-black/40 text-xs">{s.quadrant}</span>
+                              </div>
+                              <div className="text-xs text-black/50 truncate">{s.address}</div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-semibold">${s.total_price}</div>
+                              {s.est_profit !== undefined && (
+                                <div className="text-xs text-[#22C55E]">~${s.est_profit}</div>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
 
-        {view === 'home' && <CommandCenter />}
-        {view === 'schedule' && <ScheduleView />}
-        {view === 'earnings' && <EarningsDashboard />}
-        {view === 'waitlist' && <WaitlistView />}
-        {view === 'leads' && <LeadsView />}
-        {view === 'growth' && <GrowthPanel />}
-        {view === 'calls' && <CallsPanel />}
-        {view === 'intel' && <IntelPanel />}
-        {view === 'referrals' && <ReferralsPanel />}
-        {view === 'crew' && <CrewView />}
-        {view === 'config' && <ConfigPanel />}
-        {view === 'audit' && <AuditTrail />}
-      </div>
-    </main>
+                  <div className="space-y-3">
+                    {dayBookings.map((b) => (
+                      <JobCard key={b.id} b={b} act={act} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {view === 'home' && <CommandCenter />}
+          {view === 'schedule' && <ScheduleView />}
+          {view === 'earnings' && <EarningsDashboard />}
+          {view === 'waitlist' && <WaitlistView />}
+          {view === 'leads' && <LeadsView />}
+          {view === 'growth' && <GrowthPanel />}
+          {view === 'calls' && <CallsPanel />}
+          {view === 'intel' && <IntelPanel />}
+          {view === 'referrals' && <ReferralsPanel />}
+          {view === 'crew' && <CrewView />}
+          {view === 'config' && <ConfigPanel />}
+          {view === 'audit' && <AuditTrail />}
+        </div>
+      </main>
+    </div>
   );
 }
 
 // ============================================================
-// STAT
+// MINI STAT — compact card for sidebar layout
 // ============================================================
-function Stat({ label, value, accent }) {
+function MiniStat({ label, value, color }) {
   return (
-    <div className="bg-white rounded-xl border border-black/[0.06] p-3 text-center">
-      <div className={`text-xl font-bold ${accent ? 'text-[#f97316]' : 'text-[#1a1a1a]'}`}>
-        {value}
-      </div>
-      <div className="text-xs text-black/40">{label}</div>
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.06)', padding: '12px 14px' }}>
+      <div style={{ fontSize: 20, fontWeight: 700, color: color || '#1a1a1a' }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'rgba(0,0,0,.4)', marginTop: 2 }}>{label}</div>
     </div>
   );
 }
@@ -736,9 +798,13 @@ function ManualBookingButton({ onCreated }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-sm font-semibold text-black/60 hover:border-orange-400 hover:text-[#f97316]"
+        style={{
+          padding: '12px 16px', borderRadius: 12, border: '1px dashed rgba(0,0,0,.2)',
+          background: '#fff', color: 'rgba(0,0,0,.55)', fontSize: 13, fontWeight: 600,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
       >
-        + Add manual booking
+        + Booking
       </button>
     );
   }
@@ -890,9 +956,13 @@ function AddCustomDateButton({ onAdded }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-sm font-semibold text-black/60 hover:border-orange-400 hover:text-[#f97316]"
+        style={{
+          padding: '12px 16px', borderRadius: 12, border: '1px dashed rgba(0,0,0,.2)',
+          background: '#fff', color: 'rgba(0,0,0,.55)', fontSize: 13, fontWeight: 600,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
       >
-        + Add custom work day
+        + Day
       </button>
     );
   }

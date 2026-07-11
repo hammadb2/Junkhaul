@@ -42,6 +42,7 @@ export async function GET(req) {
       onboarded: full.status === 'onboarded' || full.status === 'active',
       pending_verification: full.status === 'pending_verification',
       onboarding_completed_at: full.onboarding_completed_at,
+      onboarding_step: full.onboarding_step || 0,
       has_banking: !!full.bank_account_enc,
       has_sin: !!full.sin_enc,
       td1_federal_claim: full.td1_federal_claim,
@@ -65,7 +66,7 @@ export async function PUT(req) {
 
   const body = await req.json().catch(() => ({}));
   const updates = {};
-  const allowed = ['phone', 'address', 'td1_federal_claim', 'td1_ab_claim'];
+  const allowed = ['phone', 'address', 'td1_federal_claim', 'td1_ab_claim', 'onboarding_step'];
   for (const k of allowed) {
     if (body[k] !== undefined) updates[k] = body[k];
   }

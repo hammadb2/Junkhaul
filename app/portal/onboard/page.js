@@ -95,20 +95,34 @@ function OnboardInner() {
   // Step 8 complete
   const [completeData, setCompleteData] = useState(null);
 
+  // ---- Save onboarding progress so user can resume later ----
+  const saveStep = useCallback(async (s) => {
+    try {
+      await fetch('/api/employee/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ onboarding_step: s }),
+      });
+    } catch { /* non-critical */ }
+  }, []);
+
+  // Save step whenever it changes (after step 1, when account exists)
+  useEffect(() => {
+    if (step > 1) saveStep(step);
+  }, [step, saveStep]);
+
   // ---- Step 0: validate invite ----
   const validateInvite = useCallback(async () => {
     const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('jh-onboard-token') : null);
 
     // First, check if the user is already logged in (has a valid session).
-    // If so, they may have started onboarding but not finished — let them
-    // continue without needing the invite token.
+    // If so, resume from their saved progress.
     if (!effectiveToken) {
       try {
         const meRes = await fetch('/api/employee/me');
         if (meRes.ok) {
           const meData = await meRes.json();
           if (meData.employee && !meData.employee.onboarded) {
-            // Already logged in, onboarding not complete — skip to step 2
             setInvite({
               email: meData.employee.email,
               first_name: meData.employee.name?.split(' ')[0] || '',
@@ -117,11 +131,12 @@ function OnboardInner() {
             setPersonal({
               name: meData.employee.name || '',
               email: meData.employee.email || '',
-              address: '',
+              address: meData.employee.address || '',
             });
             setLoading(false);
-            // Skip password creation step — they already have an account
-            setStep(2);
+            // Resume from saved step (skip to at least step 2 if account exists)
+            const savedStep = meData.employee.onboarding_step || 0;
+            setStep(savedStep > 1 ? savedStep : 2);
             return;
           }
         }
@@ -152,10 +167,11 @@ function OnboardInner() {
             setPersonal({
               name: meData.employee.name || '',
               email: meData.employee.email || '',
-              address: '',
+              address: meData.employee.address || '',
             });
-            // Skip password creation — they already have an account
-            setStep(2);
+            // Resume from saved step
+            const savedStep = meData.employee.onboarding_step || 0;
+            setStep(savedStep > 1 ? savedStep : 2);
             return;
           }
         }
@@ -171,6 +187,20 @@ function OnboardInner() {
       email: data.invite.email || '',
       address: '',
     });
+
+    // Check if user is already logged in with saved progress
+    try {
+      const meRes = await fetch('/api/employee/me');
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        const savedStep = meData.employee?.onboarding_step || 0;
+        if (savedStep > 0) {
+          setStep(savedStep);
+          setPersonal((p) => ({ ...p, address: meData.employee.address || '' }));
+          return;
+        }
+      }
+    } catch { /* no session yet */ }
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { validateInvite(); }, [validateInvite]);
