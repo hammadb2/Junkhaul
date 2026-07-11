@@ -8,53 +8,36 @@
 
 :root {
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  /* Dark theme tokens (default) */
-  --bg-base: #0A0A0B;
-  --bg-card: #161618;
-  --bg-elevated: #1E1E22;
-  --bg-input: #1A1A1E;
-  --accent: #f97316;
-  --accent-dark: #ea580c;
-  --text-primary: rgba(255,255,255,0.90);
-  --text-secondary: rgba(255,255,255,0.60);
-  --text-disabled: rgba(255,255,255,0.40);
-  --status-green: #22C55E;
-  --status-amber: #F59E0B;
-  --status-gray: #6B7280;
-  --status-red: #EF4444;
-  --border-subtle: rgba(255,255,255,0.08);
-  --border-card: rgba(255,255,255,0.06);
-}
-
-/* Auto-switch to light theme for customer-facing pages when system prefers light.
-   The crew portal forces dark via inline styles, so this only affects the
-   landing page, booking flow, and other customer pages that use CSS variables. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg-base: #FAFAFA;
-    --bg-card: #FFFFFF;
-    --bg-elevated: #F5F5F7;
-    --bg-input: #F0F0F2;
-    --text-primary: rgba(0,0,0,0.90);
-    --text-secondary: rgba(0,0,0,0.60);
-    --text-disabled: rgba(0,0,0,0.40);
-    --border-subtle: rgba(0,0,0,0.08);
-    --border-card: rgba(0,0,0,0.06);
-  }
-}
-
-/* Explicit light theme override — used by the crew portal layout to force
-   light mode regardless of OS preference. */
-:root[data-theme="light"] {
+  /* Light theme is the default for the entire site.
+     The track page overrides via data-theme="dark" in its layout. */
   --bg-base: #FAFAFA;
   --bg-card: #FFFFFF;
   --bg-elevated: #F5F5F7;
   --bg-input: #F0F0F2;
+  --accent: #f97316;
+  --accent-dark: #ea580c;
   --text-primary: rgba(0,0,0,0.90);
   --text-secondary: rgba(0,0,0,0.60);
   --text-disabled: rgba(0,0,0,0.40);
+  --status-green: #22C55E;
+  --status-amber: #F59E0B;
+  --status-gray: #6B7280;
+  --status-red: #EF4444;
   --border-subtle: rgba(0,0,0,0.08);
   --border-card: rgba(0,0,0,0.06);
+}
+
+/* Dark theme override — used only by the track page layout. */
+:root[data-theme="dark"] {
+  --bg-base: #0A0A0B;
+  --bg-card: #161618;
+  --bg-elevated: #1E1E22;
+  --bg-input: #1A1A1E;
+  --text-primary: rgba(255,255,255,0.90);
+  --text-secondary: rgba(255,255,255,0.60);
+  --text-disabled: rgba(255,255,255,0.40);
+  --border-subtle: rgba(255,255,255,0.08);
+  --border-card: rgba(255,255,255,0.06);
 }
 
 html,
@@ -126,63 +109,49 @@ button {
    DARK THEME COMPONENTS
    ============================================================ */
 
-/* Glassmorphism floating bar */
+/* Glassmorphism floating bar — light by default */
 .glass-bar {
-  background: rgba(10, 10, 11, 0.65);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .glass-bar {
-    background: rgba(255, 255, 255, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-  }
-}
-:root[data-theme="light"] .glass-bar {
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+:root[data-theme="dark"] .glass-bar {
+  background: rgba(10, 10, 11, 0.65);
+  border: none;
 }
 
-/* Glass button (circular, translucent) */
+/* Glass button (circular, translucent) — light by default */
 .glass-btn {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 .glass-btn:active {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.04);
   transform: scale(0.95);
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .glass-btn {
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-  }
-  :root:not([data-theme="dark"]) .glass-btn:active {
-    background: rgba(0, 0, 0, 0.04);
-  }
+:root[data-theme="dark"] .glass-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
-:root[data-theme="light"] .glass-btn {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-}
-:root[data-theme="light"] .glass-btn:active {
-  background: rgba(0, 0, 0, 0.04);
+:root[data-theme="dark"] .glass-btn:active {
+  background: rgba(255, 255, 255, 0.14);
 }
 
-/* Card — always light (portal pages use hardcoded light text) */
+/* Card — uses theme variables (light by default, dark on track page) */
 .dark-card {
-  background: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
   border-radius: 16px;
 }
 
-/* Input field — always light (portal pages use hardcoded light text) */
+/* Input field — uses theme variables (light by default, dark on track page) */
 .dark-input {
-  background: #F0F0F2;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  color: #1a1a1a;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
   border-radius: 12px;
   transition: border-color 0.2s;
 }
@@ -191,7 +160,7 @@ button {
   border-color: var(--accent);
 }
 .dark-input::placeholder {
-  color: rgba(0, 0, 0, 0.4);
+  color: var(--text-disabled);
 }
 
 /* Primary orange button */
