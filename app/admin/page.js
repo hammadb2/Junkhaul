@@ -14,6 +14,7 @@ import GrowthPanel from '@/components/admin/GrowthPanel';
 import CommandCenter from '@/components/admin/CommandCenter';
 import BookingTimeline from '@/components/admin/BookingTimeline';
 import CrewView from '@/components/admin/CrewView';
+import PayrollPanel from '@/components/admin/PayrollPanel';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { formatTime, formatDateLong } from '@/lib/dates';
 
@@ -92,6 +93,7 @@ export default function AdminDashboard() {
     { id: 'schedule', label: 'Schedule', icon: '☰' },
     { id: 'earnings', label: 'Earnings', icon: '$' },
     { id: 'crew', label: 'Crew', icon: '👥' },
+    { id: 'payroll', label: 'Payroll', icon: '$' },
     { id: 'waitlist', label: 'Waitlist', icon: '⏳' },
     { id: 'leads', label: 'Leads', icon: '📋' },
     { id: 'growth', label: 'Growth', icon: '↗' },
@@ -276,6 +278,7 @@ export default function AdminDashboard() {
           {view === 'intel' && <IntelPanel />}
           {view === 'referrals' && <ReferralsPanel />}
           {view === 'crew' && <CrewView />}
+          {view === 'payroll' && <PayrollPanel />}
           {view === 'config' && <ConfigPanel />}
           {view === 'audit' && <AuditTrail />}
         </div>
@@ -307,6 +310,9 @@ function JobCard({ b, act }) {
   const [rescheduleSlots, setRescheduleSlots] = useState([]);
   const [lightbox, setLightbox] = useState(null);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [crewPhotos, setCrewPhotos] = useState(null);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [arriving, setArriving] = useState(false);
   const done = b.status === 'completed';
   const isNoShow = b.status === 'no_show';
 
@@ -317,6 +323,42 @@ function JobCard({ b, act }) {
     const data = await res.json();
     const day = (data.days || []).find((d) => d.date === date);
     setRescheduleSlots(day?.slots || []);
+  };
+
+  const loadCrewPhotos = async () => {
+    setLoadingPhotos(true);
+    try {
+      const res = await fetch(`/api/admin/get-job-photos?booking_id=${b.id}`);
+      const d = await res.json();
+      if (res.ok) setCrewPhotos(d);
+    } catch { /* ignore */ }
+    setLoadingPhotos(false);
+  };
+
+  const markArrived = async () => {
+    if (!window.confirm(`Mark ${b.name} as crew arrived?`)) return;
+    setArriving(true);
+    await act('mark-arrived', { booking_id: b.id });
+    setArriving(false);
+  };
+
+  const uploadCrewPhoto = async (type) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('booking_id', b.id);
+      fd.append('type', type);
+      try {
+        const res = await fetch('/api/admin/upload-crew-photo', { method: 'POST', body: fd });
+        if (res.ok) { loadCrewPhotos(); }
+      } catch { /* ignore */ }
+    };
+    input.click();
   };
 
   return (
@@ -454,6 +496,21 @@ function JobCard({ b, act }) {
               Reschedule
             </button>
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={markArrived}
+              disabled={arriving}
+              className="border border-[#3B82F6]/30 text-[#3B82F6] text-sm py-2 rounded-lg"
+            >
+              {arriving ? '…' : '📍 Mark arrived'}
+            </button>
+            <button
+              onClick={() => { if (!crewPhotos) loadCrewPhotos(); setCrewPhotos(crewPhotos || {}); }}
+              className="border border-gray-300 text-sm py-2 rounded-lg"
+            >
+              📸 Crew photos
+            </button>
+          </div>
           <QuickSMS bookingId={b.id} phone={b.phone} name={b.name} />
         </div>
       )}
@@ -503,6 +560,74 @@ function JobCard({ b, act }) {
             >
               Confirm reschedule
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Crew photos modal */}
+      {crewPhotos && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={() => setCrewPhotos(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[80dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-black/[0.06] px-4 py-3 flex items-center justify-between">
+              <h3 className="font-semibold text-[#1a1a1a]">Crew photos — {b.name}</h3>
+              <button onClick={() => setCrewPhotos(null)} className="text-black/40 text-xl">✕</button>
+            </div>
+            <div className="p-4 space-y-4">
+              {loadingPhotos && <p className="text-center text-black/40 py-6">Loading…</p>}
+              {!loadingPhotos && (
+                <>
+                  {crewPhotos.crew_arrived_at && (
+                    <p className="text-xs text-[#22C55E]">● Crew arrived {new Date(crewPhotos.crew_arrived_at).toLocaleString('en-CA', { timeZone: 'America/Edmonton' })}</p>
+                  )}
+                  {/* Crew arrival photos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-black/70">Arrival photos</h4>
+                      <button onClick={() => uploadCrewPhoto('crew_arrival')} className="text-xs text-[#f97316] font-medium">+ Upload</button>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {(crewPhotos.crew_arrival_photos || []).map((url, i) => (
+                        <button key={i} onClick={() => setLightbox(url)}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="arrival" className="h-20 w-20 rounded-lg object-cover" />
+                        </button>
+                      ))}
+                      {(crewPhotos.crew_arrival_photos || []).length === 0 && <p className="text-xs text-black/30">None yet</p>}
+                    </div>
+                  </div>
+                  {/* Crew completion photos */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-black/70">Completion photos</h4>
+                      <button onClick={() => uploadCrewPhoto('crew_completion')} className="text-xs text-[#f97316] font-medium">+ Upload</button>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {(crewPhotos.crew_completion_photos || []).map((url, i) => (
+                        <button key={i} onClick={() => setLightbox(url)}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="completion" className="h-20 w-20 rounded-lg object-cover" />
+                        </button>
+                      ))}
+                      {(crewPhotos.crew_completion_photos || []).length === 0 && <p className="text-xs text-black/30">None yet</p>}
+                    </div>
+                  </div>
+                  {/* Customer photos */}
+                  {(crewPhotos.customer_photos || []).length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-black/70 mb-2">Customer photos ({crewPhotos.customer_photos.length})</h4>
+                      <div className="flex gap-2 flex-wrap">
+                        {crewPhotos.customer_photos.map((url, i) => (
+                          <button key={i} onClick={() => setLightbox(url)}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt="customer" className="h-20 w-20 rounded-lg object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -143,6 +143,96 @@ export default function ConfigPanel() {
           </div>
         );
       })}
+
+      {/* Stripe branding utility */}
+      <StripeBrandingCard />
+    </div>
+  );
+}
+
+// ============================================================
+// StripeBrandingCard — wires up /api/admin/stripe-branding
+// ============================================================
+function StripeBrandingCard() {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState('');
+
+  const check = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/stripe-branding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'check' }),
+      });
+      const d = await res.json();
+      setStatus(d);
+    } catch (err) {
+      setStatus({ error: err.message });
+    }
+    setLoading(false);
+  };
+
+  const update = async () => {
+    if (!window.confirm('Update Stripe account branding (logo, colors, statement descriptor)?')) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/stripe-branding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'update' }),
+      });
+      const d = await res.json();
+      setStatus(d);
+    } catch (err) {
+      setStatus({ error: err.message });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <div className="px-4 py-3 border-b border-black/5 font-semibold text-gray-800">
+        Stripe Branding
+      </div>
+      <div className="p-4 space-y-3">
+        <p className="text-xs text-gray-500">Update Stripe account branding (logo, statement descriptor, colors) for customer-facing checkout and receipts.</p>
+        <div className="flex gap-2">
+          <input
+            type="password"
+            placeholder="Admin password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+          <button onClick={check} disabled={loading || !password} className="border border-gray-300 text-sm font-semibold px-4 py-2 rounded-lg text-gray-700">
+            {loading ? '…' : 'Check'}
+          </button>
+          <button onClick={update} disabled={loading || !password} className="bg-[#f97316] text-white text-sm font-semibold px-4 py-2 rounded-lg">
+            Update
+          </button>
+        </div>
+        {status && (
+          <div className="text-xs space-y-1">
+            {status.error ? (
+              <p className="text-red-600">{status.error}</p>
+            ) : (
+              <>
+                {status.account && (
+                  <div className="bg-gray-50 rounded-lg p-2 space-y-1">
+                    <div><span className="text-gray-500">Business:</span> {status.account.business_name || '—'}</div>
+                    <div><span className="text-gray-500">Statement:</span> {status.account.statement_descriptor || '—'}</div>
+                    <div><span className="text-gray-500">URL:</span> {status.account.url || '—'}</div>
+                  </div>
+                )}
+                {status.ok && <p className="text-green-600">✓ {status.result || 'OK'}</p>}
+                {status.logo && <p className="text-gray-500">Logo: {status.logo}</p>}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

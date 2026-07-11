@@ -136,6 +136,60 @@ export default function CommandCenter() {
           </div>
         )}
       </div>
+
+      {/* Crew status — who's clocked in right now */}
+      <CrewStatusWidget />
+    </div>
+  );
+}
+
+// ============================================================
+// CrewStatusWidget — shows who's clocked in + period hours
+// Uses /api/admin/employees
+// ============================================================
+function CrewStatusWidget() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    const load = () => fetch('/api/admin/employees').then((r) => r.json()).then(setData).catch(() => {});
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!data) return null;
+  const clockedIn = (data.employees || []).filter((e) => e.clocked_in);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-800">Crew status</h3>
+        <span className="text-xs text-gray-500">
+          {clockedIn.length} clocked in · {data.summary?.onboarded || 0} onboarded
+        </span>
+      </div>
+      {clockedIn.length === 0 ? (
+        <p className="text-gray-500 text-sm">No one is clocked in right now.</p>
+      ) : (
+        <div className="space-y-2">
+          {clockedIn.map((e) => {
+            const mins = e.clock_in_duration_min || 0;
+            const h = Math.floor(mins / 60);
+            const m = Math.round(mins % 60);
+            return (
+              <div key={e.id} className="flex items-center justify-between bg-green-50 border border-green-100 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="font-medium text-sm text-gray-800">{e.name || e.email}</span>
+                </div>
+                <span className="text-xs text-gray-500">
+                  {h > 0 ? `${h}h ` : ''}{m}m
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
