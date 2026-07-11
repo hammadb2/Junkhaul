@@ -1906,7 +1906,6 @@ Crew app uses these environment variables:
 
 ---
 
-*End of crew app documentation. Additions can be appended below.*
 
 ---
 
@@ -2780,6 +2779,1131 @@ The `system_config` table contains runtime toggles. Crew-relevant keys include:
 3. `pay_runs` and `pay_stubs` records created.
 4. Pay stubs appear in `/portal/paystubs`.
 5. Admin can generate T4s and remittance.
+
+---
+
+---
+
+## 43. Detailed API Reference (Crew & Admin Routes)
+
+# API Documentation: Crew and Admin Routes
+
+## Crew API Routes (`/tmp/Junkhaul/app/api/crew/`)
+
+### POST `/api/crew/arrived`
+**File:** `/tmp/Junkhaul/app/api/crew/arrived/route.js`
+
+**Business Logic:**
+- Crew marks they have arrived at the job site
+- Updates booking's `crew_status` to 'arrived' and sets `crew_arrived_at` timestamp
+- Sends SMS notification to customer confirming crew arrival
+
+**Request Body:**
+```json
+{
+  "booking_id": "string (required)"
+}
+```
+
+**Database Tables:**
+- `bookings` - read and update
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates `booking_id` is present
+- Returns 404 if booking not found
+
+---
+
+### GET `/api/crew/balance-payment/[booking_id]`
+**File:** `/tmp/Junkhaul/app/api/crew/balance-payment/[booking_id]/route.js`
+
+**Business Logic:**
+- Returns balance payment information for customer-facing payment page
+- If booking is already paid, returns payment status
+- If unpaid, creates or retrieves Stripe PaymentIntent for balance payment
+- Generates 1-year signed URL for payment
+
+**Request Params:**
+- `booking_id` (path parameter)
+
+**Database Tables:**
+- `bookings` - read and update
+
+**External APIs:**
+- Stripe PaymentIntents API
+
+**Response Format (if unpaid):**
+```json
+{
+  "paid": false,
+  "clientSecret": "pi_...",
+  "booking": {
+    "booking_ref": "string",
+    "name": "string",
+    "address": "string",
+    "job_date": "string",
+    "job_time": "string",
+    "total": number,
+    "deposit_paid": number,
+    "balance_due": number,
+    "email": "string"
+  }
+}
+```
+
+**Response Format (if paid):**
+```json
+{
+  "paid": true,
+  "payment_status": "string",
+  "booking": { ... }
+}
+```
+
+**Validation/Auth:**
+- No authentication required (public via booking UUID)
+- Returns 404 if booking not found
+
+---
+
+### POST `/api/crew/balance-payment/[booking_id]`
+**File:** `/tmp/Junkhaul/app/api/crew/balance-payment/[booking_id]/route.js`
+
+**Business Logic:**
+- Allows customer to declare cash payment on the payment page
+- Updates booking payment status to 'cash_declared'
+
+**Request Params:**
+- `booking_id` (path parameter)
+
+**Request Body:**
+```json
+{
+  "action": "declare_cash"
+}
+```
+
+**Database Tables:**
+- `bookings` - update
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- No authentication required
+- Returns 400 if action is not 'declare_cash'
+
+---
+
+### POST `/api/crew/clock-off`
+**File:** `/tmp/Junkhaul/app/api/crew/clock-off/route.js`
+
+**Business Logic:**
+- Ends the tracking session and logs end of day
+- Clears the active booking on the crew_location row
+- Stops GPS tracking for the session
+
+**Request Body:**
+- None required
+
+**Database Tables:**
+- `crew_location` - read and update
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+
+---
+
+### POST `/api/crew/collect-payment`
+**File:** `/tmp/Junkhaul/app/api/crew/collect-payment/route.js`
+
+**Business Logic:**
+- Records cash payment collected by crew on-site
+- Only handles 'cash_crew' method (digital payments go through /pay/[booking_id])
+- Validates amount matches balance_due
+- Updates booking status to 'completed' and payment status to 'cash_crew'
+- Sends SMS receipt confirmation to customer
+- Triggers referral fulfillment if booking has referral code
+
+**Request Body:**
+```json
+{
+  "booking_id": "string (required)",
+  "method": "cash_crew (required)",
+  "amount": "number (required)"
+}
+```
+
+**Database Tables:**
+- `bookings` - read and update
+
+**External APIs:**
+- `/api/referral` (internal) - for referral fulfillment
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates booking_id, method, and amount are present
+- Validates method is 'cash_crew'
+- Validates amount matches balance_due
+- Returns 404 if booking not found
+
+---
+
+### POST `/api/crew/complete-job`
+**File:** `/tmp/Junkhaul/app/api/crew/complete-job/route.js`
+
+**Business Logic:**
+- Marks job as complete after completion photos are uploaded
+- Requires at least 3 completion photos
+- Sets crew_status to 'awaiting_payment' if unpaid, or 'complete' if paid
+- If paid, sends review request SMS with tracking link
+- Triggers referral fulfillment if booking has referral code
+
+**Request Body:**
+```json
+{
+  "booking_id": "string (required)"
+}
+```
+
+**Database Tables:**
+- `bookings` - read and update
+- `events` - insert (for timeline logging)
+
+**External APIs:**
+- `/api/referral` (internal) - for referral fulfillment
+
+**Response Format:**
+```json
+{
+  "ok": true,
+  "crew_status": "awaiting_payment" | "complete"
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates booking_id is present
+- Validates at least 3 completion photos exist
+- Returns 404 if booking not found
+
+---
+
+### POST `/api/crew/en-route`
+**File:** `/tmp/Junkhaul/app/api/crew/en-route/route.js`
+
+**Business Logic:**
+- Crew marks they are heading to the job
+- Generates a unique `tracking_session_id`
+- Updates booking's crew_status to 'en_route' and sets `en_route_at` timestamp
+- Sends customer SMS with live tracking link and ETA
+
+**Request Body:**
+```json
+{
+  "booking_id": "string (required)"
+}
+```
+
+**Database Tables:**
+- `bookings` - read and update
+
+**Response Format:**
+```json
+{
+  "tracking_session_id": "ts_bookingId_timestamp"
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates booking_id is present
+- Returns 404 if booking not found
+
+---
+
+### POST `/api/crew/item-conditions`
+**File:** `/tmp/Junkhaul/app/api/crew/item-conditions/route.js`
+
+**Business Logic:**
+- Saves crew-verified item conditions (good/damaged/missing) upon arrival
+- Merges conditions into existing itemized_items array
+- Attaches condition and notes to each item
+- Logs item check to events timeline
+
+**Request Body:**
+```json
+{
+  "booking_id": "string (required)",
+  "conditions": {
+    "0": "good" | "damaged" | "missing",
+    "0_note": "optional note",
+    "1": "good",
+    ...
+  }
+}
+```
+
+**Database Tables:**
+- `bookings` - read and update
+- `events` - insert (for timeline logging)
+
+**Response Format:**
+```json
+{
+  "ok": true,
+  "summary": "Crew verified X items, Y damaged, Z missing"
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates booking_id and conditions are present
+- Returns 404 if booking not found
+
+---
+
+### GET `/api/crew/jobs`
+**File:** `/tmp/Junkhaul/app/api/crew/jobs/route.js`
+
+**Business Logic:**
+- Returns today's jobs in optimized route order
+- Separates incomplete jobs (to be optimized) from completed jobs
+- Computes day statistics (total jobs, completed, remaining, payment totals)
+- Uses route optimization library for incomplete jobs
+
+**Query Params:**
+- None
+
+**Database Tables:**
+- `bookings` - read
+
+**External Libraries:**
+- `@/lib/route` - optimiseRoute function
+- `@/lib/dates` - edmontonNowParts function
+
+**Response Format:**
+```json
+{
+  "jobs": [
+    {
+      // booking objects in optimized order
+    }
+  ],
+  "stats": {
+    "total_jobs": number,
+    "completed": number,
+    "remaining": number,
+    "expected_total": number,
+    "collected_total": number,
+    "collected_cash": number,
+    "collected_card": number
+  }
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+
+---
+
+### POST `/api/crew/location`
+**File:** `/tmp/Junkhaul/app/api/crew/location/route.js`
+
+**Business Logic:**
+- Updates crew GPS position for live tracking
+- Upserts location by tracking_session_id
+- Stores coordinates, heading, speed, accuracy, and active booking
+
+**Request Body:**
+```json
+{
+  "latitude": "number (required)",
+  "longitude": "number (required)",
+  "heading": "number (optional)",
+  "speed_kmh": "number (optional)",
+  "accuracy_meters": "number (optional)",
+  "active_booking_id": "string (optional)",
+  "tracking_session_id": "string (required)"
+}
+```
+
+**Database Tables:**
+- `crew_location` - upsert
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates latitude, longitude, and tracking_session_id are present
+- Validates lat/lng are numbers
+
+---
+
+### GET `/api/crew/nearby-opportunities`
+**File:** `/tmp/Junkhaul/app/api/crew/nearby-opportunities/route.js`
+
+**Business Logic:**
+- Finds nearby opportunities within 3km of crew's current position
+- Queries three sources:
+  1. Waitlist entries (not offered today, not converted)
+  2. Future-day confirmed bookings (not opportunistic)
+  3. Quoted-but-unbooked leads (not on cooldown)
+- Computes truck fill percentage from today's jobs
+- For leads, calculates discounted prices using discount engine
+- Ranks leads by profitability score
+- Returns sorted opportunities (deadhead leads first by profitability, then others by distance)
+
+**Query Params:**
+- None
+
+**Database Tables:**
+- `crew_location` - read (for crew position)
+- `waitlist` - read
+- `bookings` - read (future bookings and today's jobs)
+- `leads` - read
+
+**External Libraries:**
+- `@/lib/discountEngine` - computeTruckFill, computeDiscountedPrice, rankLeads
+- `@/lib/dates` - edmontonNowParts
+
+**Response Format:**
+```json
+{
+  "opportunities": [
+    {
+      "waitlist_id": "string | null",
+      "booking_id": "string | null",
+      "lead_id": "string | null",
+      "customer_type": "waitlist" | "future_booking" | "lead",
+      "name": "string",
+      "phone": "string",
+      "address": "string",
+      "lat": number,
+      "lng": number,
+      "distance_km": number,
+      "load_size": "string",
+      "joined_at": "string (ISO date)",
+      "offer_type": "waitlist" | "future_booking" | "deadhead",
+      "truck_fill_pct": number,
+      // For leads only:
+      "original_price": number,
+      "discounted_price": number,
+      "discount_percent": number,
+      "savings": number,
+      "profitability_score": number
+    }
+  ],
+  "truck_fill": {
+    "fillPct": number,
+    "totalVolume": number,
+    "usedVolume": number
+  }
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Returns empty opportunities array if no crew location found
+
+---
+
+### POST `/api/crew/offer-nearby`
+**File:** `/tmp/Junkhaul/app/api/crew/offer-nearby/route.js`
+
+**Business Logic:**
+- Sends opportunistic pickup offer SMS to nearby customer
+- Creates nearby_offers record with 5-minute expiry
+- Supports three customer types: waitlist, future booking, or lead
+- For waitlist: marks as offered_today
+- For leads: sets opportunistic_offer_sent and 24-hour cooldown
+- Sends different SMS message for deadhead-discount leads (shows savings)
+
+**Request Body:**
+```json
+{
+  "booking_id": "string (optional)",
+  "waitlist_id": "string (optional)",
+  "lead_id": "string (optional)",
+  "distance_km": "number (optional, for SMS)",
+  "original_price": "number (optional, for leads)",
+  "discounted_price": "number (optional, for leads)",
+  "discount_percent": "number (optional, for leads)"
+}
+```
+*(One of booking_id, waitlist_id, or lead_id is required)*
+
+**Database Tables:**
+- `bookings` - read (for future bookings)
+- `waitlist` - read and update
+- `leads` - read and update
+- `nearby_offers` - insert
+
+**Response Format:**
+```json
+{
+  "offer_id": "string"
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates at least one of booking_id, waitlist_id, or lead_id is present
+- Returns 404 if customer not found
+- Returns 500 if SMS fails
+
+---
+
+### GET `/api/crew/photos/[booking_id]`
+**File:** `/tmp/Junkhaul/app/api/crew/photos/[booking_id]/route.js`
+
+**Business Logic:**
+- Returns crew photos for customer photo viewer page
+- Public endpoint accessible via booking UUID
+
+**Request Params:**
+- `booking_id` (path parameter)
+
+**Database Tables:**
+- `bookings` - read
+
+**Response Format:**
+```json
+{
+  "photos": [
+    {
+      "url": "string",
+      "type": "arrival" | "completion",
+      "taken_at": "string (ISO date)",
+      "lat": number,
+      "lng": number
+    }
+  ]
+}
+```
+
+**Validation/Auth:**
+- No authentication required (public via booking UUID)
+- Returns 404 if booking not found
+
+---
+
+### POST `/api/crew/resend-payment-link`
+**File:** `/tmp/Junkhaul/app/api/crew/resend-payment-link/route.js`
+
+**Business Logic:**
+- Sends customer an SMS with link to payment page
+- Allows customer to pay on their own device
+- Includes balance due amount in SMS
+
+**Request Body:**
+```json
+{
+  "booking_id": "string (required)"
+}
+```
+
+**Database Tables:**
+- `bookings` - read
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates booking_id is present
+- Returns 404 if booking not found
+- Returns 500 if SMS fails
+
+---
+
+### GET `/api/crew/route`
+**File:** `/tmp/Junkhaul/app/api/crew/route/route.js`
+
+**Business Logic:**
+- Returns driving route geometry and navigation details
+- Calls Mapbox Directions API for route calculation
+- Returns GeoJSON LineString, distance, duration, ETA, and turn-by-turn steps
+
+**Query Params:**
+- `from` (required): "lat,lng" format
+- `to` (required): booking_id
+
+**Database Tables:**
+- `bookings` - read (for destination coordinates)
+
+**External APIs:**
+- Mapbox Directions API v5
+
+**Response Format:**
+```json
+{
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [[lng, lat], ...]
+  },
+  "distance_meters": number,
+  "duration_seconds": number,
+  "eta_minutes": number,
+  "steps": [
+    {
+      // Mapbox step objects with voice instructions
+    }
+  ],
+  "destination": {
+    "name": "string",
+    "address": "string",
+    "lat": number,
+    "lng": number
+  }
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates from and to parameters are present
+- Returns 404 if booking not found
+- Returns 400 if booking has no coordinates
+- Returns 502 if Mapbox API fails
+
+---
+
+### POST `/api/crew/start-job`
+**File:** `/tmp/Junkhaul/app/api/crew/start-job/route.js`
+
+**Business Logic:**
+- Marks job as in_progress after arrival photos are uploaded
+- Requires at least 3 arrival photos
+- Updates crew_status to 'in_progress' and sets job_started_at timestamp
+- Sends customer SMS with link to view pre-job photos
+
+**Request Body:**
+```json
+{
+  "booking_id": "string (required)"
+}
+```
+
+**Database Tables:**
+- `bookings` - read and update
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates booking_id is present
+- Validates at least 3 arrival photos exist
+- Returns 404 if booking not found
+
+---
+
+### GET `/api/crew/track/[booking_id]`
+**File:** `/tmp/Junkhaul/app/api/crew/track/[booking_id]/route.js`
+
+**Business Logic:**
+- Returns booking details and latest crew location for customer tracking page
+- Public endpoint accessible via booking UUID
+- Fetches crew location filtered by active_booking_id
+
+**Request Params:**
+- `booking_id` (path parameter)
+
+**Database Tables:**
+- `bookings` - read
+- `crew_location` - read
+
+**Response Format:**
+```json
+{
+  "booking": {
+    "id": "string",
+    "name": "string",
+    "address": "string",
+    "lat": number,
+    "lng": number,
+    "crew_status": "string",
+    "job_time": "string",
+    "job_date": "string"
+  },
+  "crew_location": {
+    "latitude": number,
+    "longitude": number,
+    "heading": number,
+    "speed_kmh": number,
+    "updated_at": "string (ISO date)"
+  } | null
+}
+```
+
+**Validation/Auth:**
+- No authentication required (public via booking UUID)
+- Returns 404 if booking not found
+
+---
+
+### POST `/api/crew/upload-photo`
+**File:** `/tmp/Junkhaul/app/api/crew/upload-photo/route.js`
+
+**Business Logic:**
+- Uploads crew photo to Supabase Storage
+- Accepts multipart/form-data with photo file and metadata
+- Generates 1-year signed URL for legal protection
+- Appends photo metadata to booking's crew_photos JSONB array
+
+**Request Body (multipart/form-data):**
+- `booking_id` (required)
+- `type` (required): 'arrival' or 'completion'
+- `lat` (optional)
+- `lng` (optional)
+- `taken_at` (optional)
+- `photo` (required): file
+
+**Database Tables:**
+- `bookings` - read and update
+
+**Storage:**
+- Supabase Storage bucket: 'job-photos'
+- Path: `crew/{booking_id}/{type}_{timestamp}.jpg`
+
+**Response Format:**
+```json
+{
+  "url": "string (signed URL)"
+}
+```
+
+**Validation/Auth:**
+- Requires crew authentication via `crewAuth()`
+- Validates booking_id, type, and photo are present
+- Validates type is 'arrival' or 'completion'
+- Returns 500 if upload or URL generation fails
+
+---
+
+### POST `/api/crew/verify-pin`
+**File:** `/tmp/Junkhaul/app/api/crew/verify-pin/route.js`
+
+**Business Logic:**
+- Verifies crew PIN hash for authentication
+- App hashes 4-digit PIN with SHA-256 locally and sends hash
+- Server compares with constant-time comparison
+
+**Request Body:**
+```json
+{
+  "pin_hash": "string (required)"
+}
+```
+
+**Database Tables:**
+- None (uses constant comparison)
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- No authentication required (this is the auth endpoint)
+- Validates pin_hash is present
+- Returns 401 if PIN is invalid
+
+---
+
+## Admin API Routes
+
+### POST `/api/admin/payroll/preview`
+**File:** `/tmp/Junkhaul/app/api/admin/payroll/preview/route.js`
+
+**Business Logic:**
+- Calculates payroll preview without saving
+- Gathers un-paid shifts for a period (shifts with null pay_run_id)
+- Aggregates hours and pay per employee
+- Calculates full payroll run with deductions (CPP, EI, tax, vacation)
+- Returns preview for review before committing
+
+**Request Body:**
+```json
+{
+  "period_start": "string (ISO date, required)",
+  "period_end": "string (ISO date, required)",
+  "P": "string (optional, default: biweekly)"
+}
+```
+
+**Database Tables:**
+- `timesheets` - read
+
+**External Libraries:**
+- `@/lib/payroll` - calculatePayRun, PAY_PERIODS
+
+**Response Format:**
+```json
+{
+  "pay_run": {
+    "edition": "string",
+    "period_start": "string",
+    "period_end": "string",
+    "pay_date": "string",
+    "stubs": [
+      {
+        "employee_id": "string",
+        "regular_hours": number,
+        "overtime_hours": number,
+        "total_hours": number,
+        "gross_pay": number,
+        "cpp": number,
+        "cpp2": number,
+        "ei": number,
+        "fed_tax": number,
+        "vacation_pay": number,
+        "net_pay": number
+      }
+    ],
+    "totals": {
+      "total_gross": number,
+      "total_cpp": number,
+      "total_cpp2": number,
+      "total_ei": number,
+      "total_fed_tax": number,
+      "total_vacation": number,
+      "total_net": number,
+      "total_cra_remittance": number,
+      "remittance_due_date": "string"
+    }
+  }
+}
+```
+
+**Validation/Auth:**
+- Requires admin authentication via admin cookie
+- Validates period_start and period_end are present
+- Returns message if no un-paid shifts in period
+
+---
+
+### POST `/api/admin/payroll/run`
+**File:** `/tmp/Junkhaul/app/api/admin/payroll/run/route.js`
+
+**Business Logic:**
+- Calculates AND persists the pay run and pay stubs
+- Marks included shifts as paid (sets pay_run_id)
+- Creates pay_run record with status 'calculated'
+- Creates pay_stubs records for each employee
+- Creates remittance record for CRA payments
+- Supports both cron secret (automated) and admin cookie (manual) auth
+
+**Request Body:**
+```json
+{
+  "period_start": "string (ISO date, required)",
+  "period_end": "string (ISO date, required)",
+  "P": "string (optional, default: biweekly)"
+}
+```
+
+**Database Tables:**
+- `timesheets` - read and update
+- `pay_runs` - insert
+- `pay_stubs` - insert
+- `remittances` - insert
+
+**External Libraries:**
+- `@/lib/payroll` - calculatePayRun, PAY_PERIODS
+- `@/lib/cronAuth` - checkCronSecret
+
+**Response Format:**
+```json
+{
+  "ok": true,
+  "pay_run_id": "string",
+  "pay_run": {
+    // full pay run object with id
+  }
+}
+```
+
+**Validation/Auth:**
+- Requires admin cookie OR cron secret authentication
+- Validates period_start and period_end are present
+- Returns 400 if no un-paid shifts in period
+
+---
+
+### GET `/api/admin/payroll/approve` (list)
+**File:** `/tmp/Junkhaul/app/api/admin/payroll/approve/route.js`
+
+**Business Logic:**
+- Lists all pay runs in reverse chronological order
+- Returns up to 50 most recent pay runs
+
+**Query Params:**
+- None
+
+**Database Tables:**
+- `pay_runs` - read
+
+**Response Format:**
+```json
+{
+  "pay_runs": [
+    {
+      "id": "string",
+      "period_start": "string",
+      "period_end": "string",
+      "status": "calculated" | "approved" | "paid",
+      "total_gross": number,
+      "total_net": number,
+      "created_at": "string",
+      // ... other pay run fields
+    }
+  ]
+}
+```
+
+**Validation/Auth:**
+- Requires admin authentication via admin cookie
+
+---
+
+### POST `/api/admin/payroll/approve`
+**File:** `/tmp/Junkhaul/app/api/admin/payroll/approve/route.js`
+
+**Business Logic:**
+- Approves a calculated pay run
+- Updates status to 'approved' with timestamp and approver
+- Optionally triggers direct deposit for each pay stub
+- If direct deposit configured and successful, updates status to 'paid'
+- Requires employee bank account info for direct deposit
+
+**Request Body:**
+```json
+{
+  "pay_run_id": "string (required)",
+  "send_direct_deposit": "boolean (optional)"
+}
+```
+
+**Database Tables:**
+- `pay_runs` - read and update
+- `pay_stubs` - read
+- `employees` - read
+
+**External Libraries:**
+- `@/lib/directDeposit` - sendDirectDeposit, isDirectDepositConfigured
+
+**Response Format:**
+```json
+{
+  "ok": true,
+  "approved": true,
+  "deposits": [
+    {
+      "employee_id": "string",
+      "ok": boolean,
+      "error": "string | null"
+    }
+  ]
+}
+```
+
+**Validation/Auth:**
+- Requires admin authentication via admin cookie
+- Validates pay_run_id is present
+- Returns 404 if pay run not found
+- Returns 400 if pay run status is not 'calculated'
+- Returns warning if direct deposit not configured
+
+---
+
+### GET `/api/admin/t4s`
+**File:** `/tmp/Junkhaul/app/api/admin/t4s/route.js`
+
+**Business Logic:**
+- Returns all T4 slips for a specified tax year
+- Defaults to previous year if not specified
+- Includes employee name and email in response
+
+**Query Params:**
+- `year` (optional): defaults to previous calendar year
+
+**Database Tables:**
+- `t4_slips` - read with join to employees
+
+**Response Format:**
+```json
+{
+  "t4_slips": [
+    {
+      "id": "string",
+      "tax_year": number,
+      "employee_id": "string",
+      "income": number,
+      "cpp_contributed": number,
+      "ei_contributed": number,
+      "income_tax_deducted": number,
+      "employees": {
+        "name": "string",
+        "email": "string"
+      },
+      // ... other T4 fields
+    }
+  ],
+  "tax_year": number
+}
+```
+
+**Validation/Auth:**
+- Requires admin authentication via admin cookie
+
+---
+
+### GET `/api/admin/remittance`
+**File:** `/tmp/Junkhaul/app/api/admin/remittance/route.js`
+
+**Business Logic:**
+- Lists all CRA remittances with pay run information
+- Orders by due_date descending
+- Calculates total owed amount and count
+- Identifies next due remittance
+
+**Query Params:**
+- None
+
+**Database Tables:**
+- `remittances` - read with join to pay_runs
+
+**Response Format:**
+```json
+{
+  "remittances": [
+    {
+      "id": "string",
+      "pay_run_id": "string",
+      "due_date": "string",
+      "amount": number,
+      "status": "owed" | "paid",
+      "paid_at": "string | null",
+      "paid_method": "string | null",
+      "pay_runs": {
+        "period_start": "string",
+        "period_end": "string",
+        "total_cra_remittance": number,
+        "status": "string"
+      }
+    }
+  ],
+  "owed_total": number,
+  "owed_count": number,
+  "next_due": {
+    // remittance object or null
+  }
+}
+```
+
+**Validation/Auth:**
+- Requires admin authentication via admin cookie
+
+---
+
+### POST `/api/admin/remittance`
+**File:** `/tmp/Junkhaul/app/api/admin/remittance/route.js`
+
+**Business Logic:**
+- Marks a remittance as paid
+- Updates status, paid_at timestamp, and payment method
+
+**Request Body:**
+```json
+{
+  "remittance_id": "string (required)",
+  "paid_method": "string (optional, default: 'manual')"
+}
+```
+
+**Database Tables:**
+- `remittances` - update
+
+**Response Format:**
+```json
+{
+  "ok": true
+}
+```
+
+**Validation/Auth:**
+- Requires admin authentication via admin cookie
+- Returns 500 if update fails
+
+---
+
+## Summary
+
+**Crew Routes (17 files):**
+- All crew routes (except public customer-facing endpoints) require `crewAuth()` authentication
+- Public endpoints: balance-payment, photos, track (accessible via booking UUID)
+- Key workflows: job lifecycle (arrived → start-job → complete-job), payment collection, GPS tracking, photo uploads, nearby opportunities
+
+**Admin Routes (5 files):**
+- All admin routes require admin cookie authentication
+- Payroll routes also support cron secret for automated runs
+- Key workflows: payroll calculation, approval, direct deposit, T4 management, CRA remittance tracking
+
+**Database Tables Used:**
+- `bookings` - crew routes
+- `crew_location` - crew routes
+- `waitlist` - crew routes
+- `leads` - crew routes
+- `nearby_offers` - crew routes
+- `events` - crew routes
+- `timesheets` - payroll routes
+- `pay_runs` - payroll routes
+- `pay_stubs` - payroll routes
+- `remittances` - payroll routes
+- `t4_slips` - admin routes
+- `employees` - payroll routes
 
 ---
 
