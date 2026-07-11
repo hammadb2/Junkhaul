@@ -6382,4 +6382,110 @@ This section inventories the shared and admin-facing React components that power
 
 ---
 
+## Environment Variables, Theming, and PWA Configuration
+
+### 1. Environment Variables
+
+The crew app, portal, and PWA use the environment variables below. Public variables are exposed to the browser via the `NEXT_PUBLIC_` prefix; server-only variables are used in API routes and server libraries.
+
+#### Public variables (`NEXT_PUBLIC_*`)
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SITE_URL` | Base site URL for metadata, OG tags, and crew invite links (`app/layout.js` line 8). |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | Mapbox GL access token for the map on `/portal/schedule`, address autocomplete in `/portal/onboard`, and the customer `/track/[token]` page. |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Public VAPID key used by `components/PWARegister.js` to subscribe the crew device to push notifications. |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key for the payment form on the customer `/track/[token]` page. |
+
+#### Server-only variables
+
+| Variable | Purpose |
+|----------|---------|
+| `EMPLOYEE_ENC_KEY` | AES-256-GCM encryption key for sensitive employee fields (SIN, banking) in `lib/employeeAuth.js`. |
+| `VAPID_PUBLIC_KEY` | VAPID public key for the server-side push notification `sendNotification` calls in `lib/pushNotifications.js`. |
+| `VAPID_PRIVATE_KEY` | VAPID private key for the server-side push notification `sendNotification` calls. |
+| `VAPID_SUBJECT` | VAPID subject/contact address (defaults to `mailto:crew@junkhaul.ca`). |
+| `RESEND_API_KEY` | Resend API key used by `/api/admin/crew` routes to send employee invite emails. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | JSON credentials for the Google service account used to upload employee onboarding documents. |
+| `GOOGLE_DRIVE_EMPLOYEE_ROOT` | Google Drive folder ID where employee documents are stored. |
+| `GOOGLE_DRIVE_OWNER_EMAIL` | Email address that receives writer access to the employee document folder. |
+| `OILPRICEAPI_KEY` | API key for the `/api/employee/gas-price` route. |
+| `QUO_API_KEY` / `QUO_USER_ID` / `QUO_PHONE_NUMBER` | Quo API credentials and sender number for SMS notifications. |
+| `HAMMAD_PHONE` / `BROTHER_PHONE` | Operator phone numbers for inbound alerts and forwarding. |
+| `CRON_SECRET` | Shared secret for authenticating cron routes (e.g., `/api/cron/run-payroll`). |
+| `EFT_PROVIDER` | Direct deposit provider selector (`vopay`, `peoples`, `plooto`). |
+| `VOPAY_API_KEY` / `VOPAY_API_TOKEN` / `VOPAY_BUSINESS_ACCOUNT` | VoPay direct deposit credentials. |
+| `PEOPLES_API_KEY` / `PEOPLES_MERCHANT` | Peoples Group direct deposit credentials. |
+| `PLOOTO_API_KEY` / `PLOOTO_BUSINESS_ID` | Plooto direct deposit credentials. |
+
+### 2. CSS Theme Strategy
+
+**Default theme:** `app/globals.css` defines a light default in `:root` with `color-scheme: light` (`app/globals.css` lines 9-29). The `track` page intentionally overrides this via `data-theme="dark"`.
+
+**Theme switching:**
+- `app/portal/layout.js` sets `document.documentElement` to `data-theme="light"` in a `useEffect`, so the crew portal always renders light regardless of the device dark-mode setting. It restores the previous theme on unmount.
+- `app/track/layout.js` sets `data-theme="dark"` for the customer tracking page, also restoring the previous theme on unmount.
+
+**CSS variables (`globals.css` lines 9-29):** The `:root` block defines:
+- `--bg-base`, `--bg-card`, `--bg-elevated`, `--bg-input` — background surfaces.
+- `--accent` (`#f97316`), `--accent-dark` (`#ea580c`) — orange primary.
+- `--text-primary`, `--text-secondary`, `--text-disabled` — text colors.
+- `--status-green`, `--status-amber`, `--status-gray`, `--status-red` — status indicators.
+- `--border-subtle`, `--border-card` — borders.
+
+The `[data-theme="dark"]` block overrides these to dark values (`app/globals.css` lines 32-43).
+
+**Important utility classes used in the portal/track UI:**
+- `.glass-bar` — translucent, blurred floating bar; background inverts on `data-theme="dark"`.
+- `.glass-btn` — circular, translucent button with blur, active scale, and dark-mode invert.
+- `.dark-card` — background `var(--bg-card)`, border `var(--border-card)`, 16 px radius.
+- `.dark-input` — background `var(--bg-input)`, `var(--text-primary)`, 12 px radius, accent focus ring.
+- `.btn-primary` — orange button using `var(--accent)` and `var(--accent-dark)` on active.
+- `.btn-ghost` — secondary button with subtle border and `var(--text-secondary)`.
+- `.status-dot` — 8 px colored circle for status indicators.
+- `.pulse-ring`, `.bounce-pin`, `.slide-up`, `.slide-in-right`, `.fade-in`, `.celebrate` — motion utilities.
+- `.safe-top`, `.safe-bottom`, `.safe-left`, `.safe-right` — iOS safe-area insets.
+- `.no-scrollbar`, `.border-3`, `.tabular`, `.sheet-handle`, `.progress-line` / `.progress-line-fill`.
+
+### 3. Manifest, Theme Color, and Viewport
+
+**`public/manifest.json`** (PWA manifest):
+- `name`: "Junk Haul Crew"
+- `short_name`: "JunkHaul"
+- `description`: "Junk Haul Calgary Crew Portal"
+- `start_url`: `/portal`
+- `scope`: `/`
+- `display`: `standalone`
+- `orientation`: `portrait`
+- `background_color`: `#FAFAFA`
+- `theme_color`: `#f97316`
+- Icons: `/icon-192.png`, `/icon-512.png`, `/crew-logo.png` (all `any maskable` or `any`).
+
+**`app/layout.js` viewport** (lines 36-42):
+- `themeColor`: `#FAFAFA`
+- `width`: `device-width`, `initialScale`: 1, `maximumScale`: 1, `viewportFit`: `cover`
+
+The root `<head>` also sets `<meta name="color-scheme" content="light" />` (`app/layout.js` line 126). The manifest is referenced in metadata (`app/layout.js` line 9).
+
+**PWA registration:** `app/layout.js` renders `<PWARegister />` (line 133). `components/PWARegister.js` registers `/sw.js`, shows an iOS "Add to Home Screen" prompt on `/portal` pages (excluding onboarding), and auto-subscribes to push notifications using `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
+
+### 4. Tailwind Config
+
+**`tailwind.config.cjs`**: content globs are `app/**/*.{js,jsx}` and `components/**/*.{js,jsx}`. Relevant theme overrides:
+- `theme.extend.colors.orange.500`: `#f97316`
+- `theme.extend.colors.orange.600`: `#ea580c`
+- `theme.extend.fontFamily.sans`: `['var(--font-sans)', 'system-ui', 'sans-serif']`
+
+### 5. Layout Hierarchy
+
+- **Root layout (`app/layout.js`)**: Wraps the whole app. Imports `globals.css`, sets metadata, viewport, `/manifest.json`, and renders `<PWARegister />` before children. The `<head>` declares `<meta name="color-scheme" content="light" />`.
+- **Portal layout (`app/portal/layout.js`)**: Client layout under `/portal/*` that forces `data-theme="light"` so the crew portal stays light even on devices in dark mode.
+- **Track layout (`app/track/layout.js`)**: Client layout under `/track/*` that forces `data-theme="dark"` for the customer tracking page.
+
+### 6. Next.js Config
+
+**`next.config.mjs`**: Minimal Next.js config. It does not include a PWA plugin, custom headers, or rewrites for the crew app. It only enables:
+- `reactStrictMode: true`
+- `images.remotePatterns` allowing `**.supabase.co` (for Supabase-hosted images).
+
 *Documentation continues below. More sections can be added as needed.*
