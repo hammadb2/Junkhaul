@@ -5901,4 +5901,485 @@ CREATE TABLE IF NOT EXISTS system_config (
 
 ---
 
+## A. Component Inventory — Crew App & Admin UI
+
+This section inventories the shared and admin-facing React components that power the crew portal, onboarding, and admin controls. Each component is documented with its purpose, props/state, handlers, API calls, rendered UI, dependencies, and notable edge cases.
+
+---
+
+### A.1 `components/PWARegister.js`
+
+**Purpose:** Registers the service worker, subscribes the device to push notifications, and shows an iOS "Add to Home Screen" banner on crew portal pages. Rendered once in the root layout.
+
+**Props:** None — self-contained.
+
+**State:**
+- `showIosPrompt` (`boolean`) — controls visibility of the iOS install banner.
+
+**Hooks:**
+- `useEffect` on mount: registers `/sw.js`, detects iOS/Safari, conditionally shows the iOS prompt after 2s, and requests push permission/subscription on portal pages.
+
+**Key handlers:**
+- `requestPermissionAndSubscribe()` — requests `Notification.permission` if `default`; if granted, calls `subscribeToPush()`.
+- `subscribeToPush()` — waits for `navigator.serviceWorker.ready`, reuses an existing `pushManager` subscription or creates a new one with `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, then POSTs the subscription JSON to `/api/employee/push-subscribe`.
+- `dismissIosPrompt()` — hides the banner and persists `jh-ios-prompt-dismissed` in `localStorage`.
+
+**API calls:**
+- `POST /api/employee/push-subscribe` — sent once a valid `PushSubscription` exists.
+
+**UI rendered:**
+- Fixed bottom banner with app branding, instructions to use Share → Add to Home Screen, and a dismiss × button.
+
+**External dependencies:**
+- Browser `serviceWorker`, `PushManager`, `Notification` APIs.
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` environment variable.
+
+**Edge cases:**
+- Silently returns if APIs are unavailable.
+- iOS prompt is skipped on `/portal/onboard`, in standalone mode, or if previously dismissed.
+- All failures are logged with `console.warn` and not surfaced to the user.
+
+---
+
+### A.2 `components/portal/DocumentScanner.js`
+
+**Purpose:** File upload card for onboarding documents (SIN, driver license front/back). Accepts images and PDFs via tap, drag/drop, or file input.
+
+**Props:**
+- `label` (`string`) — display label for the document.
+- `onCapture(file)` (`function`) — callback invoked with the selected `File`.
+- `uploaded` (`boolean`) — whether the document has already been uploaded.
+- `previewUrl` (`string`) — thumbnail URL to show after upload.
+- `uploading` (`boolean`) — shows spinner state and disables replace actions.
+
+**State:**
+- `dragOver` (`boolean`) — visual drag highlight.
+
+**Hooks:**
+- `useRef` for the hidden `file` input.
+
+**Key handlers:**
+- `handleFile(e)` — reads `e.target.files[0]` and calls `onCapture`.
+- `onDrop(e)` — prevents default, grabs `e.dataTransfer.files[0]`, and calls `onCapture`.
+
+**API calls:** None directly; the parent page posts to `/api/employee/documents`.
+
+**UI rendered:**
+- Two modes:
+  1. Uploaded: green-bordered row with checkmark/thumbnail, "Uploaded" text, and "Replace" button.
+  2. Not uploaded: dashed drop zone with upload icon, label, and helper text.
+
+**External dependencies:** None.
+
+**Edge cases:**
+- Accepts `image/*,.pdf`.
+- Uploading state blocks the replace action but shows a spinner in the thumbnail slot.
+
+---
+
+### A.3 `components/portal/SelfieCapture.js`
+
+**Purpose:** File upload component specifically for the crew onboarding selfie. Identical in behavior to `DocumentScanner` but uses `capture="user"` and a circular avatar preview.
+
+**Props:**
+- `onCapture(file)` (`function`) — callback invoked with the selected `File`.
+- `uploaded` (`boolean`) — whether the selfie has already been uploaded.
+- `previewUrl` (`string`) — circular avatar preview.
+- `uploading` (`boolean`) — spinner state.
+
+**State:**
+- `dragOver` (`boolean`) — drag highlight.
+
+**Hooks:**
+- `useRef` for the hidden `file` input.
+
+**Key handlers:**
+- `handleFile(e)` — reads `e.target.files[0]` and calls `onCapture`.
+- `onDrop(e)` — reads dropped file and calls `onCapture`.
+
+**API calls:** None directly; parent page posts to `/api/employee/selfie`.
+
+**UI rendered:**
+- Uploaded: green row with circular thumbnail/avatar, "Crew selfie" label, status, and "Replace" button.
+- Not uploaded: dashed drop zone with camera icon and "Upload selfie" text.
+
+**External dependencies:** None.
+
+**Edge cases:**
+- `input` uses `accept="image/*" capture="user"` to open the front-facing camera on mobile.
+- Accepts images only.
+
+---
+
+### A.4 `components/AddressAutocomplete.js`
+
+**Purpose:** Mapbox-powered address search input with debounced suggestions, keyboard navigation, and light/dark theme support.
+
+**Props:**
+- `value` (`string`) — controlled input value.
+- `onChange(value)` (`function`) — fires on every keystroke.
+- `onSelect(feature)` (`function`) — fires when a suggestion is selected; receives the full Mapbox feature object.
+- `placeholder` (`string`, default `Start typing address...`)
+- `className` (`string`)
+- `dark` (`boolean`, default `false`) — swaps theme tokens.
+- `style` (`object`)
+
+**State:**
+- `suggestions` (`array`) — Mapbox `features`.
+- `showDropdown` (`boolean`)
+- `loading` (`boolean`)
+- `highlighted` (`number`) — keyboard-selected index.
+- `hasSearched` (`boolean`) — used to show "No addresses found" only after a search.
+
+**Hooks:**
+- `useRef` debounce timer.
+- `useEffect` cleanup clears the debounce timer on unmount.
+
+**Key handlers:**
+- `fetchSuggestions(query)` — calls Mapbox Geocoding API with Calgary bbox/proximity and `country=ca`.
+- `handleChange(val)` — debounces 250ms before fetching.
+- `selectSuggestion(s)` — updates `value`, calls `onSelect`, and closes dropdown.
+- `handleKeyDown(e)` — supports ArrowDown/ArrowUp/Enter/Escape navigation.
+
+**API calls:**
+- `GET https://api.mapbox.com/geocoding/v5/mapbox.places/{query}.json` (with `NEXT_PUBLIC_MAPBOX_TOKEN`)
+
+**UI rendered:**
+- Styled text input, absolute-positioned dropdown with loading row, "No addresses found" row, and list of suggestions with `MapPin` icon and two-line address.
+
+**External dependencies:**
+- `lucide-react` (`MapPin`, `Search`)
+- Mapbox Geocoding API and `NEXT_PUBLIC_MAPBOX_TOKEN`.
+
+**Edge cases:**
+- Skips API if `query.length < 2` or `NEXT_PUBLIC_MAPBOX_TOKEN` missing.
+- `onBlur` uses a 200ms timeout so `onMouseDown` on a suggestion can fire before the dropdown closes.
+
+---
+
+### A.5 `components/admin/CrewView.js`
+
+**Purpose:** Comprehensive admin crew management page. Displays summaries, pending invites, an invite form, employee list, broadcast messaging, crew assignments, storage/donation centers, and an employee detail slide-over for approval/editing.
+
+**Main component state:**
+- `data` — full payload from `/api/admin/crew`.
+- `loading`, `selectedId`, `assignments`, `facilities`, `centers`, `message`.
+
+**Hooks:**
+- `useState`, `useEffect`, `useCallback`, `useMemo`.
+
+**Key handlers/data fetching:**
+- `fetchAll()` — loads `data`, `assignments`, `facilities`, and `centers` in parallel via `Promise.all`.
+- `flash(type, text)` — temporary success/error message.
+
+**Sub-components and their APIs:**
+
+| Sub-component | API calls | Notes |
+|---|---|---|
+| `PendingInvitesSection` | `POST /api/admin/crew` (resend) | Lists pending invites; resend recreates the invite. |
+| `InviteForm` | `POST /api/admin/crew` | First name, last name, email, phone, pay rate. |
+| `BroadcastSection` | `GET /api/admin/crew/push`, `POST /api/admin/crew/push` | Send push notifications to all or one employee. |
+| `EmployeeList` | none | Roster with status, clocked-in pulse, onboarding badges, and period minutes. |
+| `EmployeeDetailSlideOver` | `GET /api/admin/crew/${id}`, `PATCH /api/admin/crew/${id}`, `DELETE /api/admin/crew/${id}`, `POST /api/admin/crew/${id}/resend-invite`, `POST /api/admin/crew/${id}/approve`, `GET /api/admin/employee-docs?employee_id=${id}`, `POST /api/admin/employee-docs` | Edit, terminate, approve/reject, resend invite, verify/reject documents. |
+| `AssignmentsSection` | `POST /api/admin/crew/assignments` | Create driver/secondary/U-Haul assignments for a date. |
+| `StorageSection` | `POST /api/admin/crew/storage` | Add/edit storage facilities; uses `AddressAutocomplete`. |
+| `DonationSection` | `POST /api/admin/crew/donation-centers` | Add/edit donation centers; uses `AddressAutocomplete`. |
+
+**UI rendered:**
+- Loading spinner, summary stat cards with ring indicators, pending verification alert, pending invites, invite form, broadcast panel, employee list, assignments, storage facilities, donation centers, and a right-side slide-over for the selected employee.
+
+**External dependencies:**
+- `lucide-react` icons
+- `AddressAutocomplete` (Mapbox)
+- Custom `formatDateLong` helper
+
+**Edge cases:**
+- `fetchAll` runs in `finally` so `loading` always ends.
+- `save` in `EmployeeDetailSlideOver` sends a password reset when email/name changes.
+- `terminate` confirms via `window.confirm` and closes open clock sessions on the server.
+
+---
+
+### A.6 `components/admin/CommandCenter.js`
+
+**Purpose:** Admin operations dashboard: live AI chat agent, AI-generated narrative briefing, today’s job/revenue stats, urgent calls, stale cron jobs, pending opportunistic offers, and real-time crew status.
+
+**Main component state:**
+- `data`, `loading`, `insight`, `insightLoading`, `insightError`.
+
+**Hooks:**
+- `useEffect` loads `fetchData` and `fetchInsight` on mount; polls `fetchData` every 60s.
+
+**Key handlers:**
+- `fetchData()` — `GET /api/admin/command-center`.
+- `fetchInsight(force)` — `GET /api/admin/insights` (or `?force=1`); handles `skipped` state.
+
+**Sub-components:**
+
+| Sub-component | API calls | Purpose |
+|---|---|---|
+| `AgentChat` | `POST /api/admin/agent` | Interactive chat that can take actions (SMS, calls, etc.). |
+| `NarratorCard` | (data from parent) | Displays cached AI briefing with age and regenerate button. |
+| `CrewStatusWidget` | `GET /api/admin/employees` (polls every 30s) | Shows currently clocked-in crew. |
+
+**UI rendered:**
+- AI agent chat card, AI briefing card, four stat cards, urgent calls list, stale cron list, pending offers grid, and crew status list.
+
+**External dependencies:**
+- None besides admin API.
+
+**Edge cases:**
+- `fetchData` polling auto-refreshes dashboard data every minute.
+- `AgentChat` keeps last 20 action results and scrolls to bottom on new messages.
+
+---
+
+### A.7 `components/admin/PayrollPanel.js`
+
+**Purpose:** Payroll admin UI with four tabs: Overview, Pay Runs, Remittances, and T4s. Allows previewing, running, approving, and direct-depositing pay runs.
+
+**Main component state:**
+- `tab` (`'overview' | 'runs' | 'remittance' | 't4s'`)
+
+**Sub-components:**
+
+| Sub-component | API calls | Notes |
+|---|---|---|
+| `OverviewTab` | `GET /api/admin/employees` | Summary cards + employee period table + "New Pay Run" button. |
+| `RunPayrollModal` | `POST /api/admin/payroll/preview`, `POST /api/admin/payroll/run` | Date range picker, preview totals, then confirm. |
+| `PayRunsTab` | `GET /api/admin/payroll/approve`, `POST /api/admin/payroll/approve` | Lists historical runs; supports `Approve` and `Approve + Deposit` with `send_direct_deposit: true`. |
+| `RemittanceTab` | `GET /api/admin/remittance`, `POST /api/admin/remittance` | Shows CRA remittances owed and marks them paid. |
+| `T4sTab` | `GET /api/admin/t4s?year={year}` | T4 slips by year for the last six years. |
+
+**UI rendered:**
+- Tab bar, overview stats, employee table, modal for payroll preview/run, pay run list, remittance cards, T4 table.
+
+**External dependencies:**
+- Date formatting helpers.
+
+**Edge cases:**
+- `RunPayrollModal` defaults to a 14-day period ending today.
+- `approveWithDeposit` confirms before sending direct deposits.
+
+---
+
+### A.8 `components/admin/ConfigPanel.js`
+
+**Purpose:** Admin control panel for `system_config` values grouped by category, plus a Stripe branding utility.
+
+**Main component state:**
+- `config`, `edits`, `loading`, `saving`, `message`.
+
+**Hooks:**
+- `useEffect` fetches `/api/admin/config` on mount with `mounted` guard.
+- `useMemo` groups config by category.
+
+**Key handlers:**
+- `handleChange(key, value)` — writes local edits.
+- `save()` — builds `updates` from `edits`, preserves original metadata, and `POST /api/admin/config`.
+
+**Sub-component:**
+
+| Sub-component | API calls | Notes |
+|---|---|---|
+| `StripeBrandingCard` | `POST /api/admin/stripe-branding` (actions `check` and `update`) | Requires admin password; updates logo, colors, statement descriptor. |
+
+**UI rendered:**
+- Section heading, save button, unsaved changes warning, grouped config cards with `ConfigField` inputs (boolean selects or text/number), and Stripe branding card.
+
+**External dependencies:**
+- Stripe API (server-side through admin API).
+
+**Edge cases:**
+- Boolean fields are keyed by `value_type === 'boolean'` or `key.startsWith('kill_switch_')`.
+- `inferType` guesses value type when saving a new value.
+
+---
+
+### A.9 `components/admin/RouteMap.js`
+
+**Purpose:** Leaflet map showing the U-Haul depot and numbered job stops for a route.
+
+**Props:**
+- `stops` (`array` of `{ id, lat, lng, position, name, address, job_time }`)
+
+**State:** None.
+
+**Key handlers:**
+- `numberIcon(label, color)` — builds a `divIcon` with a colored circular marker.
+- Filters `stops` to only those with numeric `lat`/`lng`.
+
+**API calls:**
+- OpenStreetMap tile server (`https://{s}.tile.openstreetmap.org/...`).
+
+**UI rendered:**
+- `MapContainer` with `TileLayer`, depot marker, and numbered stop markers with popups showing `position`, `name`, `address`, and `job_time`.
+
+**External dependencies:**
+- `leaflet`, `react-leaflet`, `leaflet/dist/leaflet.css`
+- OpenStreetMap tiles
+
+**Edge cases:**
+- If no stops are geocoded, map centers on the depot (`51.0595, -114.0447`).
+
+---
+
+### A.10 `components/admin/GrowthPanel.js`
+
+**Purpose:** Marketing/growth dashboard: abandonment funnel, opportunistic offers, surge snapshots, and cron health.
+
+**State:**
+- `data`, `loading`.
+
+**Hooks:**
+- `useEffect` with `mounted` guard fetches `/api/admin/growth`.
+
+**API calls:**
+- `GET /api/admin/growth`
+
+**UI rendered:**
+- Abandonment funnel bar chart (quoted → touch1 → touch2 → touch3 → converted)
+- Offers table (latest 20)
+- Surge snapshots table (latest 20)
+- Cron health cards
+
+**External dependencies:**
+- Admin growth API only.
+
+**Edge cases:**
+- Empty datasets show friendly "No ... yet" messages.
+
+---
+
+### A.11 `components/admin/ReferralsPanel.js`
+
+**Purpose:** Admin referrals dashboard with leaderboard and a list of all referral statuses.
+
+**State:**
+- `referrals`, `leaderboard`, `loading`.
+
+**Hooks:**
+- `useEffect` with `mounted` guard fetches `/api/admin/referrals`.
+
+**API calls:**
+- `GET /api/admin/referrals`
+
+**UI rendered:**
+- Leaderboard grid (top 6 referrers by completed count and total earned)
+- Referrals table: referrer, referee, status badge, reward split, date
+
+**External dependencies:**
+- None.
+
+**Edge cases:**
+- `statusBadge` maps `pending`, `completed`, and `expired` to colored badges.
+
+---
+
+### A.12 `components/admin/CallsPanel.js`
+
+**Purpose:** Admin view of call history with sentiment sorting and a call-detail modal.
+
+**State:**
+- `calls`, `loading`, `selected`.
+
+**Hooks:**
+- `useEffect` with `mounted` guard fetches `/api/admin/call-history`.
+
+**API calls:**
+- `GET /api/admin/call-history`
+
+**UI rendered:**
+- Calls table sorted by sentiment risk (frustrated/negative first)
+- Clicking a row opens a modal with phone, name, sentiment, ended reason, summary, transcript, and a "Call back" button using `window.open(`tel:${...}`)`.
+
+**External dependencies:**
+- None.
+
+**Edge cases:**
+- Empty states and missing fields show `-` or "No summary".
+
+---
+
+### A.13 `components/admin/BookingTimeline.js`
+
+**Purpose:** Modal timeline of events for a single booking.
+
+**Props:**
+- `bookingId` (`string`)
+- `onClose()` (`function`)
+
+**State:**
+- `data`, `loading`, `error`.
+
+**Hooks:**
+- `useEffect` with `mounted` guard fetches timeline when `bookingId` changes.
+
+**API calls:**
+- `GET /api/admin/bookings/{bookingId}/timeline`
+
+**UI rendered:**
+- Centered modal with booking summary (created, status, total, balance, surge, no-show risk)
+- Vertical timeline with icons, timestamps, event type, payload JSON, and optional body
+
+**External dependencies:**
+- None.
+
+**Edge cases:**
+- Errors surface as red text in the modal body.
+- Empty timelines show "No timeline events found."
+
+---
+
+### A.14 `components/admin/AuditTrail.js`
+
+**Purpose:** Filterable admin audit trail of system events.
+
+**State:**
+- `events`, `loading`, `filter` (default `'All'`), `limit` (default `50`).
+
+**Hooks:**
+- `useEffect` with `mounted` guard refetches when `filter` or `limit` changes.
+
+**API calls:**
+- `GET /api/admin/events?type={filter}&limit={limit}`
+
+**UI rendered:**
+- Filter select for event type and limit select
+- Events table: time, event type, booking/lead reference, payload JSON
+
+**External dependencies:**
+- None.
+
+**Edge cases:**
+- `EVENT_TYPES` includes a fixed list (surge, abandonment touches, SMS, offers, etc.).
+
+---
+
+### A.15 `components/admin/IntelPanel.js`
+
+**Purpose:** Quadrant profit summary dashboard for geographic revenue/profit analysis.
+
+**State:**
+- `summary`, `days` (default `30`), `loading`.
+
+**Hooks:**
+- `useEffect` with `mounted` guard fetches when `days` changes.
+
+**API calls:**
+- `GET /api/admin/quadrant-profit?days={days}&summary=true`
+
+**UI rendered:**
+- Day-range select (7/30/90)
+- Per-quadrant cards with revenue/profit progress bars, job counts, completed/cancelled/no-show breakdown, and average margin/job value
+
+**External dependencies:**
+- None.
+
+**Edge cases:**
+- `maxRevenue` and `maxProfit` are at least `1` to avoid division by zero.
+- Empty summary shows "No data available."
+
+---
+
 *Documentation continues below. More sections can be added as needed.*
