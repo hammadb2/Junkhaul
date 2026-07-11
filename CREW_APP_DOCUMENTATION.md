@@ -4909,4 +4909,996 @@ All admin routes require a valid admin cookie (`ADMIN_COOKIE` token matching `ad
 
 **Validation/Auth:** Requires hard-coded secret `jh-migrate-2026` in the request body; no cookie auth.
 
+## Comprehensive Database Schema (Crew App)
+
+This section provides the full `CREATE TABLE` definitions, constraints, foreign keys, and indexes for the Supabase tables used by the crew app and employee portal. The definitions are consolidated from the migration files in `supabase/migrations/` and are shown in their final effective form.
+
+---
+
+### Core Job & Waitlist Tables
+
+#### `bookings`
+
+```sql
+CREATE TABLE IF NOT EXISTS bookings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  booking_ref text UNIQUE NOT NULL DEFAULT
+    'JH-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6)),
+  name text NOT NULL,
+  phone text NOT NULL,
+  email text,
+  address text NOT NULL,
+  unit text,
+  city text DEFAULT 'Calgary',
+  postal_code text,
+  quadrant text CHECK (quadrant IN ('NW','NE','SW','SE')),
+  lat double precision,
+  lng double precision,
+  load_size text NOT NULL CHECK (load_size IN ('single_item','quarter','half','full')),
+  base_price integer NOT NULL,
+  same_day boolean DEFAULT false,
+  same_day_fee integer DEFAULT 0,
+  stairs integer DEFAULT 0,
+  stairs_fee integer DEFAULT 0,
+  has_freon boolean DEFAULT false,
+  freon_fee integer DEFAULT 0,
+  total_price integer NOT NULL,
+  dynamic_multiplier decimal DEFAULT 1.0,
+  deposit_amount integer DEFAULT 50,
+  deposit_paid boolean DEFAULT false,
+  deposit_paid_at timestamp,
+  stripe_payment_intent_id text,
+  stripe_charge_id text,
+  balance_due integer,
+  job_date date NOT NULL,
+  job_time text NOT NULL,
+  job_datetime timestamp,
+  photos text[],
+  photo_skipped boolean DEFAULT false,
+  description_text text,
+  ai_load_estimate text,
+  ai_weight_estimate_kg integer,
+  ai_confidence text CHECK (ai_confidence IN ('high','medium','low')),
+  has_hazmat boolean DEFAULT false,
+  hazmat_description text,
+  flag_for_review boolean DEFAULT false,
+  flag_reason text,
+  upgrade_pending boolean DEFAULT false,
+  suggested_load_size text,
+  suggested_price integer,
+  source text DEFAULT 'web' CHECK (source IN ('web','phone','kijiji','marketplace','referral','vapi')),
+  status text DEFAULT 'pending_payment' CHECK (status IN (
+    'pending_payment','confirmed','completed','cancelled','rescheduled','no_show'
+  )),
+  no_show_risk_score integer DEFAULT 0,
+  extra_reminder_sent boolean DEFAULT false,
+  cancellation_reason text,
+  cancelled_by text CHECK (cancelled_by IN ('customer','operator')),
+  cancelled_at timestamp,
+  refund_amount integer DEFAULT 0,
+  refund_processed boolean DEFAULT false,
+  refund_stripe_id text,
+  original_job_date date,
+  original_job_time text,
+  reschedule_count integer DEFAULT 0,
+  confirmation_sms_sent boolean DEFAULT false,
+  morning_reminder_sent boolean DEFAULT false,
+  extra_reminder_sent_at timestamp,
+  review_requested boolean DEFAULT false,
+  review_requested_at timestamp,
+  review_completed boolean DEFAULT false,
+  notes text,
+  operator_notes text,
+  created_at timestamp WITH TIME ZONE DEFAULT now(),
+  updated_at timestamp WITH TIME ZONE DEFAULT now(),
+  is_apartment boolean DEFAULT false,
+  customer_notes text,
+  -- Crew app additions (20260705, 20260706, 20260716)
+  crew_status text DEFAULT 'confirmed' CHECK (crew_status IN (
+    'confirmed','en_route','arrived','in_progress','awaiting_payment','complete'
+  )),
+  payment_status text DEFAULT 'unpaid' CHECK (payment_status IN (
+    'unpaid','paid_card','paid_apple_pay','paid_google_pay','cash_declared','cash_crew'
+  )),
+  payment_method text CHECK (payment_method IS NULL OR payment_method IN (
+    'tap','card_manual','cash','apple_pay','google_pay'
+  )),
+  payment_collected_at timestamp WITH TIME ZONE,
+  receipt_sent boolean DEFAULT false,
+  tracking_session_id text,
+  opportunistic boolean DEFAULT false,
+  en_route_at timestamp WITH TIME ZONE,
+  crew_photos jsonb DEFAULT '[]'::jsonb,
+  crew_photos_taken_at timestamp,
+  crew_arrived_at timestamp WITH TIME ZONE,
+  job_started_at timestamp WITH TIME ZONE,
+  tracking_token text
+);
+```
+
+**Indexes:**
+- `bookings_job_date_idx` ON bookings (job_date)
+- `bookings_status_idx` ON bookings (status)
+- `bookings_phone_idx` ON bookings (phone)
+- `bookings_crew_status_idx` ON bookings (crew_status)
+- `bookings_payment_status_idx` ON bookings (payment_status)
+
+---
+
+#### `waitlist`
+
+```sql
+CREATE TABLE IF NOT EXISTS waitlist (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL,
+  phone text NOT NULL,
+  preferred_date date,
+  preferred_day_type text CHECK (preferred_day_type IN ('thursday','sunday','either')),
+  load_size text,
+  address text,
+  notified boolean DEFAULT false,
+  notified_at timestamp,
+  converted_to_booking_id uuid REFERENCES bookings(id),
+  expires_at timestamp DEFAULT (now() + interval '30 days'),
+  created_at timestamp WITH TIME ZONE DEFAULT now(),
+  -- Opportunistic scheduling additions (20260705)
+  lat double precision,
+  lng double precision,
+  offered_nearby_today boolean DEFAULT false,
+  last_nearby_offer_at timestamp WITH TIME ZONE
+);
+```
+
+**Indexes:**
+- `waitlist_lat_lng_idx` ON waitlist (lat, lng)
+
+---
+
+### Employee & Onboarding Tables
+
+#### `employees`
+
+```sql
+CREATE TABLE IF NOT EXISTS employees (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text UNIQUE NOT NULL,
+  password_hash text NOT NULL,
+  name text NOT NULL,
+  phone text,
+  sin text,
+  sin_enc text,
+  address text,
+  hire_date date NOT NULL DEFAULT CURRENT_DATE,
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','onboarded','active','terminated')),
+  onboarded_at timestamptz,
+  terminated_at timestamptz,
+  pay_rate numeric(8,2) NOT NULL DEFAULT 15.00,
+  td1_federal_claim numeric(10,2) NOT NULL DEFAULT 15705,
+  td1_ab_claim numeric(10,2) NOT NULL DEFAULT 22159,
+  vacation_pct numeric(5,2) NOT NULL DEFAULT 4.00,
+  bank_institution text,
+  bank_transit text,
+  bank_account text,
+  bank_account_enc text,
+  drive_folder_id text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  -- Later additions (20260714, 20260716)
+  selfie_url text,
+  invite_id uuid REFERENCES employee_invites(id),
+  first_name text,
+  last_name text,
+  td1_federal_data jsonb,
+  td1_ab_data jsonb,
+  contract_signed boolean DEFAULT false,
+  contract_signed_at timestamptz,
+  contract_data jsonb,
+  acknowledgments jsonb DEFAULT '{}',
+  onboarding_completed_at timestamptz
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `employee_invites`
+
+```sql
+CREATE TABLE IF NOT EXISTS employee_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  phone TEXT,
+  token TEXT NOT NULL UNIQUE,
+  pay_rate NUMERIC DEFAULT 18.00,
+  status TEXT DEFAULT 'pending',
+  invited_by TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  accepted_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ DEFAULT (now() + interval '7 days')
+);
+```
+
+**Indexes:**
+- `idx_employee_invites_token` ON employee_invites (token)
+- `idx_employee_invites_email` ON employee_invites (email)
+
+---
+
+#### `employee_documents`
+
+```sql
+CREATE TABLE IF NOT EXISTS employee_documents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid REFERENCES employees(id) ON DELETE CASCADE,
+  doc_type text NOT NULL CHECK (doc_type IN (
+    'employment_contract','td1_federal','td1_ab','id','banking_info',
+    'sin_document','drivers_license_front','drivers_license_back','other'
+  )),
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','uploaded','verified','rejected')),
+  drive_file_id text,
+  drive_file_url text,
+  uploaded_at timestamptz DEFAULT now(),
+  verified_at timestamptz,
+  verified_by text,
+  notes text,
+  expires_at date,
+  expiry_notified_at timestamptz,
+  UNIQUE (employee_id, doc_type)
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `employee_sessions`
+
+```sql
+CREATE TABLE IF NOT EXISTS employee_sessions (
+  token text PRIMARY KEY,
+  employee_id uuid REFERENCES employees(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  last_seen_at timestamptz DEFAULT now()
+);
+```
+
+**Indexes:**
+- `employee_sessions_employee_idx` ON employee_sessions (employee_id)
+- `employee_sessions_expires_idx` ON employee_sessions (expires_at)
+
+---
+
+### Time & Payroll Tables
+
+#### `timesheets`
+
+```sql
+CREATE TABLE IF NOT EXISTS timesheets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid REFERENCES employees(id) ON DELETE CASCADE,
+  clock_in_at timestamptz NOT NULL DEFAULT now(),
+  clock_out_at timestamptz,
+  clock_in_lat float,
+  clock_in_lng float,
+  clock_out_lat float,
+  clock_out_lng float,
+  regular_hours numeric(6,2),
+  overtime_hours numeric(6,2),
+  total_hours numeric(6,2),
+  gross_pay numeric(10,2),
+  pay_run_id uuid,
+  notes text,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+**Indexes:**
+- `timesheets_employee_idx` ON timesheets (employee_id)
+- `timesheets_clock_in_idx` ON timesheets (clock_in_at)
+- `timesheets_pay_run_idx` ON timesheets (pay_run_id)
+
+---
+
+#### `job_clock_sessions`
+
+```sql
+CREATE TABLE IF NOT EXISTS job_clock_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id UUID REFERENCES bookings(id),
+  assignment_id UUID REFERENCES crew_assignments(id),
+  employee_id UUID REFERENCES employees(id),
+  clock_in_at TIMESTAMPTZ NOT NULL,
+  clock_out_at TIMESTAMPTZ,
+  duration_minutes NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:**
+- `idx_job_clock_booking` ON job_clock_sessions (booking_id)
+- `idx_job_clock_employee` ON job_clock_sessions (employee_id)
+
+---
+
+#### `payroll_rates`
+
+```sql
+CREATE TABLE IF NOT EXISTS payroll_rates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  edition text NOT NULL,
+  effective_from date NOT NULL,
+  effective_to date,
+  cpp_rate numeric(6,4) NOT NULL,
+  cpp_basic_exemption numeric(10,2) NOT NULL,
+  cpp_max_pensionable numeric(10,2) NOT NULL,
+  cpp_max_contribution numeric(10,2) NOT NULL,
+  cpp2_rate numeric(6,4) NOT NULL,
+  cpp2_lower_ceiling numeric(10,2) NOT NULL,
+  cpp2_upper_ceiling numeric(10,2) NOT NULL,
+  cpp2_max_contribution numeric(10,2) NOT NULL,
+  ei_rate numeric(6,4) NOT NULL,
+  ei_max_insurable numeric(10,2) NOT NULL,
+  ei_max_premium numeric(10,2) NOT NULL,
+  fed_brackets jsonb NOT NULL,
+  fed_basic_personal_amount numeric(10,2) NOT NULL,
+  ab_brackets jsonb NOT NULL,
+  ab_basic_personal_amount numeric(10,2) NOT NULL,
+  fed_cpp_base numeric(10,2),
+  fed_cpp2_base numeric(10,2),
+  fed_ei_base numeric(10,2),
+  fed_ab_tax_reduction numeric(10,2),
+  source text,
+  notes text,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (edition)
+);
+```
+
+**Indexes:**
+- `payroll_rates_effective_idx` ON payroll_rates (effective_from)
+
+---
+
+#### `pay_runs`
+
+```sql
+CREATE TABLE IF NOT EXISTS pay_runs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start date NOT NULL,
+  period_end date NOT NULL,
+  status text NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft','calculated','approved','paid','closed')),
+  run_at timestamptz DEFAULT now(),
+  approved_at timestamptz,
+  approved_by text,
+  paid_at timestamptz,
+  total_gross numeric(12,2),
+  total_cpp numeric(12,2),
+  total_cpp2 numeric(12,2),
+  total_ei numeric(12,2),
+  total_fed_tax numeric(12,2),
+  total_ab_tax numeric(12,2),
+  total_vacation numeric(12,2),
+  total_net numeric(12,2),
+  total_cra_remittance numeric(12,2),
+  remittance_due_date date,
+  remittance_paid boolean DEFAULT false,
+  remittance_paid_at timestamptz,
+  edition text,
+  notes text,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+**Indexes:**
+- `pay_runs_status_idx` ON pay_runs (status)
+- `pay_runs_period_idx` ON pay_runs (period_start, period_end)
+
+---
+
+#### `pay_stubs`
+
+```sql
+CREATE TABLE IF NOT EXISTS pay_stubs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  pay_run_id uuid REFERENCES pay_runs(id) ON DELETE CASCADE,
+  employee_id uuid REFERENCES employees(id) ON DELETE CASCADE,
+  regular_hours numeric(6,2),
+  overtime_hours numeric(6,2),
+  total_hours numeric(6,2),
+  regular_pay numeric(10,2),
+  overtime_pay numeric(10,2),
+  gross_pay numeric(10,2),
+  vacation_pay numeric(10,2),
+  cpp numeric(10,2),
+  cpp2 numeric(10,2),
+  ei numeric(10,2),
+  fed_tax numeric(10,2),
+  ab_tax numeric(10,2),
+  total_deductions numeric(10,2),
+  net_pay numeric(10,2),
+  ytd_gross numeric(10,2),
+  ytd_cpp numeric(10,2),
+  ytd_cpp2 numeric(10,2),
+  ytd_ei numeric(10,2),
+  ytd_fed_tax numeric(10,2),
+  ytd_ab_tax numeric(10,2),
+  ytd_vacation numeric(10,2),
+  ytd_insurable_earnings numeric(10,2),
+  ytd_pensionable_earnings numeric(10,2),
+  direct_deposit_status text DEFAULT 'pending'
+    CHECK (direct_deposit_status IN ('pending','sent','settled','failed','n/a')),
+  direct_deposit_id text,
+  direct_deposit_sent_at timestamptz,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (pay_run_id, employee_id)
+);
+```
+
+**Indexes:**
+- `pay_stubs_run_idx` ON pay_stubs (pay_run_id)
+- `pay_stubs_employee_idx` ON pay_stubs (employee_id)
+
+---
+
+#### `remittances`
+
+```sql
+CREATE TABLE IF NOT EXISTS remittances (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  pay_run_id uuid REFERENCES pay_runs(id) ON DELETE CASCADE,
+  due_date date NOT NULL,
+  amount numeric(12,2) NOT NULL,
+  status text NOT NULL DEFAULT 'owed'
+    CHECK (status IN ('owed','paid','late')),
+  paid_at timestamptz,
+  paid_method text,
+  reference text,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+**Indexes:**
+- `remittances_due_idx` ON remittances (due_date)
+- `remittances_status_idx` ON remittances (status)
+
+---
+
+#### `direct_deposit_log`
+
+```sql
+CREATE TABLE IF NOT EXISTS direct_deposit_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  pay_stub_id uuid REFERENCES pay_stubs(id) ON DELETE CASCADE,
+  employee_id uuid REFERENCES employees(id) ON DELETE CASCADE,
+  provider text NOT NULL,
+  provider_txn_id text,
+  amount numeric(10,2) NOT NULL,
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','sent','settled','failed')),
+  raw_response jsonb,
+  error text,
+  created_at timestamptz DEFAULT now(),
+  settled_at timestamptz
+);
+```
+
+**Indexes:**
+- `dd_log_employee_idx` ON direct_deposit_log (employee_id)
+- `dd_log_status_idx` ON direct_deposit_log (status)
+
+---
+
+#### `t4_slips`
+
+```sql
+CREATE TABLE IF NOT EXISTS t4_slips (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid REFERENCES employees(id) ON DELETE CASCADE,
+  tax_year int NOT NULL,
+  employment_income numeric(12,2),
+  cpp_pensionable_earnings numeric(12,2),
+  cpp_contribution numeric(12,2),
+  ei_insurable_earnings numeric(12,2),
+  ei_premium numeric(12,2),
+  income_tax_deducted numeric(12,2),
+  cpp2_pensionable_earnings numeric(12,2),
+  cpp2_contribution numeric(12,2),
+  vacation_pay_included numeric(12,2),
+  generated_at timestamptz DEFAULT now(),
+  status text DEFAULT 'generated'
+    CHECK (status IN ('generated','filed')),
+  UNIQUE (employee_id, tax_year)
+);
+```
+
+**Indexes:**
+- `t4_slips_year_idx` ON t4_slips (tax_year)
+
+---
+
+### Crew Assignment & Operations Tables
+
+#### `crew_assignments`
+
+```sql
+CREATE TABLE IF NOT EXISTS crew_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assignment_date DATE NOT NULL,
+  driver_employee_id UUID REFERENCES employees(id),
+  secondary_employee_id UUID REFERENCES employees(id),
+  uhaul_location TEXT,
+  uhaul_location_lat FLOAT,
+  uhaul_location_lng FLOAT,
+  status TEXT DEFAULT 'scheduled',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(assignment_date, driver_employee_id)
+);
+```
+
+**Indexes:**
+- `idx_crew_assignments_date` ON crew_assignments (assignment_date)
+
+---
+
+#### `truck_checks`
+
+```sql
+CREATE TABLE IF NOT EXISTS truck_checks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assignment_id UUID REFERENCES crew_assignments(id),
+  check_type TEXT NOT NULL,
+  dashboard_photo_url TEXT,
+  odometer_km INTEGER,
+  fuel_level TEXT,
+  fuel_percent NUMERIC,
+  truck_photos JSONB DEFAULT '[]',
+  damage_notes TEXT,
+  gas_receipt_url TEXT,
+  gas_amount_cad NUMERIC,
+  gas_station TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  created_by UUID REFERENCES employees(id)
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `transaction_receipts`
+
+```sql
+CREATE TABLE IF NOT EXISTS transaction_receipts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assignment_id UUID REFERENCES crew_assignments(id),
+  employee_id UUID REFERENCES employees(id),
+  receipt_type TEXT NOT NULL,
+  vendor TEXT,
+  amount_cad NUMERIC NOT NULL,
+  receipt_photo_url TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:**
+- `idx_receipts_assignment` ON transaction_receipts (assignment_id)
+- `idx_receipts_employee` ON transaction_receipts (employee_id)
+
+---
+
+#### `customer_signatures`
+
+```sql
+CREATE TABLE IF NOT EXISTS customer_signatures (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id UUID REFERENCES bookings(id),
+  customer_name_typed TEXT NOT NULL,
+  customer_signature_url TEXT,
+  crew_member_typed TEXT NOT NULL,
+  crew_member_id UUID REFERENCES employees(id),
+  amount_confirmed NUMERIC NOT NULL,
+  payment_method TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `storage_facilities`
+
+```sql
+CREATE TABLE IF NOT EXISTS storage_facilities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  lat FLOAT,
+  lng FLOAT,
+  access_code TEXT,
+  capacity_sqft NUMERIC,
+  current_usage_pct NUMERIC DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `storage_drops`
+
+```sql
+CREATE TABLE IF NOT EXISTS storage_drops (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assignment_id UUID REFERENCES crew_assignments(id),
+  facility_id UUID REFERENCES storage_facilities(id),
+  booking_id UUID REFERENCES bookings(id),
+  item_photos JSONB DEFAULT '[]',
+  capacity_photo_url TEXT,
+  capacity_estimate_pct NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  created_by UUID REFERENCES employees(id)
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `donation_centers`
+
+```sql
+CREATE TABLE IF NOT EXISTS donation_centers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  lat FLOAT,
+  lng FLOAT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `donation_runs`
+
+```sql
+CREATE TABLE IF NOT EXISTS donation_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assignment_id UUID REFERENCES crew_assignments(id),
+  facility_id UUID REFERENCES storage_facilities(id),
+  center_id UUID REFERENCES donation_centers(id),
+  item_photos JSONB DEFAULT '[]',
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `landfills`
+
+```sql
+CREATE TABLE IF NOT EXISTS landfills (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  lat FLOAT,
+  lng FLOAT,
+  sunday_open BOOLEAN DEFAULT false,
+  summer_only_sunday BOOLEAN DEFAULT false,
+  monday_to_friday BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `gas_price_cache`
+
+```sql
+CREATE TABLE IF NOT EXISTS gas_price_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  province TEXT DEFAULT 'AB',
+  price_per_litre NUMERIC NOT NULL,
+  currency TEXT DEFAULT 'CAD',
+  source TEXT DEFAULT 'OilPriceAPI',
+  fetched_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:** none additional
+
+---
+
+### Tracking, Location, Notifications, Issues & Feedback
+
+#### `crew_locations`
+
+```sql
+CREATE TABLE IF NOT EXISTS crew_locations (
+  employee_id UUID PRIMARY KEY REFERENCES employees(id),
+  lat FLOAT NOT NULL,
+  lng FLOAT NOT NULL,
+  heading FLOAT,
+  speed FLOAT,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:** none additional (primary key on `employee_id`)
+
+---
+
+#### `crew_location`
+
+```sql
+CREATE TABLE IF NOT EXISTS crew_location (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tracking_session_id text UNIQUE NOT NULL,
+  latitude float NOT NULL,
+  longitude float NOT NULL,
+  heading float,
+  speed_kmh float,
+  accuracy_meters float,
+  active_booking_id uuid REFERENCES bookings(id) ON DELETE SET NULL,
+  crew_pin_hash text,
+  updated_at timestamp WITH TIME ZONE DEFAULT now()
+);
+```
+
+**Indexes:**
+- `crew_location_active_booking_idx` ON crew_location (active_booking_id)
+- `crew_location_session_idx` ON crew_location (tracking_session_id)
+
+---
+
+#### `crew_pin`
+
+```sql
+CREATE TABLE IF NOT EXISTS crew_pin (
+  id integer PRIMARY KEY DEFAULT 1,
+  pin_hash text NOT NULL,
+  updated_at timestamp WITH TIME ZONE DEFAULT now()
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `nearby_offers`
+
+```sql
+CREATE TABLE IF NOT EXISTS nearby_offers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id uuid REFERENCES bookings(id) ON DELETE SET NULL,
+  waitlist_id uuid REFERENCES waitlist(id) ON DELETE CASCADE,
+  customer_phone text NOT NULL,
+  customer_name text,
+  offered_at timestamp WITH TIME ZONE DEFAULT now(),
+  accepted boolean,
+  responded_at timestamp WITH TIME ZONE,
+  offer_expires_at timestamp WITH TIME ZONE,
+  crew_lat float,
+  crew_lng float,
+  distance_km float,
+  converted_booking_id uuid REFERENCES bookings(id)
+);
+```
+
+**Indexes:**
+- `nearby_offers_phone_idx` ON nearby_offers (customer_phone)
+
+---
+
+#### `gps_overrides`
+
+```sql
+CREATE TABLE IF NOT EXISTS gps_overrides (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id uuid REFERENCES bookings(id) ON DELETE CASCADE,
+  reason text NOT NULL DEFAULT 'gps_unavailable',
+  crew_lat float,
+  crew_lng float,
+  job_lat float,
+  job_lng float,
+  distance_meters float,
+  created_at timestamp WITH TIME ZONE DEFAULT now()
+);
+```
+
+**Indexes:** none additional
+
+---
+
+#### `push_subscriptions`
+
+```sql
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id),
+  endpoint TEXT NOT NULL,
+  p256dh TEXT,
+  auth TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(employee_id, endpoint)
+);
+```
+
+**Indexes:**
+- `idx_push_subs_employee` ON push_subscriptions (employee_id)
+
+---
+
+#### `crew_notifications`
+
+```sql
+CREATE TABLE IF NOT EXISTS crew_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+  type TEXT NOT NULL DEFAULT 'info',
+  title TEXT NOT NULL,
+  body TEXT,
+  link TEXT,
+  read_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+**Indexes:**
+- `idx_crew_notif_emp` ON crew_notifications (employee_id, created_at DESC)
+
+---
+
+#### `job_issues`
+
+```sql
+CREATE TABLE IF NOT EXISTS job_issues (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
+  employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+  issue_type TEXT NOT NULL DEFAULT 'other',
+  severity TEXT NOT NULL DEFAULT 'medium',
+  description TEXT,
+  photo_url TEXT,
+  resolved_at TIMESTAMPTZ,
+  resolved_by UUID REFERENCES employees(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+**Indexes:**
+- `idx_job_issues_booking` ON job_issues (booking_id)
+- `idx_job_issues_unresolved` ON job_issues (resolved_at) WHERE resolved_at IS NULL
+
+---
+
+#### `incident_reports`
+
+```sql
+CREATE TABLE IF NOT EXISTS incident_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+  booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+  incident_type TEXT NOT NULL DEFAULT 'other',
+  severity TEXT NOT NULL DEFAULT 'medium',
+  description TEXT NOT NULL,
+  location TEXT,
+  photo_urls JSONB DEFAULT '[]'::jsonb,
+  reported_to TEXT,
+  status TEXT NOT NULL DEFAULT 'reported',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+**Indexes:**
+- `idx_incident_emp` ON incident_reports (employee_id, created_at DESC)
+- `idx_incident_status` ON incident_reports (status)
+
+---
+
+#### `offline_job_queue`
+
+```sql
+CREATE TABLE IF NOT EXISTS offline_job_queue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+  booking_id UUID,
+  action TEXT NOT NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  synced_at TIMESTAMPTZ,
+  sync_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+**Indexes:**
+- `idx_offline_queue_emp` ON offline_job_queue (employee_id, synced_at)
+
+---
+
+#### `customer_feedback`
+
+```sql
+CREATE TABLE IF NOT EXISTS customer_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id UUID REFERENCES bookings(id),
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  review_text TEXT,
+  reviewer_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:**
+- `idx_customer_feedback_booking` ON customer_feedback (booking_id)
+
+---
+
+#### `crew_tips`
+
+```sql
+CREATE TABLE IF NOT EXISTS crew_tips (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id UUID REFERENCES bookings(id),
+  assignment_id UUID REFERENCES crew_assignments(id),
+  amount_cad NUMERIC NOT NULL,
+  stripe_payment_intent_id TEXT,
+  stripe_charge_id TEXT,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Indexes:**
+- `idx_crew_tips_booking` ON crew_tips (booking_id)
+- `idx_crew_tips_assignment` ON crew_tips (assignment_id)
+
+---
+
+### Supporting Configuration Tables
+
+#### `system_config`
+
+```sql
+CREATE TABLE IF NOT EXISTS system_config (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  key text UNIQUE NOT NULL,
+  value text,
+  value_type text DEFAULT 'string' CHECK (value_type IN ('string','number','boolean','json')),
+  description text,
+  category text DEFAULT 'general',
+  updated_by text,
+  updated_at timestamp WITH TIME ZONE DEFAULT now()
+);
+```
+
+**Notes:** Used for crew-management runtime values such as `default_pay_rate`, `uhaul_tank_capacity_litres`, `storage_facility_id`, `donation_center_id`, and `kill_switch_*` flags.
+
+**Indexes:** none additional (`key` is unique)
+
+---
+
 *Documentation continues below. More sections can be added as needed.*
