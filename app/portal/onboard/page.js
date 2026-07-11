@@ -94,6 +94,21 @@ function OnboardInner() {
 
   // Step 8 complete
   const [completeData, setCompleteData] = useState(null);
+  const [resumeStep, setResumeStep] = useState(1);
+
+  // PWA gate state
+  const [notifPermission, setNotifPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
+
+  const isStandalone = typeof window !== 'undefined' && (window.navigator?.standalone || window.matchMedia?.('(display-mode: standalone)')?.matches);
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const pwaReady = isStandalone && (typeof window === 'undefined' || !('Notification' in window) || notifPermission === 'granted');
+
+  const getStartStep = useCallback((inferred) => {
+    if (inferred <= 1) return 1; // password/account always first
+    return pwaReady ? inferred : 0; // force PWA gate before rest of onboarding
+  }, [pwaReady]);
 
   // ---- Save onboarding progress so user can resume later ----
   const saveStep = useCallback(async (s) => {
@@ -106,9 +121,33 @@ function OnboardInner() {
     } catch { /* non-critical */ }
   }, []);
 
-  // Save step whenever it changes (after step 1, when account exists)
+  const inferResumeStep = useCallback((employee, docs = []) => {
+    if (!employee) return 1;
+    if (employee.onboarding_completed_at || employee.pending_verification || employee.onboarded) return 8;
+    if (!employee.has_password) return 1;
+
+    const uploadedDocTypes = new Set(
+      (docs || [])
+        .filter((d) => d.status === 'uploaded' || d.status === 'verified')
+        .map((d) => d.doc_type)
+    );
+    const docsReady =
+      uploadedDocTypes.has('sin_document') &&
+      uploadedDocTypes.has('drivers_license_front') &&
+      uploadedDocTypes.has('drivers_license_back') &&
+      !!employee.selfie_url;
+    if (!docsReady) return 2;
+    if (!employee.td1_federal_done) return 3;
+    if (!employee.td1_ab_done) return 4;
+    if (!employee.contract_signed) return 5;
+    if (!employee.has_banking) return 6;
+    if (!employee.acknowledgments_done) return 7;
+    return 8;
+  }, []);
+
+  // Save step whenever it changes (never before account exists)
   useEffect(() => {
-    if (step > 1) saveStep(step);
+    if (step > 0) saveStep(step);
   }, [step, saveStep]);
 
   // ---- Step 0: validate invite ----
@@ -116,13 +155,15 @@ function OnboardInner() {
     const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('jh-onboard-token') : null);
 
     // First, check if the user is already logged in (has a valid session).
-    // If so, resume from their saved progress.
+    // If so, resume from first incomplete step and do not regress.
     if (!effectiveToken) {
       try {
         const meRes = await fetch('/api/employee/me');
         if (meRes.ok) {
           const meData = await meRes.json();
-          if (meData.employee && !meData.employee.onboarded) {
+          if (meData.employee && !meData.employee.onboarded && !meData.employee.pending_verification) {
+            const inferred = inferResumeStep(meData.employee, meData.documents);
+            setResumeStep(inferred);
             setInvite({
               email: meData.employee.email,
               first_name: meData.employee.name?.split(' ')[0] || '',
@@ -134,9 +175,7 @@ function OnboardInner() {
               address: meData.employee.address || '',
             });
             setLoading(false);
-            // Resume from saved step (skip to at least step 2 if account exists)
-            const savedStep = meData.employee.onboarding_step || 0;
-            setStep(savedStep > 1 ? savedStep : 2);
+            setStep(getStartStep(inferred));
             return;
           }
         }
@@ -158,7 +197,9 @@ function OnboardInner() {
         const meRes = await fetch('/api/employee/me');
         if (meRes.ok) {
           const meData = await meRes.json();
-          if (meData.employee && !meData.employee.onboarded) {
+          if (meData.employee && !meData.employee.onboarded && !meData.employee.pending_verification) {
+            const inferred = inferResumeStep(meData.employee, meData.documents);
+            setResumeStep(inferred);
             setInvite({
               email: meData.employee.email,
               first_name: meData.employee.name?.split(' ')[0] || '',
@@ -169,9 +210,7 @@ function OnboardInner() {
               email: meData.employee.email || '',
               address: meData.employee.address || '',
             });
-            // Resume from saved step
-            const savedStep = meData.employee.onboarding_step || 0;
-            setStep(savedStep > 1 ? savedStep : 2);
+            setStep(getStartStep(inferred));
             return;
           }
         }
@@ -193,17 +232,38 @@ function OnboardInner() {
       const meRes = await fetch('/api/employee/me');
       if (meRes.ok) {
         const meData = await meRes.json();
-        const savedStep = meData.employee?.onboarding_step || 0;
-        if (savedStep > 0) {
-          setStep(savedStep);
+        const inferred = inferResumeStep(meData.employee, meData.documents);
+        setResumeStep(inferred);
+        if (inferred > 0 && !meData.employee?.pending_verification && !meData.employee?.onboarded) {
+          setStep(getStartStep(inferred));
           setPersonal((p) => ({ ...p, address: meData.employee.address || '' }));
           return;
         }
       }
     } catch { /* no session yet */ }
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, inferResumeStep, getStartStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { validateInvite(); }, [validateInvite]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    setNotifPermission(Notification.permission);
+  }, []);
+
+  // If account/password step is already complete, do not show it again.
+  useEffect(() => {
+    if (step === 1 && resumeStep > 1) {
+      setStep(getStartStep(resumeStep));
+    }
+  }, [step, resumeStep, getStartStep]);
+
+  // Hard gate: once account exists, remaining onboarding must happen in installed PWA
+  // with notifications enabled.
+  useEffect(() => {
+    if (resumeStep > 1 && !pwaReady && step !== 0) {
+      setStep(0);
+    }
+  }, [resumeStep, pwaReady, step]);
 
   // ---- Password validation ----
   const validatePw = (pw) => {
@@ -217,6 +277,47 @@ function OnboardInner() {
   const onPwChange = (val) => {
     setAccountForm({ ...accountForm, password: val });
     setPwErrors(validatePw(val));
+  };
+
+  const requestNotifications = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return true;
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
+    const permission = await Notification.requestPermission();
+    setNotifPermission(permission);
+    if (permission !== 'granted') return false;
+
+    // Best effort: create a push subscription immediately while in onboarding.
+    try {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+          if (vapidKey) {
+            const padding = '='.repeat((4 - (vapidKey.length % 4)) % 4);
+            const base64 = (vapidKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const convertedKey = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) convertedKey[i] = rawData.charCodeAt(i);
+            sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: convertedKey,
+            });
+          }
+        }
+        if (sub) {
+          await fetch('/api/employee/push-subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sub),
+          });
+        }
+      }
+    } catch {
+      // non-blocking: permission has already been granted
+    }
+    return true;
   };
 
   // ---- Address autocomplete via Mapbox ----
@@ -265,8 +366,10 @@ function OnboardInner() {
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error || 'Could not create account'); return; }
+    const nextResume = Math.max(2, resumeStep || 1);
+    setResumeStep(nextResume);
     setPersonal((p) => ({ ...p, address: accountForm.address }));
-    setStep(2);
+    setStep(pwaReady ? nextResume : 0);
   };
 
   // ---- Step 2: document uploads ----
@@ -406,8 +509,6 @@ function OnboardInner() {
   };
 
   // ============ Shared UI helpers ============
-  const isStandalone = typeof window !== 'undefined' && (window.navigator?.standalone || window.matchMedia?.('(display-mode: standalone)')?.matches);
-  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   const ProgressBar = () => (
     <div style={{ position: 'sticky', top: 0, zIndex: 10, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
@@ -578,10 +679,24 @@ function OnboardInner() {
 
           <ErrorBanner />
           <div style={{ marginTop: 24 }}>
-            <ContinueBtn label="Continue" onClick={() => setStep(1)} />
-            {!isStandalone && (
-              <button onClick={() => setStep(1)} style={{ width: '100%', background: 'transparent', border: 'none', color: 'rgba(0,0,0,.4)', fontSize: 14, padding: '12px 0', marginTop: 8 }}>Skip for now</button>
-            )}
+            <ContinueBtn
+              label={!isStandalone ? 'I installed the app' : (notifPermission !== 'granted' ? 'Allow notifications' : 'Continue')}
+              onClick={async () => {
+                setError('');
+                if (!isStandalone) {
+                  setError('Install the app to Home Screen first, then tap this button.');
+                  return;
+                }
+                if (notifPermission !== 'granted') {
+                  const ok = await requestNotifications();
+                  if (!ok) {
+                    setError('Please allow notifications to continue.');
+                    return;
+                  }
+                }
+                setStep(Math.max(1, resumeStep || 1));
+              }}
+            />
           </div>
         </StepShell>
       </Shell>

@@ -18,6 +18,20 @@ const STATUS_COLORS = {
 };
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+const SUPPORT_PHONE = '(587) 325-0751';
+
+function speedLimitForRoadClass(roadClass) {
+  const map = {
+    motorway: 100,
+    trunk: 90,
+    primary: 80,
+    secondary: 70,
+    tertiary: 60,
+    street: 50,
+    service: 30,
+  };
+  return map[roadClass] || 50;
+}
 
 export default function SchedulePage() {
   const router = useRouter();
@@ -35,6 +49,10 @@ export default function SchedulePage() {
   const [routeInfo, setRouteInfo] = useState(null);
   const [locPerm, setLocPerm] = useState('default');
   const [showLocPrompt, setShowLocPrompt] = useState(false);
+  const [liveSpeedKmh, setLiveSpeedKmh] = useState(null);
+  const [liveHeading, setLiveHeading] = useState(0);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [alternatives, setAlternatives] = useState([]);
 
   // Bottom sheet state
   const [sheetState, setSheetState] = useState('collapsed'); // 'collapsed' | 'half' | 'full'
@@ -65,12 +83,30 @@ export default function SchedulePage() {
   const crewMarkerRef = useRef(null);
   const watchIdRef = useRef(null);
   const lastSentRef = useRef(0);
+  const spokenInstructionRef = useRef('');
+  const offRouteCountRef = useRef(0);
 
   // Tick every second for live job timers
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Keep voice guidance clean when route changes.
+  useEffect(() => {
+    if (!routeInfo?.instruction) return;
+    if (!('speechSynthesis' in window)) return;
+    if (!voiceEnabled) return;
+    const next = String(routeInfo.voice || routeInfo.instruction).trim();
+    if (!next || spokenInstructionRef.current === next) return;
+    if (document.visibilityState !== 'visible') return;
+    spokenInstructionRef.current = next;
+    const utter = new SpeechSynthesisUtterance(next);
+    utter.rate = 1.02;
+    utter.pitch = 1;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utter);
+  }, [routeInfo?.instruction, routeInfo?.voice, voiceEnabled]);
 
   // ---------- Location permission + watch ----------
   useEffect(() => {
@@ -113,6 +149,12 @@ export default function SchedulePage() {
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCrewPos(p);
+        if (typeof pos.coords.speed === 'number') {
+          setLiveSpeedKmh(Math.max(0, Math.round(pos.coords.speed * 3.6)));
+        }
+        if (typeof pos.coords.heading === 'number' && !Number.isNaN(pos.coords.heading)) {
+          setLiveHeading(pos.coords.heading);
+        }
         const ts = Date.now();
         if (ts - lastSentRef.current >= 30000) {
           lastSentRef.current = ts;
@@ -261,7 +303,12 @@ export default function SchedulePage() {
     if (crewPos) {
       if (crewMarkerRef.current) crewMarkerRef.current.remove();
       const el = document.createElement('div');
-      el.innerHTML = `<div style="position:relative;width:20px;height:20px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 12px rgba(59,130,246,0.6);"><div style="position:absolute;top:-4px;left:-4px;right:-4px;bottom:-4px;border-radius:50%;background:rgba(59,130,246,0.3);animation:pulse-ring 2s ease-out infinite;"></div></div>`;
+      el.innerHTML = `
+        <div style="position:relative;width:44px;height:44px;transform:rotate(${Math.round(liveHeading || 0)}deg);transform-origin:center;">
+          <img src="/logo/truck.png" alt="crew truck" style="width:44px;height:44px;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,.25));" />
+          <div style="position:absolute;inset:-8px;border-radius:999px;border:2px solid rgba(249,115,22,.25);animation:pulse-ring 2s ease-out infinite;"></div>
+        </div>
+      `;
       crewMarkerRef.current = new window.mapboxgl.Marker(el)
         .setLngLat([crewPos.lng, crewPos.lat])
         .addTo(map);
@@ -278,7 +325,7 @@ export default function SchedulePage() {
       if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 60, maxZoom: 14 });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, jobCoords, crewPos]);
+  }, [mapReady, jobCoords, crewPos, liveHeading]);
 
   // ---------- Draw route + ETA ----------
   const drawRoute = useCallback(
@@ -287,15 +334,61 @@ export default function SchedulePage() {
       if (!map || !MAPBOX_TOKEN) return;
       try {
         const res = await fetch(
-          `https://api.mapbox.com/directions/v5/mapbox/driving/${fromLng},${fromLat};${toLng},${toLat}.json?access_token=${MAPBOX_TOKEN}&geometries=geojson`
+          `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${fromLng},${fromLat};${toLng},${toLat}.json?access_token=${MAPBOX_TOKEN}&geometries=geojson&steps=true&overview=full&voice_instructions=true&banner_instructions=true&annotations=speed,maxspeed,congestion&alternatives=true`
         );
         const d = await res.json();
         if (d.routes && d.routes[0]) {
           const route = d.routes[0];
+          const leg = route.legs?.[0] || {};
+          const allSteps = leg.steps || [];
+          const nextManeuvers = allSteps
+            .slice(0, 3)
+            .map((s, idx) => ({
+              idx,
+              instruction: s.maneuver?.instruction || 'Continue',
+              distance_m: Math.round(s.distance || 0),
+              type: s.maneuver?.type || 'turn',
+            }));
+          const firstStep = route.legs?.[0]?.steps?.[0];
+          const maneuverText = firstStep?.maneuver?.instruction || 'Continue on route';
+          const roadClass = firstStep?.intersections?.[0]?.classes?.[0] || firstStep?.name || 'street';
+          let speedLimit = speedLimitForRoadClass(roadClass);
+          // Prefer explicit speed limits from Mapbox annotations if available.
+          const maxSpeedAnn = route.legs?.[0]?.annotation?.maxspeed || [];
+          const speedCandidates = maxSpeedAnn
+            .map((s) => {
+              if (typeof s === 'number') return s;
+              if (!s) return null;
+              if (typeof s.speed === 'number') return s.speed;
+              if (typeof s.maxspeed === 'number') return s.maxspeed;
+              return null;
+            })
+            .filter((n) => typeof n === 'number' && Number.isFinite(n) && n > 0);
+          if (speedCandidates.length) {
+            const avg = speedCandidates.reduce((a, b) => a + b, 0) / speedCandidates.length;
+            speedLimit = Math.round(avg);
+          }
+
+          setAlternatives((d.routes || []).slice(1, 3).map((r, i) => ({
+            id: i,
+            eta_min: Math.round((r.duration || 0) / 60),
+            distance_km: ((r.distance || 0) / 1000).toFixed(1),
+          })));
+
           setRouteInfo({
             eta: Math.round(route.duration / 60),
             distance: (route.distance / 1000).toFixed(1),
             geometry: route.geometry,
+            instruction: maneuverText,
+            speed_limit_kmh: speedLimit,
+            voice: firstStep?.voiceInstructions?.[0]?.announcement || maneuverText,
+            progress: {
+              remaining_km: (route.distance / 1000).toFixed(1),
+              remaining_min: Math.round(route.duration / 60),
+              duration_s: Math.round(route.duration || 0),
+              distance_m: Math.round(route.distance || 0),
+            },
+            maneuvers: nextManeuvers,
           });
           if (map.getSource('route')) {
             map.getSource('route').setData({
@@ -324,25 +417,53 @@ export default function SchedulePage() {
     if (!mapReady || !crewPos || !nextJob) return;
     const dest = jobCoords[nextJob.id];
     if (!dest) return;
+    const map = mapInstanceRef.current;
+
+    // Off-route detection: if crew is far from current route line, trigger reroute.
+    if (routeInfo?.geometry?.coordinates?.length) {
+      const coords = routeInfo.geometry.coordinates;
+      let minDistM = Infinity;
+      const toMeters = (lng1, lat1, lng2, lat2) => {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2
+          + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+      };
+      for (let i = 0; i < coords.length; i++) {
+        const [lng, lat] = coords[i];
+        const d = toMeters(crewPos.lng, crewPos.lat, lng, lat);
+        if (d < minDistM) minDistM = d;
+      }
+      if (minDistM > 120) offRouteCountRef.current += 1;
+      else offRouteCountRef.current = 0;
+      if (offRouteCountRef.current >= 2) {
+        offRouteCountRef.current = 0;
+        drawRoute(crewPos.lng, crewPos.lat, dest[0], dest[1]);
+      }
+    }
+
     drawRoute(crewPos.lng, crewPos.lat, dest[0], dest[1]);
+    if (map) {
+      map.easeTo({ center: [crewPos.lng, crewPos.lat], bearing: liveHeading || 0, pitch: 58, zoom: Math.max(map.getZoom(), 14.5), duration: 700 });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, crewPos, nextJob?.id, jobCoords[nextJob?.id]]);
+  }, [mapReady, crewPos, nextJob?.id, jobCoords[nextJob?.id], liveHeading]);
 
-  // ---------- Navigate (open in maps app) ----------
-  const openInMaps = (lat, lng) => {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const url = isIOS
-      ? `https://maps.apple.com/?daddr=${lat},${lng}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    window.open(url, '_blank');
-  };
-
+  // ---------- In-app navigation focus ----------
   const navigateToJob = (b) => {
     const c = jobCoords[b.id];
     if (c) {
-      openInMaps(c[1], c[0]);
+      const map = mapInstanceRef.current;
+      if (map) {
+        map.flyTo({ center: c, zoom: 15.5, pitch: 58, bearing: liveHeading || 0, speed: 0.8, curve: 1.4 });
+      }
+      setSheetState('collapsed');
+      drawRoute(crewPos?.lng ?? c[0], crewPos?.lat ?? c[1], c[0], c[1]);
     } else if (b.address) {
-      window.open(`https://maps.google.com/?q=${encodeURIComponent(b.address)}`, '_blank');
+      // Keep crew in-app: map stays focused on current position until geocode resolves.
+      setSheetState('collapsed');
     }
   };
 
@@ -560,6 +681,67 @@ export default function SchedulePage() {
                 </span>
                 <Navigation size={18} color="#f97316" />
               </button>
+            )}
+            {routeInfo && (
+              <div
+                style={{
+                  position: 'absolute', left: 16, right: 16, bottom: 16,
+                  background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(18px)',
+                  borderRadius: 16, border: '1px solid rgba(0,0,0,.06)', padding: '12px 14px',
+                  boxShadow: '0 6px 24px rgba(0,0,0,.12)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: 'rgba(0,0,0,.45)' }}>Next maneuver</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {routeInfo.instruction || 'Continue on route'}
+                    </div>
+                    {!!routeInfo.maneuvers?.length && (
+                      <div style={{ marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {routeInfo.maneuvers.slice(1, 3).map((m) => (
+                          <span key={m.idx} style={{ fontSize: 11, color: 'rgba(0,0,0,.55)', background: 'rgba(0,0,0,.05)', borderRadius: 999, padding: '2px 8px' }}>
+                            {m.instruction} · {(m.distance_m / 1000).toFixed(1)} km
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="tabular" style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>{liveSpeedKmh ?? 0} km/h</div>
+                      <div style={{ fontSize: 11, color: 'rgba(0,0,0,.5)' }}>limit {routeInfo.speed_limit_kmh ?? 50}</div>
+                    </div>
+                    <button
+                      onClick={() => setVoiceEnabled((v) => !v)}
+                      style={{
+                        border: 'none', borderRadius: 10, background: voiceEnabled ? 'rgba(34,197,94,.12)' : 'rgba(0,0,0,.08)',
+                        color: voiceEnabled ? '#22C55E' : 'rgba(0,0,0,.6)', fontSize: 12, fontWeight: 700, padding: '8px 10px',
+                      }}
+                    >
+                      {voiceEnabled ? 'Voice On' : 'Voice Off'}
+                    </button>
+                    <button
+                      onClick={() => window.open(`tel:${SUPPORT_PHONE.replace(/[^\d+]/g, '')}`, '_self')}
+                      style={{
+                        border: 'none', borderRadius: 10, background: 'rgba(239,68,68,.1)', color: '#EF4444',
+                        fontSize: 12, fontWeight: 700, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 6,
+                      }}
+                    >
+                      <Phone size={14} /> Support
+                    </button>
+                  </div>
+                </div>
+                {!!alternatives.length && (
+                  <div style={{ marginTop: 8, borderTop: '1px solid rgba(0,0,0,.06)', paddingTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {alternatives.map((a) => (
+                      <span key={a.id} style={{ fontSize: 11, color: 'rgba(0,0,0,.55)', background: 'rgba(59,130,246,.08)', borderRadius: 999, padding: '3px 8px' }}>
+                        Alt {a.id + 1}: {a.eta_min} min · {a.distance_km} km
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </>
         ) : (

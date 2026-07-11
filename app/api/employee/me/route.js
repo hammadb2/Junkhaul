@@ -43,6 +43,12 @@ export async function GET(req) {
       pending_verification: full.status === 'pending_verification',
       onboarding_completed_at: full.onboarding_completed_at,
       onboarding_step: full.onboarding_step || 0,
+      has_password: !!full.password_hash,
+      selfie_url: full.selfie_url || null,
+      td1_federal_done: !!full.td1_federal_data,
+      td1_ab_done: !!full.td1_ab_data,
+      contract_signed: !!full.contract_signed,
+      acknowledgments_done: !!full.acknowledgments,
       has_banking: !!full.bank_account_enc,
       has_sin: !!full.sin_enc,
       td1_federal_claim: full.td1_federal_claim,
@@ -69,6 +75,22 @@ export async function PUT(req) {
   const allowed = ['phone', 'address', 'td1_federal_claim', 'td1_ab_claim', 'onboarding_step'];
   for (const k of allowed) {
     if (body[k] !== undefined) updates[k] = body[k];
+  }
+
+  // Never allow onboarding progress to move backwards.
+  if (updates.onboarding_step !== undefined) {
+    const requestedStep = Number(updates.onboarding_step);
+    if (!Number.isFinite(requestedStep)) {
+      delete updates.onboarding_step;
+    } else {
+      const { data: current } = await supabaseAdmin
+        .from('employees')
+        .select('onboarding_step')
+        .eq('id', emp.id)
+        .maybeSingle();
+      const currentStep = Number(current?.onboarding_step || 0);
+      updates.onboarding_step = Math.max(currentStep, Math.floor(requestedStep));
+    }
   }
 
   // Banking info (encrypted at rest)
