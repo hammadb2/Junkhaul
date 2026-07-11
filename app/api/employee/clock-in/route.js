@@ -10,6 +10,9 @@ export async function POST(req) {
   const emp = await getAuthedEmployee(req);
   if (!emp) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (emp.status === 'terminated') return NextResponse.json({ error: 'Account inactive' }, { status: 403 });
+  if (!['active', 'onboarded'].includes(emp.status)) {
+    return NextResponse.json({ error: 'Your account is not approved for shifts yet.' }, { status: 403 });
+  }
 
   const { lat, lng } = await req.json().catch(() => ({}));
 

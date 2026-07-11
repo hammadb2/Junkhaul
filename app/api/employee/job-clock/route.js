@@ -10,6 +10,9 @@ export const runtime = 'nodejs';
 export async function POST(req) {
   const emp = await getAuthedEmployee(req);
   if (!emp) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!['active', 'onboarded'].includes(emp.status)) {
+    return NextResponse.json({ error: 'Your account is not approved for shifts yet.' }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const { booking_id, assignment_id, action } = body;
