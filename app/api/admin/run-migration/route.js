@@ -114,6 +114,29 @@ export async function POST(req) {
   }).catch(() => ({ error: 'rpc not available' }));
   results.push({ step: 'push_subscriptions table', error: e6 });
 
+  // 7. Expand employee_documents doc_type check constraint to include
+  // onboarding-specific document types used by the portal.
+  const { error: e7 } = await supabaseAdmin.rpc('exec_sql', {
+    query: `
+      ALTER TABLE employee_documents
+        DROP CONSTRAINT IF EXISTS employee_documents_doc_type_check;
+      ALTER TABLE employee_documents
+        ADD CONSTRAINT employee_documents_doc_type_check
+        CHECK (doc_type IN (
+          'employment_contract',
+          'td1_federal',
+          'td1_ab',
+          'id',
+          'banking_info',
+          'sin_document',
+          'drivers_license_front',
+          'drivers_license_back',
+          'other'
+        ));
+    `
+  }).catch(() => ({ error: 'rpc not available' }));
+  results.push({ step: 'employee_documents doc_type constraint', error: e7 });
+
   // If exec_sql doesn't exist, try direct table creation via the API
   const hasRpcError = results.some(r => r.error === 'rpc not available');
   if (hasRpcError) {
@@ -178,6 +201,22 @@ CREATE POLICY IF NOT EXISTS "Service role comp" ON compensation_log FOR ALL USIN
 
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_token text;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_expires_at timestamptz;
+
+ALTER TABLE employee_documents
+  DROP CONSTRAINT IF EXISTS employee_documents_doc_type_check;
+ALTER TABLE employee_documents
+  ADD CONSTRAINT employee_documents_doc_type_check
+  CHECK (doc_type IN (
+    'employment_contract',
+    'td1_federal',
+    'td1_ab',
+    'id',
+    'banking_info',
+    'sin_document',
+    'drivers_license_front',
+    'drivers_license_back',
+    'other'
+  ));
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
