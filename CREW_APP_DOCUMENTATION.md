@@ -3907,4 +3907,1006 @@ The `system_config` table contains runtime toggles. Crew-relevant keys include:
 
 ---
 
+---
+
+## Crew API Reference
+
+This section documents the crew-facing (`/api/employee/*`) and admin crew-management (`/api/admin/crew/*` and related admin) route handlers used by the Junk Haul crew portal.
+
+### Part 1 — Employee Authentication & Profile
+
+#### `POST /api/employee/login`
+
+**Business Logic:** Authenticates an employee with email and password. Creates a server-side session and returns a `Set-Cookie` header for the portal.
+
+**Request Body:** `{ email: string, password: string }`
+
+**Database Tables Accessed:** `employees` (lookup, status, password_hash), `employee_sessions` (session created via `createSession`)
+
+**Response Format:** `{ employee: { id, email, name, status, onboarding_complete, pending_verification } }` with a `Set-Cookie: employee_session=...` header.
+
+**Validation/Auth:** Email and password are required; status `terminated` returns 403 "Account inactive"; status `rejected` returns 403 with `verification_notes`; invalid credentials return 401.
+
+---
+
+#### `POST /api/employee/logout`
+
+**Business Logic:** Destroys the employee session from the cookie and clears it.
+
+**Request Body:** None (reads request cookie)
+
+**Database Tables Accessed:** `employee_sessions` (deleted by `destroySession`)
+
+**Response Format:** `{ ok: true }` with a cleared `Set-Cookie` header.
+
+**Validation/Auth:** No explicit auth; cookie is parsed and removed if present.
+
+---
+
+#### `GET /api/employee/me`
+
+**Business Logic:** Returns the current employee profile, onboarding checklist, required document list, and uploaded document status.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employees` (full row), `employee_documents` (doc_type, status, uploaded_at, verified_at)
+
+**Response Format:** `{ employee: { id, email, name, phone, address, status, hire_date, pay_rate, onboarded, pending_verification, onboarding_completed_at, onboarding_step, has_password, selfie_url, td1_federal_done, td1_ab_done, contract_signed, acknowledgments_done, has_banking, has_sin, td1_federal_claim, td1_ab_claim }, documents: [...], onboarding: { complete, required, uploaded, missing }, drive_configured: false }`
+
+**Validation/Auth:** Requires valid employee session (`getAuthedEmployee`). Returns 401 if not logged in.
+
+---
+
+#### `PUT /api/employee/me`
+
+**Business Logic:** Updates employee profile fields. Optionally saves encrypted banking details and advances `onboarding_step` (never backwards).
+
+**Request Body:** `{ phone?, address?, td1_federal_claim?, td1_ab_claim?, onboarding_step?, bank_institution?, bank_transit?, bank_account? }`
+
+**Database Tables Accessed:** `employees`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Requires employee session. Allowed profile fields are whitelisted; `onboarding_step` is maxed with current value; `bank_account` is encrypted to `bank_account_enc`.
+
+---
+
+#### `POST /api/employee/signup`
+
+**Business Logic:** Creates a new employee account from the legacy self-signup flow. Seeds required document rows and auto-logs the user in.
+
+**Request Body:** `{ name, email, phone?, password, sin?, address? }`
+
+**Database Tables Accessed:** `employees` (insert), `employee_documents` (seed pending rows)
+
+**Response Format:** `{ employee: { id, email, name, status } }` with `Set-Cookie` session header.
+
+**Validation/Auth:** No pre-auth; email is de-duped; `status` is set to `pending`.
+
+---
+
+#### `GET /api/employee/reset-password`
+
+**Business Logic:** Verifies a password-reset token and returns the employee email and first name.
+
+**Query Params:** `token`
+
+**Database Tables Accessed:** `employees` (reset_token, reset_expires_at)
+
+**Response Format:** `{ ok: true, email: string, first_name: string }`
+
+**Validation/Auth:** Token must exist and `reset_expires_at` must be in the future.
+
+---
+
+#### `POST /api/employee/reset-password`
+
+**Business Logic:** Sets a new password using the reset token, clears all existing sessions, and removes the token.
+
+**Request Body:** `{ token, password }`
+
+**Database Tables Accessed:** `employees`, `employee_sessions` (delete all for the employee)
+
+**Response Format:** `{ ok: true, email: string }`
+
+**Validation/Auth:** Password must be at least 8 characters, contain one number, and one special character; token must not be expired.
+
+---
+
+### Part 2 — Employee Onboarding
+
+#### `POST /api/employee/onboard/acknowledgments`
+
+**Business Logic:** Saves the employee acknowledgment flags (tickets, phone, data, company_card) to the employee record.
+
+**Request Body:** `{ tickets?, phone?, data?, company_card? }` (all booleans)
+
+**Database Tables Accessed:** `employees`
+
+**Response Format:** `{ ok: true, acknowledgments: { tickets, phone, data, company_card, acknowledged_at } }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `GET /api/employee/onboard/acknowledgments`
+
+**Business Logic:** Returns the current acknowledgment flags for the employee.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employees`
+
+**Response Format:** `{ acknowledgments: {} }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/onboard/banking`
+
+**Business Logic:** Saves encrypted banking information as an `employee_documents` row of type `banking_info`.
+
+**Request Body:** `{ bank_name?, institution_number?, transit_number?, account_number }`
+
+**Database Tables Accessed:** `employee_documents`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Requires employee session. `account_number` is required; JSON payload is encrypted with `encryptField`.
+
+---
+
+#### `POST /api/employee/onboard/complete`
+
+**Business Logic:** Validates that all onboarding steps (contract, TD1 forms, acknowledgments, selfie, all required documents) are complete and marks the employee as `pending_verification`.
+
+**Request Body:** `{ license_data? }`
+
+**Database Tables Accessed:** `employees`, `employee_documents`
+
+**Response Format:** `{ ok: true, completed_at: ISOString, status: 'pending_verification' }` or `{ error: 'Onboarding incomplete', missing: [...], docStatus: {...} }` with 400.
+
+**Validation/Auth:** Requires employee session; checks required docs are `uploaded` or `verified`, `contract_signed`, `td1_federal_data`, `td1_ab_data`, `acknowledgments.tickets`, `selfie_url`.
+
+---
+
+#### `GET /api/employee/onboard/complete`
+
+**Business Logic:** Checks and returns the onboarding completion status and document status map.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employees`, `employee_documents`
+
+**Response Format:** `{ employee, onboarding: { contract_signed, td1_federal, td1_ab, acknowledgments, completed, documents: { doc_type: { status, uploaded } } } }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/onboard/contract`
+
+**Business Logic:** Records the typed signature for the employment contract and updates the `employment_contract` document status.
+
+**Request Body:** `{ signature_typed, contract_version?, contract_text_hash? }`
+
+**Database Tables Accessed:** `employees`, `employee_documents`
+
+**Response Format:** `{ ok: true, signed_at: ISOString }`
+
+**Validation/Auth:** Requires employee session; `signature_typed` required; stores IP and signature metadata.
+
+---
+
+#### `GET /api/employee/onboard/contract`
+
+**Business Logic:** Returns the contract signature status and metadata.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employees`
+
+**Response Format:** `{ signed: boolean, signed_at: string|null, data: object|null }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `GET /api/employee/onboard/invite`
+
+**Business Logic:** Public pre-auth endpoint that returns invite details by token for the onboarding page.
+
+**Query Params:** `token`
+
+**Database Tables Accessed:** `employee_invites`
+
+**Response Format:** `{ invite: { id, email, first_name, last_name, phone, pay_rate, status, expires_at, created_at } }`
+
+**Validation/Auth:** No auth; token must exist, not expired, and not already `accepted`.
+
+---
+
+#### `POST /api/employee/onboard/invite`
+
+**Business Logic:** Accepts an invite and creates or updates the employee record. Seeds document rows for new accounts and auto-logs in the user.
+
+**Request Body:** `{ token, password, phone, address }`
+
+**Database Tables Accessed:** `employee_invites`, `employees`, `employee_documents`
+
+**Response Format:** `{ employee: { id, email, name, status } }` with `Set-Cookie` session header.
+
+**Validation/Auth:** No pre-auth; password must be at least 8 chars, one number, one special character; phone and address required; existing completed employee returns 409.
+
+---
+
+#### `POST /api/employee/onboard/td1`
+
+**Business Logic:** Stores TD1 Federal or TD1AB form data on the employee and marks the corresponding document as completed.
+
+**Request Body:** `{ form_type: 'federal' | 'ab', data: object }`
+
+**Database Tables Accessed:** `employees`, `employee_documents`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Requires employee session; `form_type` and `data` required.
+
+---
+
+#### `GET /api/employee/onboard/td1`
+
+**Business Logic:** Returns the current TD1 form data for both federal and Alberta.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employees`
+
+**Response Format:** `{ federal: object|null, ab: object|null }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+### Part 3 — Employee Documents & Selfie
+
+#### `GET /api/employee/documents`
+
+**Business Logic:** Lists the current employee's onboarding document rows and statuses.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employee_documents`
+
+**Response Format:** `{ documents: [...] }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/documents`
+
+**Business Logic:** Uploads an onboarding document to the `employee-documents` Supabase Storage bucket. OCRs driver's license images, updates the `employee_documents` table, and merges extracted license data into the employee profile. If all required docs are present, moves status to `pending_verification`.
+
+**Request Body:** Multipart form with `doc_type` and `file`.
+
+**Allowed `doc_type` values:** `employment_contract`, `td1_federal`, `td1_ab`, `id`, `banking_info`, `sin_document`, `drivers_license_front`, `drivers_license_back`, `other`
+
+**Database Tables Accessed:** `employee_documents` (upsert), `employees` (license_data merge, status update), `employee-documents` storage bucket
+
+**Response Format:** `{ ok: true, document: {...}, extracted_data: object, onboarding_complete: boolean }`
+
+**Validation/Auth:** Requires employee session; `doc_type` and `file` required; `doc_type` must be in allowed list.
+
+---
+
+#### `POST /api/employee/selfie`
+
+**Business Logic:** Uploads a crew selfie to the `crew-photos` bucket and stores the public URL on the employee row.
+
+**Request Body:** Multipart form with `file` (image).
+
+**Database Tables Accessed:** `employees`, `crew-photos` storage bucket
+
+**Response Format:** `{ ok: true, selfie_url: string }`
+
+**Validation/Auth:** Requires employee session; storage bucket is created if missing.
+
+---
+
+#### `GET /api/employee/selfie`
+
+**Business Logic:** Public endpoint that returns the crew first names and selfie URLs for a booking based on the booking's `job_date` crew assignments.
+
+**Query Params:** `booking_id`
+
+**Database Tables Accessed:** `bookings`, `crew_assignments`, `employees`
+
+**Response Format:** `{ crew: [{ first_name, selfie_url }] }`
+
+**Validation/Auth:** No auth; `booking_id` required.
+
+### Part 4 — Employee Clock, Schedule & Operations
+
+#### `POST /api/employee/clock-in`
+
+**Business Logic:** Starts a new shift for the employee. Prevents double clock-in if an open shift already exists.
+
+**Request Body:** `{ lat?, lng? }` (optional GPS coordinates)
+
+**Database Tables Accessed:** `timesheets`
+
+**Response Format:** `{ ok: true, shift: { id, employee_id, clock_in_at, clock_in_lat, clock_in_lng } }`
+
+**Validation/Auth:** Requires employee session; status must be `active` or `onboarded`; `terminated` blocked. Returns 409 if an open shift exists.
+
+---
+
+#### `POST /api/employee/clock-out`
+
+**Business Logic:** Closes the current open shift, calculates regular/overtime hours and gross pay based on weekly and daily hours, and the employee's `pay_rate`.
+
+**Request Body:** `{ lat?, lng? }`
+
+**Database Tables Accessed:** `timesheets`, `employees` (pay_rate)
+
+**Response Format:** `{ ok: true, shift: { id, clock_in_at, clock_out_at, regular_hours, overtime_hours, total_hours, gross_pay } }`
+
+**Validation/Auth:** Requires employee session; must have an open shift or returns 404. Uses `calcShiftGross` and `splitOvertime`.
+
+---
+
+#### `POST /api/employee/job-clock`
+
+**Business Logic:** Clocks in or out for a specific booking (`action: 'in' | 'out'`). Auto-starts a shift timesheet when first job is clocked in and auto-closes the shift when the last open job session ends.
+
+**Request Body:** `{ booking_id, assignment_id?, action }`
+
+**Database Tables Accessed:** `job_clock_sessions`, `timesheets`, `bookings`
+
+**Response Format:** `{ ok: true, session: {...} }` for `in`; `{ ok: true, duration_minutes: number }` for `out`
+
+**Validation/Auth:** Requires employee session; status must be `active` or `onboarded`; `booking_id` and `action` required.
+
+---
+
+#### `GET /api/employee/shifts`
+
+**Business Logic:** Returns the current open shift, recent 30 closed shifts, and aggregated pay-period hours (current calendar month, un-paid).
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `timesheets`
+
+**Response Format:** `{ open_shift: {...}|null, recent: [...], period: { regular_hours, overtime_hours, total_hours, gross } }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `GET /api/employee/schedule`
+
+**Business Logic:** Returns the employee's crew assignment for a given date, the day's bookings, partner info, and open/completed job sessions. Supports `weekly=true` for a Mon-Sun view.
+
+**Query Params:** `date?` (YYYY-MM-DD, default today), `weekly?` (`true` for week view)
+
+**Database Tables Accessed:** `crew_assignments`, `bookings`, `employees`, `job_clock_sessions`, `timesheets`
+
+**Response Format:** For a single day: `{ assignment, partner, bookings, open_sessions, completed_sessions, open_shift }`. For weekly: `{ week: [{ date, dayName, dayNum, isToday, assignment, bookings }], startDate, endDate }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/location`
+
+**Business Logic:** Upserts the employee's current GPS location (with optional heading and speed) for the admin live tracking dashboard.
+
+**Request Body:** `{ lat: number, lng: number, heading?, speed? }`
+
+**Database Tables Accessed:** `crew_locations`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Requires employee session; `lat` and `lng` must be numbers.
+
+---
+
+#### `GET /api/employee/location`
+
+**Business Logic:** Public customer-tracking endpoint. Returns the most recent crew location for the date of a given booking.
+
+**Query Params:** `booking_id`
+
+**Database Tables Accessed:** `bookings`, `crew_assignments`, `crew_locations`, `employees`
+
+**Response Format:** `{ location: { lat, lng, heading, updated_at, crew_first_names, en_route } | null }`
+
+**Validation/Auth:** No auth; `booking_id` required; `en_route` is true if location updated within the last 5 minutes.
+
+---
+
+#### `GET /api/employee/landfill`
+
+**Business Logic:** Returns landfills open today based on day-of-week and season rules, sorted by distance from crew GPS if provided.
+
+**Query Params:** `lat?, lng?`
+
+**Database Tables Accessed:** `landfills`
+
+**Response Format:** `{ recommended: {...}, all: [...], warnings: [...], day_of_week, is_sunday }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `GET /api/employee/gas-price`
+
+**Business Logic:** Returns the current cached Alberta gas price, or fetches a fresh price from OilPriceAPI and caches it for up to 7 days.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `gas_price_cache`
+
+**Response Format:** `{ price_per_litre, currency, source, fetched_at, from_cache, warning? }`
+
+**Validation/Auth:** Requires employee session. Falls back to default `1.55 CAD` if API key is missing or fetch fails.
+
+---
+
+#### `GET /api/employee/notifications`
+
+**Business Logic:** Lists the employee's notifications and counts unread messages.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `crew_notifications`
+
+**Response Format:** `{ notifications: [...], unread: number }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/notifications`
+
+**Business Logic:** Marks notifications as read by `id` or marks all as read.
+
+**Request Body:** `{ id? }` or `{ markAll: true }`
+
+**Database Tables Accessed:** `crew_notifications`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `GET /api/employee/pay-stubs`
+
+**Business Logic:** Returns the employee's pay stubs (newest first, up to 52).
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `pay_stubs`
+
+**Response Format:** `{ pay_stubs: [{ id, pay_run_id, created_at, regular_hours, overtime_hours, total_hours, regular_pay, overtime_pay, gross_pay, vacation_pay, cpp, cpp2, ei, fed_tax, total_deductions, net_pay, ytd_gross, ytd_cpp, ytd_cpp2, ytd_ei, ytd_vacation, direct_deposit_status, direct_deposit_sent_at }] }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/push-subscribe`
+
+**Business Logic:** Saves a Web Push subscription for the employee so admin can send push notifications.
+
+**Request Body:** `{ endpoint, keys?: { p256dh?, auth? } }`
+
+**Database Tables Accessed:** `push_subscriptions`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Requires employee session; `endpoint` required.
+
+---
+
+#### `DELETE /api/employee/push-subscribe`
+
+**Business Logic:** Removes a Web Push subscription by endpoint.
+
+**Query Params:** `endpoint`
+
+**Database Tables Accessed:** `push_subscriptions`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/receipts`
+
+**Business Logic:** Records a transaction receipt (U-Haul, gas, dump, or other) for an assignment or general expense.
+
+**Request Body:** `{ assignment_id?, receipt_type: 'uhaul'|'gas'|'dump'|'other', vendor?, amount_cad, receipt_photo_url?, notes? }`
+
+**Database Tables Accessed:** `transaction_receipts`
+
+**Response Format:** `{ ok: true, receipt: {...} }`
+
+**Validation/Auth:** Requires employee session; `receipt_type` and `amount_cad` required.
+
+---
+
+#### `GET /api/employee/receipts`
+
+**Business Logic:** Lists the employee's receipts, optionally filtered by `assignment_id` or `date`.
+
+**Query Params:** `assignment_id?`, `date?` (YYYY-MM-DD)
+
+**Database Tables Accessed:** `transaction_receipts`
+
+**Response Format:** `{ receipts: [...] }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/signature`
+
+**Business Logic:** Captures a customer signature for a completed booking and updates the booking payment/status.
+
+**Request Body:** `{ booking_id, customer_name_typed, customer_signature_url?, amount_confirmed, payment_method? ('cash'|'card') }`
+
+**Database Tables Accessed:** `customer_signatures`, `bookings`
+
+**Response Format:** `{ ok: true, signature: {...} }`
+
+**Validation/Auth:** Requires employee session; `booking_id`, `customer_name_typed`, and `amount_confirmed` required. Sets `bookings.status` to `completed` and `payment_status` to `paid`.
+
+---
+
+#### `GET /api/employee/signature`
+
+**Business Logic:** Returns signatures for a booking.
+
+**Query Params:** `booking_id`
+
+**Database Tables Accessed:** `customer_signatures`
+
+**Response Format:** `{ signatures: [...] }`
+
+**Validation/Auth:** Requires employee session; `booking_id` required.
+
+---
+
+#### `POST /api/employee/storage-drop`
+
+**Business Logic:** Records items dropped at a storage facility and updates facility capacity if an estimate is provided.
+
+**Request Body:** `{ assignment_id?, facility_id, booking_id?, item_photos?, capacity_photo_url?, capacity_estimate_pct? }`
+
+**Database Tables Accessed:** `storage_drops`, `storage_facilities`
+
+**Response Format:** `{ ok: true, drop: {...} }`
+
+**Validation/Auth:** Requires employee session; `facility_id` required.
+
+---
+
+#### `GET /api/employee/storage-drop`
+
+**Business Logic:** Lists active storage facilities for the crew to select.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `storage_facilities`
+
+**Response Format:** `{ facilities: [{ id, name, address, lat, lng, access_code, capacity_sqft, current_usage_pct }] }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/truck-check`
+
+**Business Logic:** Records a pickup or return truck check (odometer, fuel, damage, gas receipt).
+
+**Request Body:** `{ assignment_id, check_type: 'pickup'|'return', dashboard_photo_url?, odometer_km?, fuel_level?, fuel_percent?, truck_photos?, damage_notes?, gas_receipt_url?, gas_amount_cad?, gas_station? }`
+
+**Database Tables Accessed:** `truck_checks`
+
+**Response Format:** `{ ok: true, check: {...} }`
+
+**Validation/Auth:** Requires employee session; `assignment_id` and `check_type` required.
+
+---
+
+#### `GET /api/employee/truck-check`
+
+**Business Logic:** Lists truck checks for an assignment.
+
+**Query Params:** `assignment_id`
+
+**Database Tables Accessed:** `truck_checks`
+
+**Response Format:** `{ checks: [...] }`
+
+**Validation/Auth:** Requires employee session; `assignment_id` required.
+
+---
+
+#### `GET /api/employee/incidents`
+
+**Business Logic:** Lists incident reports filed by the employee.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `incident_reports`, `crew_notifications`
+
+**Response Format:** `{ incidents: [...] }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/incidents`
+
+**Business Logic:** Files a new incident report and creates a warning notification.
+
+**Request Body:** `{ booking_id?, incident_type?, severity?, description, location?, photo_urls?, reported_to? }`
+
+**Database Tables Accessed:** `incident_reports`, `crew_notifications`
+
+**Response Format:** `{ incident: {...} }`
+
+**Validation/Auth:** Requires employee session; `description` required.
+
+---
+
+#### `GET /api/employee/issues`
+
+**Business Logic:** Lists job issues raised by the employee, optionally filtered by `booking_id`.
+
+**Query Params:** `booking_id?`
+
+**Database Tables Accessed:** `job_issues`
+
+**Response Format:** `{ issues: [...] }`
+
+**Validation/Auth:** Requires employee session.
+
+---
+
+#### `POST /api/employee/issues`
+
+**Business Logic:** Creates a new job issue flag and notifies admin.
+
+**Request Body:** `{ booking_id?, issue_type?, severity?, description?, photo_url? }`
+
+**Database Tables Accessed:** `job_issues`, `crew_notifications`
+
+**Response Format:** `{ issue: {...} }`
+
+**Validation/Auth:** Requires employee session.
+
+### Part 5 — Admin Crew Management API
+
+All admin routes require a valid admin cookie (`ADMIN_COOKIE` token matching `adminToken()` from `@/lib/adminAuth`). They return `{ error: 'Unauthorized' }` with status 401 when not authenticated.
+
+---
+
+#### `GET /api/admin/crew`
+
+**Business Logic:** Returns a full list of employees with live clock-in status, current-month job-clock hours, onboarding completion flags, and pending invites.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employees`, `job_clock_sessions`, `employee_invites`
+
+**Response Format:** `{ employees: [{ ...employee, clocked_in, clock_in_at, clock_in_duration_min, current_booking_id, period: { total_hours, total_minutes }, onboarding: { contract_signed, td1_federal, td1_ab, acknowledgments, completed } }], pending_invites: [...], summary: { total, onboarded, pending, pending_verification, clocked_in_now, pending_invites } }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `POST /api/admin/crew`
+
+**Business Logic:** Creates a fresh onboarding invite for a new crew member. If an incomplete employee record or pending invite already exists, it refreshes/deletes the old record and re-sends the email via Resend.
+
+**Request Body:** `{ first_name, last_name, email, phone?, pay_rate? }`
+
+**Database Tables Accessed:** `employee_invites`, `employees` (and cascades `employee_documents`, `employee_sessions`, `job_clock_sessions` when removing old incomplete accounts)
+
+**Response Format:** `{ ok: true, invite }` (status 201)
+
+**Validation/Auth:** Admin cookie required; `first_name`, `last_name`, and `email` required. `pay_rate` defaults to 18.
+
+---
+
+#### `GET /api/admin/crew/[id]`
+
+**Business Logic:** Returns a single employee with full onboarding data, documents, invite, recent job clock sessions, and crew assignments.
+
+**Path Params:** `id` (employee UUID)
+
+**Database Tables Accessed:** `employees`, `employee_documents`, `employee_invites`, `job_clock_sessions`, `crew_assignments`
+
+**Response Format:** `{ employee, documents, invite, recent_sessions, assignments }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `PATCH /api/admin/crew/[id]`
+
+**Business Logic:** Updates an employee's admin-editable fields. Optionally sends a password-reset email if the admin changed email or set `send_reset: true`.
+
+**Path Params:** `id`
+
+**Request Body:** `{ status?, pay_rate?, first_name?, last_name?, name?, phone?, email?, hire_date?, onboarding_completed_at?, address?, onboarded_at?, send_reset? }`
+
+**Database Tables Accessed:** `employees`
+
+**Response Format:** `{ ok: true, employee, reset_sent: boolean }`
+
+**Validation/Auth:** Admin cookie required; email is lower-cased and trimmed; name is derived from first/last if needed.
+
+---
+
+#### `DELETE /api/admin/crew/[id]`
+
+**Business Logic:** Soft-terminates an employee by setting `status` to `terminated`, clocks out any open job sessions, and revokes all sessions.
+
+**Path Params:** `id`
+
+**Database Tables Accessed:** `employees`, `job_clock_sessions`, `employee_sessions`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `POST /api/admin/crew/[id]/approve`
+
+**Business Logic:** Admin approves or rejects an employee's onboarding. On approve, status becomes `active` and an SMS is sent. On reject, status becomes `rejected` and an SMS with reason is sent.
+
+**Path Params:** `id`
+
+**Request Body:** `{ action: 'approve' | 'reject', notes? }`
+
+**Database Tables Accessed:** `employees`
+
+**Response Format:** `{ ok: true, status: 'active' | 'rejected' }`
+
+**Validation/Auth:** Admin cookie required; `action` must be `approve` or `reject`.
+
+---
+
+#### `POST /api/admin/crew/[id]/resend-invite`
+
+**Business Logic:** Resends an onboarding invite with a fresh token. If the employee already completed onboarding, returns 400.
+
+**Path Params:** `id`
+
+**Database Tables Accessed:** `employees`, `employee_invites`
+
+**Response Format:** `{ ok: true, invite }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `GET /api/admin/crew/assignments`
+
+**Business Logic:** Lists crew assignments, optionally filtered by a single date or a date range.
+
+**Query Params:** `date?`, `from?`, `to?`
+
+**Database Tables Accessed:** `crew_assignments`, `employees` (driver and secondary foreign relations)
+
+**Response Format:** `{ assignments: [{ ...assignment, driver: {...}, secondary: {...} }] }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `POST /api/admin/crew/assignments`
+
+**Business Logic:** Creates or updates a crew assignment for a date and sends push notifications to the assigned crew members.
+
+**Request Body:** `{ assignment_date, driver_employee_id, secondary_employee_id?, uhaul_location?, uhaul_location_lat?, uhaul_location_lng?, id? }`
+
+**Database Tables Accessed:** `crew_assignments`, `employees` (for push notification)
+
+**Response Format:** `{ ok: true, assignment }`
+
+**Validation/Auth:** Admin cookie required; `assignment_date` and `driver_employee_id` required. Uses upsert on `(assignment_date, driver_employee_id)` uniqueness.
+
+---
+
+#### `GET /api/admin/crew/donation-centers`
+
+**Business Logic:** Lists donation centers.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `donation_centers`
+
+**Response Format:** `{ centers: [...] }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `POST /api/admin/crew/donation-centers`
+
+**Business Logic:** Creates or updates a donation center.
+
+**Request Body:** `{ id?, name, address, lat?, lng?, phone?, hours?, accepted_items? }`
+
+**Database Tables Accessed:** `donation_centers`
+
+**Response Format:** `{ center: {...} }`
+
+**Validation/Auth:** Admin cookie required; `name` and `address` required.
+
+---
+
+#### `GET /api/admin/crew/push`
+
+**Business Logic:** Lists active employees with their push-subscription counts.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employees`, `push_subscriptions`
+
+**Response Format:** `{ employees: [{ id, name, push_subscriptions }], total_subscriptions }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `POST /api/admin/crew/push`
+
+**Business Logic:** Sends a push notification to all active employees or one specific employee.
+
+**Request Body:** `{ target: 'all' | 'individual', employee_id?, title, body, url? }`
+
+**Database Tables Accessed:** `employees`, `push_subscriptions`
+
+**Response Format:** `{ ok: true, sent, totalSubs, message?, errors? }`
+
+**Validation/Auth:** Admin cookie required; `title` and `body` required; `employee_id` required when `target` is `individual`.
+
+---
+
+#### `GET /api/admin/crew/storage`
+
+**Business Logic:** Lists active storage facilities.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `storage_facilities`
+
+**Response Format:** `{ facilities: [...] }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `POST /api/admin/crew/storage`
+
+**Business Logic:** Creates or updates a storage facility.
+
+**Request Body:** `{ id?, name, address, lat?, lng?, access_code?, capacity_sqft? }`
+
+**Database Tables Accessed:** `storage_facilities`
+
+**Response Format:** `{ facility: {...} }`
+
+**Validation/Auth:** Admin cookie required; `name` and `address` required.
+
+---
+
+### Part 6 — Related Admin APIs
+
+#### `GET /api/admin/employee-docs`
+
+**Business Logic:** Returns all uploaded documents for a given employee.
+
+**Query Params:** `employee_id`
+
+**Database Tables Accessed:** `employee_documents`
+
+**Response Format:** `{ documents: [...] }`
+
+**Validation/Auth:** Admin cookie required; `employee_id` required.
+
+---
+
+#### `POST /api/admin/employee-docs`
+
+**Business Logic:** Verifies or rejects a document and records the admin verification timestamp.
+
+**Request Body:** `{ document_id, status: 'verified' | 'rejected', notes? }`
+
+**Database Tables Accessed:** `employee_documents`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Admin cookie required; `status` must be `verified` or `rejected`.
+
+---
+
+#### `GET /api/admin/employees`
+
+**Business Logic:** Admin overview of employees: who is clocked in, pay-period hours (current calendar month, un-paid), onboarding doc completion, and summary counts.
+
+**Request Body/Query:** None
+
+**Database Tables Accessed:** `employees`, `timesheets`, `employee_documents`
+
+**Response Format:** `{ employees: [{ ...employee, clocked_in, clock_in_at, clock_in_duration_min, clock_in_gps, period: { regular_hours, overtime_hours, total_hours, gross }, onboarding: { complete, uploaded, missing } }], summary: { total, onboarded, pending, clocked_in_now } }`
+
+**Validation/Auth:** Admin cookie required.
+
+---
+
+#### `POST /api/admin/mark-arrived`
+
+**Business Logic:** Records the crew arrival timestamp on a booking.
+
+**Request Body:** `{ booking_id }`
+
+**Database Tables Accessed:** `bookings`
+
+**Response Format:** `{ ok: true }`
+
+**Validation/Auth:** Admin cookie required; `booking_id` required.
+
+---
+
+#### `GET /api/admin/get-job-photos`
+
+**Business Logic:** Returns crew and customer photos for a booking, filtered by booking ID or customer phone.
+
+**Query Params:** `booking_id` or `phone`
+
+**Database Tables Accessed:** `bookings`
+
+**Response Format:** `{ booking_id, customer_name, job_date, address, status, crew_arrived_at, customer_photos, crew_arrival_photos, crew_completion_photos, total_crew_photos }`
+
+**Validation/Auth:** Admin cookie required; `booking_id` or `phone` required.
+
+---
+
+#### `POST /api/admin/upload-crew-photo`
+
+**Business Logic:** Uploads a crew arrival or completion photo to the `job-photos` storage bucket and appends the photo record to the booking's `crew_photos` JSONB array.
+
+**Request Body:** Multipart form with `file`, `booking_id`, `type` (`crew_arrival` or `crew_completion`)
+
+**Database Tables Accessed:** `bookings`, `job-photos` storage bucket
+
+**Response Format:** `{ url: string }`
+
+**Validation/Auth:** Admin cookie required; `file`, `booking_id`, and `type` required; `type` must be `crew_arrival` or `crew_completion`.
+
+---
+
+#### `POST /api/admin/run-migration`
+
+**Business Logic:** Runs a one-time data migration script to add missing columns and tables (crew photo fields on bookings, `call_history`, `escalations`, `compensation_log`, `push_subscriptions`, reset-token columns on `employees`, and `employee_documents` doc-type constraint). Used during environment setup.
+
+**Request Body:** `{ secret: 'jh-migrate-2026' }`
+
+**Database Tables Accessed:** Executes SQL via `exec_sql` RPC or returns manual SQL fallback.
+
+**Response Format:** `{ results: [{ step, error }], message?, sql? }`
+
+**Validation/Auth:** Requires hard-coded secret `jh-migrate-2026` in the request body; no cookie auth.
+
 *Documentation continues below. More sections can be added as needed.*
