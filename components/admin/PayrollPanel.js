@@ -268,7 +268,11 @@ function RunPayrollModal({ onClose, onDone }) {
                       <div><span className="text-black/50">Net:</span> <strong className="text-[#22C55E]">{fmtMoney(preview.totals.total_net)}</strong></div>
                       <div><span className="text-black/50">CPP:</span> {fmtMoney(preview.totals.total_cpp)}</div>
                       <div><span className="text-black/50">EI:</span> {fmtMoney(preview.totals.total_ei)}</div>
-                      <div><span className="text-black/50">Tax:</span> {fmtMoney(preview.totals.total_fed_tax)}</div>
+                      <div><span className="text-black/50">Tax:</span> {fmtMoney(preview.totals.total_fed_tax)}
+                        {Number(preview.totals.total_fed_tax) === 0 && (
+                          <div className="text-[10px] text-black/40 mt-0.5">No income tax withheld — annualized earnings are below the basic personal amount</div>
+                        )}
+                      </div>
                       <div><span className="text-black/50">CRA remit:</span> <strong className="text-[#f97316]">{fmtMoney(preview.totals.total_cra_remittance)}</strong></div>
                     </div>
                   </div>

@@ -276,6 +276,44 @@ check('high income tax', pch.fedTax, 1206.79);
 check('high net pay', pch.netPay, 3607.06);
 
 // ============================================================
+// 9. LOW-INCOME SCENARIO — biweekly $377.56 wages, 2026
+//    Regression test: $0.00 income tax is CORRECT, not a bug.
+//    Annualized income is below both federal and AB basic personal
+//    amounts, so no income tax is due — only CPP + EI.
+//
+//    wages = $377.56, vacation 4% = $15.10, gross = $392.66, P = 26
+//    CPP = 0.0595 × (392.66 − 134.615) = 0.0595 × 258.045 = 15.354 → 15.35
+//    EI  = 0.0163 × 392.66 = 6.400 → 6.40
+//    F5  = 15.35 × 0.168067 = 2.580
+//    A   = 26 × (392.66 − 2.580) = 26 × 390.08 = 10142.08
+//    Fed: A = 10142 < 16452 (BPA) → T3 = max(0, 0.14×10142 − 2303.28 − ...) = 0
+//      (0.14×10142 = 1419.89 < K1=2303.28 alone, so T3 goes negative → floored at 0)
+//    AB: A = 10142 < 22769 (AB BPA) → T4 = max(0, 0.08×10142 − 1821.52 − ...) = 0
+//      (0.08×10142 = 811.37 < K1P=1821.52 alone, so T4 goes negative → floored at 0)
+//    T = (0 + 0)/26 = 0.00
+//    total deductions = 15.35 + 6.40 + 0 = 21.75
+//    net = 392.66 − 21.75 = 370.91
+// ============================================================
+console.log('\n=== Full paycheque (low income, biweekly $377.56, 2026) ===');
+
+const pcl = calculateDeductionsPure({
+  rates,
+  grossForPeriod: 377.56,
+  P: PAY_PERIODS.biweekly,
+  TC: 16452,
+  TCP: 22769,
+});
+
+check('low gross', pcl.gross, 392.66);
+check('low wages', pcl.wages, 377.56);
+check('low vacation pay', pcl.vacationPay, 15.10);
+check('low CPP', pcl.cpp, 15.35);
+check('low EI', pcl.ei, 6.40);
+check('low income tax (should be $0)', pcl.fedTax, 0.00);
+check('low total deductions', pcl.totalDeductions, 21.75);
+check('low net pay', pcl.netPay, 370.91);
+
+// ============================================================
 // RESULT
 // ============================================================
 console.log(`\n========================================`);

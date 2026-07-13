@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
 import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { sendDirectDeposit, isDirectDepositConfigured } from '@/lib/directDeposit';
+import { sendSMS } from '@/lib/sms';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -65,6 +66,35 @@ export async function POST(req) {
     await supabaseAdmin.from('pay_runs')
       .update({ status: allSent ? 'paid' : 'approved', paid_at: allSent ? new Date().toISOString() : null })
       .eq('id', pay_run_id);
+  }
+
+  // ── Notify each employee that their pay stub is ready ──
+  try {
+    const { data: stubs } = await supabaseAdmin
+      .from('pay_stubs')
+      .select('id, employee_id, net_pay')
+      .eq('pay_run_id', pay_run_id);
+
+    for (const stub of stubs || []) {
+      const { data: emp } = await supabaseAdmin
+        .from('employees')
+        .select('phone, name')
+        .eq('id', stub.employee_id)
+        .maybeSingle();
+      if (!emp?.phone) continue;
+
+      const periodLabel = `${run.period_start} to ${run.period_end}`;
+      const portalLink = 'https://junkhaul.ca/portal/paystubs';
+      const netFormatted = Number(stub.net_pay || 0).toFixed(2);
+      await sendSMS(
+        emp.phone,
+        `Your pay stub for ${periodLabel} is ready — $${netFormatted} net. View it at ${portalLink}`,
+        null,
+        'pay_stub_ready'
+      ).catch(() => {}); // best-effort — don't fail approval over an SMS
+    }
+  } catch {
+    // best-effort
   }
 
   return NextResponse.json({ ok: true, approved: true, deposits: depositResults });
