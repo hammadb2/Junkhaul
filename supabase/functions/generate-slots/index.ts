@@ -1,8 +1,14 @@
 import { supabase, isKillSwitchOn } from '../_shared/clients.ts';
 import { edmontonNow } from '../_shared/time.ts';
 
-const SLOT_TIMES = ['07:30', '09:00', '11:00', '13:00'];
-const MAX_JOBS = 1;
+// Arrival windows (2 per day). slot_time is the window start,
+// used as the unique key. window_label / window_start / window_end
+// are stored alongside for the booking UI.
+const WINDOWS = [
+  { slot_time: '07:30', label: 'Morning', start: '07:30', end: '11:00' },
+  { slot_time: '11:00', label: 'Afternoon', start: '11:00', end: '15:00' },
+];
+const MAX_JOBS = 4; // per window — crew sequences these day-of
 const WEEKS_AHEAD = 16; // 4 months rolling — no hard end date
 
 // Canadian statutory holidays (add more years as needed)
@@ -51,7 +57,7 @@ Deno.serve(async () => {
     .lt('slot_date', cutoffStr)
     .eq('jobs_booked', 0);
 
-  // Step 2: Generate Thu + Sun slots 16 weeks ahead
+  // Step 2: Generate window-based slots 16 weeks ahead, all 7 days
   const rows: Record<string, unknown>[] = [];
   const start = new Date(`${now.date}T12:00:00Z`);
 
@@ -60,22 +66,25 @@ Deno.serve(async () => {
     d.setUTCDate(start.getUTCDate() + i);
     const dow = d.getUTCDay();
 
-    if (dow !== 0 && dow !== 4) continue; // Sunday=0, Thursday=4
-
+    // 24-hour any-day guarantee: generate slots for every day.
+    // Skip statutory holidays — no pickups on those days.
     const dateStr = d.toISOString().slice(0, 10);
 
     // Skip statutory holidays
     if (STAT_HOLIDAYS.has(dateStr)) continue;
 
-    const day_type = dow === 0 ? 'sunday' : 'thursday';
+    const day_type = dow === 0 ? 'sunday' : dow === 6 ? 'saturday' : 'weekday';
 
-    for (const t of SLOT_TIMES) {
+    for (const w of WINDOWS) {
       rows.push({
         slot_date: dateStr,
-        slot_time: t,
+        slot_time: w.slot_time,
         day_type,
         max_jobs: MAX_JOBS,
         is_available: true,
+        window_label: w.label,
+        window_start: w.start,
+        window_end: w.end,
       });
     }
   }

@@ -28,6 +28,14 @@ const LOADS = [
 
 const STEPS = ['phone', 'address', 'photos', 'items', 'load', 'schedule', 'details', 'payment', 'done'];
 
+// '15:00' -> '3:00 PM' (client-side version of lib/dates formatTime)
+const formatTimeDisplay = (time24) => {
+  const [h, m] = time24.split(':').map((x) => parseInt(x, 10));
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+};
+
 const todayEdmonton = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Edmonton',
@@ -96,6 +104,9 @@ export default function BookPage() {
     truck_size: 15,
     job_date: null,
     job_time: null,
+    job_window_label: null,
+    job_window_start: null,
+    job_window_end: null,
     name: '',
     phone: '',
     email: '',
@@ -1312,7 +1323,13 @@ function ScheduleStep({ state, update, onNext }) {
   const [noStandardSlots, setNoStandardSlots] = useState(false);
 
   useEffect(() => {
-    fetch('/api/slots')
+    // Pass load_size + address so the API can run the landfill
+    // closing feasibility check per window.
+    const params = new URLSearchParams();
+    if (state.load_size) params.set('load_size', state.load_size);
+    if (state.address) params.set('address', state.address);
+    const qs = params.toString();
+    fetch(`/api/slots${qs ? `?${qs}` : ''}`)
       .then((r) => r.json())
       .then((data) => {
         setDays(data.days || []);
@@ -1320,15 +1337,18 @@ function ScheduleStep({ state, update, onNext }) {
         if (data.days?.length) setActiveDay(data.days[0].date);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [state.load_size, state.address]);
 
   const today = todayEdmonton();
   const day = days.find((d) => d.date === activeDay);
 
-  const pick = (date, time, isCustom = false) => {
+  const pick = (date, slot, isCustom = false) => {
     update({
       job_date: date,
-      job_time: time,
+      job_time: slot.time,
+      job_window_label: slot.window_label || null,
+      job_window_start: slot.window_start || null,
+      job_window_end: slot.window_end || null,
       same_day: date === today,
       is_custom_slot: isCustom,
     });
@@ -1351,7 +1371,7 @@ function ScheduleStep({ state, update, onNext }) {
     <div className="flex flex-col gap-4">
       <h2 className="text-2xl font-bold text-gray-900">Pick a time</h2>
       <p className="text-gray-500 text-sm -mt-2">
-        We run Thursdays and Sundays. All bookings must be at least 24 hours in advance.
+        We operate 7 days a week. All bookings must be at least 24 hours in advance.
       </p>
 
       {noStandardSlots && (
@@ -1392,14 +1412,15 @@ function ScheduleStep({ state, update, onNext }) {
         {day?.slots.map((s) => {
           const remaining = s.remaining || 0;
           const isScarce = remaining <= 2;
+          const displayLabel = s.display || s.label;
           return (
             <div key={s.time} className="relative">
               <SlotPill
-                time={s.label}
+                time={displayLabel}
                 available
                 sameDay={activeDay === today}
                 selected={state.job_date === activeDay && state.job_time === s.time}
-                onClick={() => pick(activeDay, s.time, day?.is_custom)}
+                onClick={() => pick(activeDay, s, day?.is_custom)}
               />
               {isScarce && !day?.is_custom && (
                 <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
@@ -1477,6 +1498,9 @@ function DetailsStep({ state, update, price, onCreated }) {
           truck_size: state.truck_size || 15,
           job_date: state.job_date,
           job_time: state.job_time,
+          job_window_label: state.job_window_label || null,
+          job_window_start: state.job_window_start || null,
+          job_window_end: state.job_window_end || null,
           photos: state.photoUrls,
           photo_skipped: state.photo_skipped,
           description_text: state.description_text || null,
@@ -1552,7 +1576,11 @@ function DetailsStep({ state, update, price, onCreated }) {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">Pickup time</span>
-          <span className="font-medium text-gray-900">{state.job_time}</span>
+          <span className="font-medium text-gray-900">
+            {state.job_window_label
+              ? `${state.job_window_label} (${state.job_window_start ? formatTimeDisplay(state.job_window_start) : ''}–${state.job_window_end ? formatTimeDisplay(state.job_window_end) : ''})`
+              : state.job_time}
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">Pickup address</span>

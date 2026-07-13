@@ -89,9 +89,10 @@ export default function WaitlistPage() {
             onChange={set('preferred_day_type')}
             className="border border-gray-300 rounded-xl px-3 py-3 text-sm"
           >
-            <option value="either">Either Thursday or Sunday</option>
-            <option value="thursday">Thursday</option>
+            <option value="either">Any day (24-hour guarantee)</option>
+            <option value="weekday">Weekday</option>
             <option value="sunday">Sunday</option>
+            <option value="saturday">Saturday</option>
           </select>
 
           <label className="text-sm font-medium text-gray-700">Estimated load</label>

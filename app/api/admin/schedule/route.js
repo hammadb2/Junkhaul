@@ -126,14 +126,14 @@ export async function POST(req) {
   }
 
   if (action === 'add_day') {
-    const times = body.times || ['07:30', '09:00', '11:00', '13:00'];
+    const times = body.times || ['07:30', '11:00'];
     const dow = new Date(`${slot_date}T12:00:00Z`).getUTCDay();
-    const day_type = dow === 0 ? 'sunday' : dow === 4 ? 'thursday' : 'custom';
+    const day_type = dow === 0 ? 'sunday' : dow === 6 ? 'saturday' : 'weekday';
     const rows = times.map((t) => ({
       slot_date,
       slot_time: t,
       day_type,
-      max_jobs: max_jobs || 1,
+      max_jobs: max_jobs || 4,
       is_available: true,
     }));
     await supabaseAdmin

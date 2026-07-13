@@ -35,6 +35,9 @@ export async function POST(req) {
       truck_size = 15,
       job_date,
       job_time,
+      job_window_label = null,
+      job_window_start = null,
+      job_window_end = null,
       photos = [],
       photo_skipped = false,
       description_text = null,
@@ -92,6 +95,9 @@ export async function POST(req) {
             is_available: true,
             max_jobs: 5,
             jobs_booked: 0,
+            window_label: job_window_label || null,
+            window_start: job_window_start || null,
+            window_end: job_window_end || null,
           });
         if (createErr) {
           return NextResponse.json(
@@ -228,6 +234,9 @@ export async function POST(req) {
       balance_due: priced.balance_due,
       job_date,
       job_time,
+      job_window_label,
+      job_window_start,
+      job_window_end,
       job_datetime: jobDateTimeUTC(job_date, job_time).toISOString(),
       photos,
       photo_skipped,

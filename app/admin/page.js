@@ -1354,7 +1354,7 @@ function ScheduleView() {
         const totalMax = day.slots.reduce((s, sl) => s + sl.max_jobs, 0);
         const isFull = totalBooked >= totalMax;
         const allClosed = day.slots.every((sl) => !sl.is_available);
-        const isThursday = day.day_type === 'thursday';
+        const isThursday = day.day_type === 'thursday' || day.day_type === 'weekday';
         const isSunday = day.day_type === 'sunday';
 
         return (
