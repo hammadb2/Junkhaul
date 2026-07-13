@@ -4,7 +4,7 @@ import FaqClient from './FaqClient';
 export const metadata = {
   title: 'What We Haul — Junk Haul Calgary',
   description:
-    'Full list of items Junk Haul Calgary accepts and cannot accept, pricing add-ons, service hours (Sundays), and cancellation policy.',
+    'Full list of items Junk Haul Calgary accepts and cannot accept, pricing add-ons, 24-hour pickup guarantee, and cancellation policy.',
 };
 
 const faqJsonLd = {
@@ -16,7 +16,7 @@ const faqJsonLd = {
       name: 'What days do you operate?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'We run pickups on Sundays only. Available time slots are 7:30 AM, 9:00 AM, 11:00 AM, and 1:00 PM. Same-day pickup is available when slots are open.',
+        text: 'We operate 7 days a week. Every booking is guaranteed pickup within 24 hours, any day. No more waiting for a weekly slot — book today, gone today.',
       },
     },
     {

@@ -1,5 +1,6 @@
 import './globals.css';
 import PWARegister from '@/components/PWARegister';
+import GA4 from '@/components/GA4';
 
 export const metadata = {
   title: 'Junk Haul Calgary — Same Day Junk Removal',
@@ -66,7 +67,7 @@ const jsonLd = {
   openingHoursSpecification: [
     {
       '@type': 'OpeningHoursSpecification',
-      dayOfWeek: ['Sunday'],
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
       opens: '07:30',
       closes: '17:00',
     },
@@ -131,6 +132,7 @@ export default function RootLayout({ children }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <PWARegister />
+        <GA4 />
         {children}
       </body>
     </html>

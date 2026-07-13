@@ -85,6 +85,13 @@ export default function Home() {
         <p className="text-xs text-gray-400">
           <Link href="/faq" className="underline">What do we haul?</Link> · Same Day. Calgary.
         </p>
+        <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-gray-400 mt-2">
+          <Link href="/commercial-junk-removal" className="underline">Commercial</Link>
+          <Link href="/garage-cleanouts" className="underline">Garage Cleanouts</Link>
+          <Link href="/estate-cleanouts" className="underline">Estate Cleanouts</Link>
+          <Link href="/furniture-removal" className="underline">Furniture Removal</Link>
+          <Link href="/appliance-removal" className="underline">Appliance Removal</Link>
+        </div>
       </div>
     </main>
   );

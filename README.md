@@ -8,9 +8,10 @@ with route optimisation, and AI voice agents for phone bookings.
 Functions) · Stripe (CAD deposits) · Quo (SMS) · Groq Llama-4 Scout (photo/description
 AI) · OpenStreetMap (Nominatim geocoding + OSRM routing + Leaflet maps) · Vapi (voice).
 
-Business rules: operates **Thursdays & Sundays**, all times **America/Edmonton**,
-$50 deposit, prices $99 / $160 / $240 / $380, add-ons same-day +$50 / stairs +$25 per
-flight / freon +$40.
+Business rules: operates **7 days a week** with a **24-hour pickup guarantee** (any
+booking, any day, guaranteed pickup within 24 hours via dynamic dispatch), all times
+**America/Edmonton**, $50 deposit, prices $99 / $160 / $240 / $380, add-ons same-day
++$50 / stairs +$25 per flight / freon +$40.
 
 ---
 
