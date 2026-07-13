@@ -58,12 +58,24 @@
 ### Photo Analysis (analysePhotos)
 - Takes base64-encoded photos
 - Sends to Groq with vision capability
-- Returns JSON: load_size, estimated_weight_kg, has_freon, freon_count, freon_items, has_hazmat, hazmat_description, hazmat_items, stairs_visible, confidence, flag_for_review, flag_reason, items_detected (name, quantity, weight, is_freon, is_hazmat), notes
-- Rules: 15ft U-Haul dimensions, weight limits per load size, hazmat detection (paint, chemicals, propane, gas, asbestos, medical waste, car batteries, tires)
+- Returns JSON: load_size, estimated_weight_kg, has_freon, freon_count, freon_items, has_hazmat, hazmat_description, hazmat_items, stairs_visible, confidence, flag_for_review, flag_reason, photo_unusable, safety_alert, safety_alert_summary, items_detected (name, quantity, weight, is_freon, is_hazmat), notes
+- Rules: 15ft U-Haul dimensions, weight limits per load size, expanded rejection list (see below), privacy/silence rules, safety-alert rules
+
+### Items we CANNOT take (has_hazmat flow — flag, exclude from load/price, show customer a reason)
+- Hazardous/dangerous goods: asbestos-containing materials (old tiles, popcorn ceiling, vermiculite insulation), paint/solvents/chemicals (unless clearly empty/dried), gasoline/motor oil/fuels, propane tanks & pressurized cylinders, pesticides/herbicides/lawn chemicals, medical waste/sharps/needles, ammunition/firearms/explosives, radioactive materials, human/animal remains, wet paint cans, aerosol cans, large quantities of liquid waste, car batteries, tires
+- Food/perishables: spoiled/perishable food, open/partially used food containers, food waste (compostable or not), liquids in food containers
+- Food nuance: an EMPTY fridge/freezer/cooler/pantry/cabinet is fine (not flagged). A STOCKED one sets has_hazmat=true with a "please empty it first" hazmat_description, but the appliance/cabinet itself stays priced (is_hazmat=false on the item). Freon appliances are NOT excluded — $40 surcharge each, only flagged if still stocked with food.
+
+### Privacy / silence (built into the prompt — never describe, log, or reference)
+The AI must never output anything about (in any field): personal identifying documents in the background (mail, statements, IDs, account numbers), people's faces/identities (family photos, reflections), medications/medical equipment/mobility aids, commentary on living conditions or finances, religious/cultural/personal items, household weapons not part of the junk, or sexual/intimate content. If a photo is unusable due to intimate content, it returns photo_unusable=true with no descriptive text, and the customer is shown a generic "photo unusable, please retake" message.
+
+### Safety alert (narrow exception to silence — INTERNAL ONLY)
+If the photo clearly shows a serious safety hazard (person in immediate danger, active fire, major flood, gas leak signs, severe structural collapse risk, extensive mold/water damage, pest infestation, drug paraphernalia), the AI sets safety_alert=true + safety_alert_summary. handleSafetyAlert() in lib/ai.js sends an SMS to the operator (ADMIN_PHONE, default +15873250751) and logs a row in the safety_alerts table. stripInternalFields() removes safety_alert/safety_alert_summary from every customer-facing response (web, SMS, WhatsApp). The customer never sees it.
 
 ### Description Analysis (analyseDescription)
 - Same output but from text description instead of photos
 - Includes pricing reference in the prompt so AI can estimate load size accurately
+- Same rejection list, privacy, and safety-alert rules as photo analysis (photo_unusable is always false for text)
 
 ### JSON Parsing
 - Strips ```json fences if present
@@ -455,10 +467,13 @@ Detects stage from last outbound message:
 2. Strip data: prefix from photos
 3. Call analysePhotos() or analyseDescription()
 4. Upload photos to Supabase storage, get public URLs
-5. Validate load_size is in allowed set
-6. Check weight safety flag
-7. Calculate price range: low (base) to high (base + same-day)
-8. Return analysis + price range + photo URLs
+5. If photo_unusable=true: return early with a generic "photo unusable, please retake" message (no analysis/price)
+6. handleSafetyAlert(): if safety_alert=true, SMS the operator + log to safety_alerts table
+7. Validate load_size is in allowed set
+8. Check weight safety flag
+9. Calculate price range: low (base) to high (base + same-day)
+10. stripInternalFields() removes safety_alert* from the response
+11. Return analysis + price range + photo URLs (safety alert never included)
 
 ---
 

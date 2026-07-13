@@ -625,6 +625,15 @@ function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
+
+      // Photo unusable (e.g. intimate content accidentally in frame) — ask the
+      // customer to retake. Never describe why. No analysis is returned.
+      if (data.photo_unusable) {
+        setError('Photo unusable — please retake your photo and try again.');
+        setAnalyzing(false);
+        return;
+      }
+
       update({
         analysis: data.analysis,
         load_size: data.analysis.load_size,
@@ -838,15 +847,24 @@ function ItemsStep({ state, update, onNext }) {
         </p>
       </div>
 
-      {/* Hazmat warning */}
-      {items.some((i) => i.is_hazmat) && (
+      {/* Hazmat / cannot-take warning */}
+      {(items.some((i) => i.is_hazmat) || (state.analysis?.has_hazmat && state.analysis?.hazmat_description)) && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-          <p className="text-sm font-medium text-red-700">Items we cannot take:</p>
-          <ul className="text-sm text-red-600 mt-1">
-            {items.filter((i) => i.is_hazmat).map((i, idx) => (
-              <li key={idx}>• {i.name} — please remove before pickup</li>
-            ))}
-          </ul>
+          <p className="text-sm font-medium text-red-700">
+            {state.analysis?.has_hazmat && state.analysis?.hazmat_description && !items.some((i) => i.is_hazmat)
+              ? 'Action needed before pickup:'
+              : 'Items we cannot take:'}
+          </p>
+          {items.filter((i) => i.is_hazmat).length > 0 && (
+            <ul className="text-sm text-red-600 mt-1">
+              {items.filter((i) => i.is_hazmat).map((i, idx) => (
+                <li key={idx}>• {i.name} — please remove before pickup</li>
+              ))}
+            </ul>
+          )}
+          {state.analysis?.has_hazmat && state.analysis?.hazmat_description && !items.some((i) => i.is_hazmat) && (
+            <p className="text-sm text-red-600 mt-1">• {state.analysis.hazmat_description}</p>
+          )}
         </div>
       )}
 
@@ -1003,7 +1021,7 @@ function LoadStep({ state, update, price, onNext }) {
           )}
           {state.analysis.has_hazmat && (
             <p className="text-xs text-red-600 font-medium bg-red-50 rounded p-2">
-              ⚠️ We cannot take hazmat items (paint, chemicals, propane, tires). Please remove them before pickup.
+              ⚠️ {state.analysis.hazmat_description || 'We cannot take some items in your photo (e.g. paint, chemicals, propane, food, tires). Please remove them before pickup.'}
             </p>
           )}
           <p className="text-xs text-blue-500">Wrong? Adjust your load size and add-ons below.</p>

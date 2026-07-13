@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { sendWhatsApp, downloadWhatsAppMedia } from '@/lib/whatsapp';
 import { calculatePrice, getPricingConfig, LOAD_LABELS, PRICING } from '@/lib/pricing';
-import { analysePhotos } from '@/lib/ai';
+import { analysePhotos, handleSafetyAlert, stripInternalFields } from '@/lib/ai';
 import { edmontonNowParts, formatDateLong, formatTime, jobDateTimeUTC } from '@/lib/dates';
 import { geocodeAddress } from '@/lib/geocode';
 import { sendDepositLink } from '@/lib/messages';
@@ -381,35 +381,49 @@ export async function POST(req) {
 
       try {
         const analysis = await analysePhotos(photoBase64s);
-        const load_size = analysis.load_size || 'quarter';
-        const freon_count = analysis.freon_count || (analysis.has_freon ? 1 : 0);
+
+        // Photo unusable (e.g. intimate content in frame) — ask for a retake,
+        // never describe why. No quote, no stored analysis.
+        if (analysis.photo_unusable) {
+          await sendWhatsApp(from, 'Sorry, that photo didnt come through usable. Could you retake it and send it again?', recentBooking?.id, 'photo_unusable');
+          return NextResponse.json({ ok: true });
+        }
+
+        // Safety alert: route privately to operator, then strip from anything
+        // customer-facing (including the stored analysis below).
+        await handleSafetyAlert(analysis, { source: 'whatsapp', booking_id: recentBooking?.id || null, lead_phone: from });
+        const safeAnalysis = stripInternalFields(analysis);
+
+        const load_size = safeAnalysis.load_size || 'quarter';
+        const freon_count = safeAnalysis.freon_count || (safeAnalysis.has_freon ? 1 : 0);
         const pricingConfig = await getPricingConfig();
-        const priced = calculatePrice({ load_size, has_freon: analysis.has_freon, freon_count, pricingConfig });
+        const priced = calculatePrice({ load_size, has_freon: safeAnalysis.has_freon, freon_count, pricingConfig });
 
         let msg = `Based on your photos youre looking at a ${LOAD_LABELS[load_size]}, $${priced.total} total.`;
         msg += ` Thats $50 to lock it in and $${priced.balance_due} when we pick up.`;
-        if (analysis.has_freon && freon_count > 0) {
+        if (safeAnalysis.has_freon && freon_count > 0) {
           msg += ` Includes $${priced.freon_fee} for the ${freon_count} freon appliance${freon_count > 1 ? 's' : ''}.`;
         }
-        if (analysis.items_detected && analysis.items_detected.length > 0) {
-          const items = analysis.items_detected.slice(0, 5).map(i => `${i.quantity}x ${i.name}`).join(', ');
+        if (safeAnalysis.items_detected && safeAnalysis.items_detected.length > 0) {
+          const items = safeAnalysis.items_detected.slice(0, 5).map(i => `${i.quantity}x ${i.name}`).join(', ');
           msg += ` I can see: ${items}.`;
         }
-        if (analysis.has_hazmat) {
-          msg += ` Heads up, I see some stuff we cant take (${analysis.hazmat_items?.join(', ') || 'hazardous materials'}). Well have to leave those.`;
+        if (safeAnalysis.has_hazmat) {
+          const reason = safeAnalysis.hazmat_description || (safeAnalysis.hazmat_items?.join(', ') || 'some items we cant take');
+          msg += ` Heads up: ${reason}. Well have to leave those.`;
         }
         msg += ` Want to book a pickup?`;
 
         await sendWhatsApp(from, msg, recentBooking?.id, 'photo_quote');
 
-        // Store analysis
+        // Store analysis (internal fields already stripped)
         await supabaseAdmin.from('messages').insert({
           booking_id: recentBooking?.id || null,
           direction: 'outbound',
           to_number: from,
           from_number: 'whatsapp',
           message_type: 'photo_analysis',
-          body: JSON.stringify({ analysis, price: priced.total, load_size, has_freon: analysis.has_freon, freon_count }),
+          body: JSON.stringify({ analysis: safeAnalysis, price: priced.total, load_size, has_freon: safeAnalysis.has_freon, freon_count }),
         });
 
         return NextResponse.json({ ok: true });

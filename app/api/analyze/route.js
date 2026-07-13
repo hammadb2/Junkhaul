@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { analysePhotos, analyseDescription } from '@/lib/ai';
+import { analysePhotos, analyseDescription, handleSafetyAlert, stripInternalFields } from '@/lib/ai';
 import { calculatePrice, getPricingConfig, checkWeightFlag } from '@/lib/pricing';
 import { buildItemizedQuote } from '@/lib/itemPricing';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
@@ -53,6 +53,19 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Provide photos or a description.' }, { status: 400 });
     }
 
+    // Photo unusable (e.g. intimate content accidentally in frame) — tell the
+    // customer to retake without ever describing why. No analysis, no price.
+    if (analysis.photo_unusable) {
+      return NextResponse.json({
+        photo_unusable: true,
+        error: 'Photo unusable — please retake your photo and try again.',
+      });
+    }
+
+    // Safety alert: route privately to the operator (SMS + internal DB log),
+    // then strip it from the response so it never reaches the customer.
+    await handleSafetyAlert(analysis, { source: 'web', photo_urls: photoUrls });
+
     const load_size = ['single_item', 'quarter', 'half', 'full'].includes(analysis.load_size)
       ? analysis.load_size
       : 'quarter';
@@ -71,13 +84,13 @@ export async function POST(req) {
     const itemized = buildItemizedQuote(analysis.items_detected, { stairs: 0, same_day: false });
 
     return NextResponse.json({
-      analysis: {
+      analysis: stripInternalFields({
         ...analysis,
         load_size,
         freon_count,
         flag_for_review,
         flag_reason: analysis.flag_reason || (weight.flag ? weight.reason : null),
-      },
+      }),
       price: { low, high, base: priced.base_price, freon_fee: priced.freon_fee },
       itemized,
       photoUrls,
