@@ -23,13 +23,21 @@ export default function AddressAutocomplete({
   const [loading, setLoading] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const debounceRef = useRef(null);
 
   const fetchSuggestions = async (query) => {
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (query.length < 2 || !token) {
+    if (query.length < 2) {
       setSuggestions([]);
       setHasSearched(false);
+      setSearchError(false);
+      return;
+    }
+    if (!token) {
+      setSuggestions([]);
+      setHasSearched(true);
+      setSearchError(true);
       return;
     }
     setLoading(true);
@@ -43,10 +51,12 @@ export default function AddressAutocomplete({
       const data = await res.json();
       setSuggestions(data.features || []);
       setHasSearched(true);
+      setSearchError(false);
     } catch (err) {
       console.error('[AddressAutocomplete] Mapbox fetch error:', err);
       setSuggestions([]);
       setHasSearched(true);
+      setSearchError(true);
     } finally {
       setLoading(false);
     }
@@ -94,6 +104,9 @@ export default function AddressAutocomplete({
   const noResultColor = dark ? 'rgba(255,255,255,0.3)' : '#9ca3af';
 
   const showResults = showDropdown && (loading || suggestions.length > 0 || (hasSearched && suggestions.length === 0));
+
+  const errorColor = dark ? 'rgba(255,200,100,0.7)' : '#b45309';
+  const errorBg = dark ? 'rgba(255,200,100,0.08)' : '#fffbeb';
 
   return (
     <div style={{ position: 'relative', zIndex: 9999 }}>
@@ -145,9 +158,11 @@ export default function AddressAutocomplete({
             </div>
           )}
           {!loading && suggestions.length === 0 && hasSearched && (
-            <div style={{ padding: '14px 16px', fontSize: 14, color: noResultColor, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ padding: '14px 16px', fontSize: 14, color: searchError ? errorColor : noResultColor, background: searchError ? errorBg : 'transparent', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Search size={14} />
-              No addresses found. Try a different search.
+              {searchError
+                ? 'Address search unavailable — you can still type your full address manually.'
+                : 'No addresses found. Try a different search.'}
             </div>
           )}
           {suggestions.map((s, i) => {
