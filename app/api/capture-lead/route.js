@@ -52,16 +52,52 @@ export async function POST(req) {
   }
 
   if (action === 'price_reveal') {
-    const { ai_price_estimate, load_size } = rest;
-    await supabaseAdmin.from('leads').update({
+    const { ai_price_estimate, load_size, photos, itemized } = rest;
+    // Update the lead row with the latest quote info + photos + itemized.
+    const leadUpdate = {
       ai_price_estimate,
       load_size,
       quote_revealed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    }).eq('session_id', session_id);
+    };
+    if (photos) leadUpdate.photos = photos;
+    if (itemized) leadUpdate.description_text = JSON.stringify(itemized);
+
+    // Fetch lead_id for the quote history insert.
+    const { data: leadRow } = await supabaseAdmin
+      .from('leads')
+      .select('id')
+      .eq('session_id', session_id)
+      .single();
+
+    await supabaseAdmin.from('leads').update(leadUpdate).eq('session_id', session_id);
+
+    // Insert a row into lead_quotes so we keep the full history.
+    if (leadRow && ai_price_estimate) {
+      await supabaseAdmin.from('lead_quotes').insert({
+        lead_id: leadRow.id,
+        price: ai_price_estimate,
+        load_size,
+        photos: photos || null,
+        itemized: itemized || null,
+      }).catch(() => {}); // best-effort — don't fail the quote over history
+    }
+
     if (ai_price_estimate) {
       await sendSMS(phone, `Your Junk Haul Calgary quote: $${ai_price_estimate}. $50 deposit locks in your slot. Book here: https://junkhaul.ca/book — quote valid 48 hrs.`, null, 'lead_price_reveal');
     }
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'step') {
+    // Funnel tracking — fire on every step change.
+    const { step_name } = rest;
+    if (!step_name) return NextResponse.json({ ok: true });
+    await supabaseAdmin.from('leads').update({
+      last_step_reached: step_name,
+      last_step_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('session_id', session_id).catch(() => {});
     return NextResponse.json({ ok: true });
   }
 

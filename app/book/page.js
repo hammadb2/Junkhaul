@@ -114,6 +114,24 @@ export default function BookPage() {
   const update = (patch) => setState((s) => ({ ...s, ...patch }));
   const stepIndex = STEPS.indexOf(step);
 
+  // Funnel tracking — fire a lightweight capture-lead update on every
+  // step change so we know where each lead dropped off.
+  const goToStep = (nextStep) => {
+    setStep(nextStep);
+    if (capturedPhone && sessionId) {
+      fetch('/api/capture-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: capturedPhone,
+          session_id: sessionId,
+          action: 'step',
+          step_name: nextStep,
+        }),
+      }).catch(() => {});
+    }
+  };
+
   const price = calculatePrice({
     load_size: state.load_size,
     same_day: state.same_day,
@@ -162,7 +180,7 @@ export default function BookPage() {
               update={update}
               onNext={(phone) => {
                 setCapturedPhone(phone);
-                setStep('address');
+                goToStep('address');
               }}
             />
           )}
@@ -171,7 +189,7 @@ export default function BookPage() {
               state={state}
               update={update}
               sessionId={sessionId}
-              onNext={() => setStep('photos')}
+              onNext={() => goToStep('photos')}
             />
           )}
           {step === 'photos' && (
@@ -180,14 +198,14 @@ export default function BookPage() {
               update={update}
               capturedPhone={capturedPhone}
               sessionId={sessionId}
-              onNext={() => setStep(state.itemized ? 'items' : 'load')}
+              onNext={() => goToStep(state.itemized ? 'items' : 'load')}
             />
           )}
           {step === 'items' && (
             <ItemsStep
               state={state}
               update={update}
-              onNext={() => setStep('load')}
+              onNext={() => goToStep('load')}
             />
           )}
           {step === 'load' && (
@@ -195,14 +213,14 @@ export default function BookPage() {
               state={state}
               update={update}
               price={price}
-              onNext={() => setStep('schedule')}
+              onNext={() => goToStep('schedule')}
             />
           )}
           {step === 'schedule' && (
             <ScheduleStep
               state={state}
               update={update}
-              onNext={() => setStep('details')}
+              onNext={() => goToStep('details')}
             />
           )}
           {step === 'details' && (
@@ -212,7 +230,7 @@ export default function BookPage() {
               price={price}
               onCreated={(b) => {
                 setBooking(b);
-                setStep('payment');
+                goToStep('payment');
                 if (capturedPhone) {
                   fetch('/api/capture-lead', {
                     method: 'POST',
@@ -243,7 +261,7 @@ export default function BookPage() {
                     address: state.unit ? `${state.unit}-${state.address}` : state.address,
                     phone: state.phone,
                   }));
-                  setStep('done');
+                  goToStep('done');
                 }}
               />
             </div>
@@ -363,6 +381,21 @@ function AddressStep({ state, update, sessionId, onNext }) {
         }).catch(() => {});
         setSubmitting(false);
         return;
+      }
+      // Save the address on the lead for in-area customers too,
+      // so we have it even if they don't finish the booking.
+      if (state.phone) {
+        fetch('/api/capture-lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: state.phone,
+            session_id: sessionId,
+            action: 'update',
+            address: state.address,
+            address_data: state.address_data,
+          }),
+        }).catch(() => {});
       }
       onNext();
     } catch {
@@ -662,6 +695,8 @@ function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
             action: 'price_reveal',
             ai_price_estimate: priceEstimate.total,
             load_size: data.analysis.load_size,
+            photos: data.photoUrls || [],
+            itemized: data.itemized || null,
           }),
         }).catch(() => {});
       }

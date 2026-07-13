@@ -1507,11 +1507,12 @@ function ScheduleView() {
 }
 
 // ============================================================
-// LEADS VIEW — unconverted leads who got a price but didn't book
+// LEADS VIEW — unconverted leads with full detail panel
 // ============================================================
 function LeadsView() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null);
 
   const load = () => {
     fetch('/api/admin/leads')
@@ -1523,67 +1524,183 @@ function LeadsView() {
 
   if (loading) return <p className="text-center text-black/40 py-10">Loading leads…</p>;
 
-  const withPrice = leads.filter((l) => l.ai_price_estimate);
-  const withoutPrice = leads.filter((l) => !l.ai_price_estimate);
+  // Group leads by phone so we show one card per person with all their quotes.
+  const byPhone = {};
+  leads.forEach((l) => {
+    if (!byPhone[l.phone]) byPhone[l.phone] = [];
+    byPhone[l.phone].push(l);
+  });
+  const phoneGroups = Object.entries(byPhone).sort((a, b) => {
+    const aLatest = Math.max(...a[1].map((l) => new Date(l.created_at).getTime()));
+    const bLatest = Math.max(...b[1].map((l) => new Date(l.created_at).getTime()));
+    return bLatest - aLatest;
+  });
+
+  const fmtDate = (d) => d
+    ? new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '';
+
+  // Collect all quotes across sessions for this phone.
+  const allQuotes = (sessions) => sessions.flatMap((l) => l.quotes || []);
+
+  // Use the most recent lead session for display fields.
+  const latest = (sessions) => sessions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+  // Funnel step labels for display.
+  const STEP_LABELS = {
+    phone: 'Phone entered',
+    address: 'Address entered',
+    photos: 'Photos uploaded',
+    items: 'Items reviewed',
+    load: 'Load size picked',
+    schedule: 'Time picked',
+    details: 'Details entered',
+    payment: 'Payment page',
+    done: 'Booking complete',
+  };
+
+  const dropoffLabel = (step) => STEP_LABELS[step] || step || 'Unknown';
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-black/50">{leads.length} unconverted lead{leads.length !== 1 ? 's' : ''}</p>
-      {leads.length === 0 && <p className="text-center text-black/40 py-10">No unconverted leads right now.</p>}
+      <p className="text-sm text-black/50">{phoneGroups.length} unconverted lead{phoneGroups.length !== 1 ? 's' : ''}</p>
+      {phoneGroups.length === 0 && <p className="text-center text-black/40 py-10">No unconverted leads right now.</p>}
 
-      {withPrice.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-xs font-semibold text-black/50 uppercase tracking-wide">Got a price — didn&apos;t book</p>
-          {withPrice.map((lead) => (
-            <div key={lead.id} className="bg-white rounded-2xl border border-black/[0.06] p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <a href={`tel:${lead.phone}`} className="text-[#f97316] font-semibold text-sm">{lead.phone}</a>
-                  {lead.address && (
-                    <p className="text-xs text-black/50 mt-0.5">{lead.address}</p>
-                  )}
-                  <div className="flex gap-2 mt-1 flex-wrap">
-                    <span className="text-xs bg-[#22C55E]/10 text-green-700 rounded px-1.5 py-0.5 font-medium">${lead.ai_price_estimate} quote</span>
-                    {lead.load_size && (
-                      <span className="text-xs bg-[#F5F5F7] text-black/60 rounded px-1.5 py-0.5 capitalize">{lead.load_size.replace('_', ' ')}</span>
-                    )}
-                    <span className="text-xs text-black/40">
-                      {new Date(lead.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      {phoneGroups.map(([phone, sessions]) => {
+        const rep = latest(sessions);
+        const quotes = allQuotes(sessions);
+        const hasPrice = quotes.length > 0 || rep.ai_price_estimate;
+        const isExpanded = expanded === phone;
+
+        return (
+          <div key={phone} className="bg-white rounded-2xl border border-black/[0.06] p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <a href={`tel:${phone}`} className="text-[#f97316] font-semibold text-sm">{phone}</a>
+                {rep.address && (
+                  <p className="text-xs text-black/50 mt-0.5">{rep.address}</p>
+                )}
+                <div className="flex gap-2 mt-1 flex-wrap">
+                  {hasPrice ? (
+                    <span className="text-xs bg-[#22C55E]/10 text-green-700 rounded px-1.5 py-0.5 font-medium">
+                      {quotes.length > 0
+                        ? `${quotes.length} quote${quotes.length > 1 ? 's' : ''} — latest $${quotes[0].price}`
+                        : `$${rep.ai_price_estimate} quote`}
                     </span>
-                    {lead.follow_up_sent && <span className="text-xs bg-[#3B82F6]/10 text-[#3B82F6] rounded px-1.5 py-0.5">Followed up</span>}
-                  </div>
-                </div>
-                <a href={`tel:${lead.phone}`} className="bg-[#f97316] text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {withoutPrice.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-xs font-semibold text-black/50 uppercase tracking-wide">Entered phone — no price yet</p>
-          {withoutPrice.map((lead) => (
-            <div key={lead.id} className="bg-white rounded-2xl border border-black/[0.06] p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <a href={`tel:${lead.phone}`} className="text-[#f97316] font-semibold text-sm">{lead.phone}</a>
-                  {lead.address && (
-                    <p className="text-xs text-black/50 mt-0.5">{lead.address}</p>
-                  )}
-                  <div className="flex gap-2 mt-1 flex-wrap">
+                  ) : (
                     <span className="text-xs bg-[#F59E0B]/10 text-yellow-700 rounded px-1.5 py-0.5">No photos uploaded</span>
-                    <span className="text-xs text-black/40">
-                      {new Date(lead.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  )}
+                  {rep.load_size && (
+                    <span className="text-xs bg-[#F5F5F7] text-black/60 rounded px-1.5 py-0.5 capitalize">{rep.load_size.replace('_', ' ')}</span>
+                  )}
+                  {rep.last_step_reached && rep.last_step_reached !== 'done' && (
+                    <span className="text-xs bg-[#EF4444]/10 text-red-600 rounded px-1.5 py-0.5">
+                      Dropped at: {dropoffLabel(rep.last_step_reached)}
                     </span>
-                  </div>
+                  )}
+                  <span className="text-xs text-black/40">{fmtDate(rep.created_at)}</span>
+                  {rep.follow_up_sent && <span className="text-xs bg-[#3B82F6]/10 text-[#3B82F6] rounded px-1.5 py-0.5">Followed up</span>}
                 </div>
-                <a href={`tel:${lead.phone}`} className="bg-[#f97316] text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0">Call</a>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setExpanded(isExpanded ? null : phone)}
+                  className="text-xs text-black/50 hover:text-black/80 font-medium"
+                >
+                  {isExpanded ? 'Hide' : 'Details'}
+                </button>
+                <a href={`tel:${phone}`} className="bg-[#f97316] text-white text-xs font-semibold px-3 py-2 rounded-lg">Call</a>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            {isExpanded && (
+              <div className="mt-3 pt-3 border-t border-black/[0.06] space-y-3 text-xs">
+                {/* Quote history */}
+                {quotes.length > 0 && (
+                  <div>
+                    <div className="font-semibold text-black/60 mb-1">Quote history</div>
+                    {quotes.map((q, i) => (
+                      <div key={i} className="flex justify-between text-black/50 py-0.5">
+                        <span>${q.price} — {q.load_size?.replace('_', ' ') || 'unknown'}</span>
+                        <span>{fmtDate(q.created_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Funnel drop-off */}
+                {rep.last_step_reached && (
+                  <div>
+                    <div className="font-semibold text-black/60 mb-1">Funnel</div>
+                    <div className="text-black/50">
+                      Last step: <span className="font-medium text-black/70">{dropoffLabel(rep.last_step_reached)}</span>
+                      {rep.last_step_at && <span className="ml-2">{fmtDate(rep.last_step_at)}</span>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Photos */}
+                {rep.photos && rep.photos.length > 0 && (
+                  <div>
+                    <div className="font-semibold text-black/60 mb-1">Photos ({rep.photos.length})</div>
+                    <div className="flex gap-2 flex-wrap">
+                      {rep.photos.slice(0, 6).map((url, i) => (
+                        <img key={i} src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-black/10" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Itemized breakdown */}
+                {rep.description_text && (
+                  <div>
+                    <div className="font-semibold text-black/60 mb-1">AI item breakdown</div>
+                    <div className="text-black/50 whitespace-pre-wrap">
+                      {(() => {
+                        try {
+                          const parsed = JSON.parse(rep.description_text);
+                          if (parsed?.items) {
+                            return parsed.items.map((it) => `• ${it.quantity > 1 ? `${it.quantity}x ` : ''}${it.name}`).join('\n');
+                          }
+                          return JSON.stringify(parsed, null, 2).slice(0, 500);
+                        } catch {
+                          return rep.description_text.slice(0, 500);
+                        }
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Attribution */}
+                <div>
+                  <div className="font-semibold text-black/60 mb-1">Attribution</div>
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="bg-[#F5F5F7] rounded px-1.5 py-0.5">Source: {rep.source || 'web'}</span>
+                    {rep.utm_source && <span className="bg-[#F5F5F7] rounded px-1.5 py-0.5">utm_source: {rep.utm_source}</span>}
+                    {rep.utm_medium && <span className="bg-[#F5F5F7] rounded px-1.5 py-0.5">utm_medium: {rep.utm_medium}</span>}
+                    {rep.utm_campaign && <span className="bg-[#F5F5F7] rounded px-1.5 py-0.5">utm_campaign: {rep.utm_campaign}</span>}
+                    {rep.gclid && <span className="bg-[#F5F5F7] rounded px-1.5 py-0.5">gclid: {rep.gclid.slice(0, 12)}…</span>}
+                    {rep.fbclid && <span className="bg-[#F5F5F7] rounded px-1.5 py-0.5">fbclid: {rep.fbclid.slice(0, 12)}…</span>}
+                    {rep.quadrant && <span className="bg-[#F5F5F7] rounded px-1.5 py-0.5">Quadrant: {rep.quadrant}</span>}
+                  </div>
+                </div>
+
+                {/* Sessions */}
+                {sessions.length > 1 && (
+                  <div>
+                    <div className="font-semibold text-black/60 mb-1">Sessions ({sessions.length})</div>
+                    {sessions.map((s, i) => (
+                      <div key={i} className="text-black/40 py-0.5">
+                        {fmtDate(s.created_at)} — {s.ai_price_estimate ? `$${s.ai_price_estimate}` : 'no quote'}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

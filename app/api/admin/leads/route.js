@@ -24,5 +24,25 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ leads: leads || [] });
+  // Fetch quote history for all these leads in one query.
+  const leadIds = (leads || []).map((l) => l.id);
+  let quotesByLead = {};
+  if (leadIds.length > 0) {
+    const { data: quotes } = await supabaseAdmin
+      .from('lead_quotes')
+      .select('lead_id, price, load_size, photos, itemized, created_at')
+      .in('lead_id', leadIds)
+      .order('created_at', { ascending: false });
+    (quotes || []).forEach((q) => {
+      if (!quotesByLead[q.lead_id]) quotesByLead[q.lead_id] = [];
+      quotesByLead[q.lead_id].push(q);
+    });
+  }
+
+  const enriched = (leads || []).map((l) => ({
+    ...l,
+    quotes: quotesByLead[l.id] || [],
+  }));
+
+  return NextResponse.json({ leads: enriched });
 }
