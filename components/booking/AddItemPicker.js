@@ -157,7 +157,7 @@ export default function AddItemPicker({ onAdd, compact = false }) {
                 <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">No donate</span>
               )}
             </div>
-            <span className="text-gray-500 text-xs">${item.price}</span>
+            {!compact && <span className="text-gray-500 text-xs">${item.price}</span>}
           </button>
         ))}
       </div>
@@ -167,7 +167,7 @@ export default function AddItemPicker({ onAdd, compact = false }) {
         <div className="border-t border-gray-200 pt-3 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-900">{selectedItem.name}</span>
-            <span className="text-sm text-gray-500">${selectedItem.price} each</span>
+            {!compact && <span className="text-sm text-gray-500">${selectedItem.price} each</span>}
           </div>
 
           {/* Quantity */}
@@ -210,7 +210,7 @@ export default function AddItemPicker({ onAdd, compact = false }) {
             onClick={handleAdd}
             className="w-full bg-[#f97316] text-white text-sm font-medium py-2 rounded-lg"
           >
-            Add {qty > 1 ? `${qty}x ` : ''}{selectedItem.name} — ${selectedItem.price * qty}
+            Add {qty > 1 ? `${qty}x ` : ''}{selectedItem.name} — {compact ? 'Free' : `$${selectedItem.price * qty}`}
           </button>
         </div>
       )}

@@ -1539,6 +1539,9 @@ function LeadsView() {
               <div className="flex items-start justify-between">
                 <div>
                   <a href={`tel:${lead.phone}`} className="text-[#f97316] font-semibold text-sm">{lead.phone}</a>
+                  {lead.address && (
+                    <p className="text-xs text-black/50 mt-0.5">{lead.address}</p>
+                  )}
                   <div className="flex gap-2 mt-1 flex-wrap">
                     <span className="text-xs bg-[#22C55E]/10 text-green-700 rounded px-1.5 py-0.5 font-medium">${lead.ai_price_estimate} quote</span>
                     {lead.load_size && (
@@ -1565,6 +1568,9 @@ function LeadsView() {
               <div className="flex items-start justify-between">
                 <div>
                   <a href={`tel:${lead.phone}`} className="text-[#f97316] font-semibold text-sm">{lead.phone}</a>
+                  {lead.address && (
+                    <p className="text-xs text-black/50 mt-0.5">{lead.address}</p>
+                  )}
                   <div className="flex gap-2 mt-1 flex-wrap">
                     <span className="text-xs bg-[#F59E0B]/10 text-yellow-700 rounded px-1.5 py-0.5">No photos uploaded</span>
                     <span className="text-xs text-black/40">
