@@ -192,6 +192,14 @@ function JobSummary({ booking }) {
             ))}
           </div>
         )}
+        {Number(booking.travel_fee || 0) > 0 && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+              <span style={{ color: TXT2 }}>Travel Charge</span>
+              <span className="tabular" style={{ color: TXT, fontWeight: 600 }}>${Number(booking.travel_fee).toFixed(0)}</span>
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
           <div>
             <div style={{ fontSize: 12, color: TXT3 }}>Deposit</div>

@@ -15,7 +15,7 @@ import {
 import PaymentStep from '@/components/booking/PaymentStep';
 import Confirmation from '@/components/booking/Confirmation';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
-import { calculatePrice, PRICING, LOAD_LABELS } from '@/lib/pricingConstants';
+import { calculatePrice, PRICING, LOAD_LABELS, TRUCK_SIZES, TRUCK_SIZE_WEIGHT_THRESHOLDS } from '@/lib/pricingConstants';
 import { buildItemizedQuote, recalcWithDisposal } from '@/lib/itemPricing';
 import AddItemPicker from '@/components/booking/AddItemPicker';
 
@@ -93,6 +93,7 @@ export default function BookPage() {
     stairs_confirmed: false,
     has_freon: false,
     freon_count: 0,
+    truck_size: 15,
     job_date: null,
     job_time: null,
     name: '',
@@ -119,6 +120,7 @@ export default function BookPage() {
     stairs: state.stairs,
     has_freon: state.has_freon,
     freon_count: state.freon_count,
+    truck_size: state.truck_size || 15,
     job_date: state.job_date,
     job_time: state.job_time,
   });
@@ -986,6 +988,23 @@ function ItemsStep({ state, update, onNext }) {
 // STEP 2 — LOAD SIZE + ADD-ONS
 // ============================================================
 function LoadStep({ state, update, price, onNext }) {
+  // Truck size upsell trigger: show when full load is selected OR
+  // AI weight estimate approaches/exceeds the 15ft capacity.
+  // AI weight is in kg; convert to lbs for threshold comparison.
+  const aiWeightLbs = state.analysis?.estimated_weight_kg
+    ? Math.round(state.analysis.estimated_weight_kg * 2.20462)
+    : 0;
+  const showTruckUpsell =
+    state.load_size === 'full' ||
+    aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_20ft_lbs;
+
+  // Auto-suggest a truck size based on AI weight (customer can override).
+  const suggestedTruckSize = aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_26ft_lbs
+    ? 26
+    : aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_20ft_lbs
+    ? 20
+    : 15;
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -1042,6 +1061,44 @@ function LoadStep({ state, update, price, onNext }) {
         ))}
       </div>
 
+      {/* Truck size upsell — shown for full loads or heavy AI estimates */}
+      {showTruckUpsell && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
+          <div>
+            <span className="text-sm font-medium text-gray-900">Truck size</span>
+            {suggestedTruckSize > 15 && (
+              <span className="text-xs text-orange-600 ml-2">
+                We recommend {TRUCK_SIZES[suggestedTruckSize].label} based on your load
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[15, 20, 26].map((size) => (
+              <button
+                key={size}
+                onClick={() => update({ truck_size: size })}
+                className={`rounded-lg p-2 text-center border-2 transition-colors ${
+                  (state.truck_size || 15) === size
+                    ? 'border-orange-500 bg-white'
+                    : 'border-gray-200 bg-white hover:border-orange-300'
+                }`}
+              >
+                <div className="text-sm font-bold text-gray-900">{TRUCK_SIZES[size].label}</div>
+                <div className="text-[10px] text-gray-500">{TRUCK_SIZES[size].volume_cuft} cu ft</div>
+                <div className="text-xs font-medium text-orange-600 mt-0.5">
+                  {TRUCK_SIZES[size].fee === 0 ? 'Included' : `+$${TRUCK_SIZES[size].fee}`}
+                </div>
+              </button>
+            ))}
+          </div>
+          {suggestedTruckSize === 26 && aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_26ft_lbs && (
+            <p className="text-xs text-gray-500">
+              Your load is heavy enough that the 20ft won&apos;t help (it carries less weight than the 15ft). The 26ft is the right choice.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Add items to donate (works even without photo analysis) */}
       <div className="bg-green-50 border border-green-200 rounded-xl p-3">
         <div className="flex items-center justify-between mb-1">
@@ -1057,14 +1114,16 @@ function LoadStep({ state, update, price, onNext }) {
         </p>
         {state.itemized && state.itemized.items && state.itemized.items.filter((i) => i.disposal === 'donate').length > 0 && (
           <div className="space-y-1 mb-2">
-            {state.itemized.items.filter((i) => i.disposal === 'donate').map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-2 py-1.5">
+            {state.itemized.items.filter((i) => i.disposal === 'donate').map((item) => {
+              const realIdx = state.itemized.items.indexOf(item);
+              return (
+              <div key={realIdx} className="flex items-center justify-between bg-white rounded-lg px-2 py-1.5">
                 <span className="text-sm text-gray-700">
                   {item.quantity > 1 ? `${item.quantity}x ` : ''}{item.name}
                 </span>
                 <button
                   onClick={() => {
-                    const newItems = state.itemized.items.filter((_, i) => i !== idx);
+                    const newItems = state.itemized.items.filter((_, i) => i !== realIdx);
                     if (newItems.length === 0) {
                       update({ itemized: null });
                     } else {
@@ -1075,7 +1134,8 @@ function LoadStep({ state, update, price, onNext }) {
                   className="text-gray-300 hover:text-red-500 text-sm"
                 >✕</button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <AddItemPicker
@@ -1174,6 +1234,7 @@ function LoadStep({ state, update, price, onNext }) {
         {price.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span><span>${price.freon_fee}</span></div>}
         {price.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span><span>${price.stairs_fee}</span></div>}
         {price.same_day_fee > 0 && <div className="flex justify-between"><span>Same-day</span><span>${price.same_day_fee}</span></div>}
+        {price.truck_fee > 0 && <div className="flex justify-between"><span>Larger truck ({TRUCK_SIZES[state.truck_size || 15]?.label})</span><span>+${price.truck_fee}</span></div>}
         <div className="flex justify-between font-medium text-gray-600 pt-1 border-t"><span>Deposit today</span><span>$50</span></div>
         <div className="flex justify-between font-medium text-gray-600"><span>Balance on pickup</span><span>${price.balance_due}</span></div>
       </div>
@@ -1378,6 +1439,7 @@ function DetailsStep({ state, update, price, onCreated }) {
           stairs: state.stairs,
           has_freon: state.has_freon,
           freon_count: state.freon_count,
+          truck_size: state.truck_size || 15,
           job_date: state.job_date,
           job_time: state.job_time,
           photos: state.photoUrls,

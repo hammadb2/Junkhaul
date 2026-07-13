@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { calculatePrice, getPricingConfig, PRICING, checkWeightFlag, LOAD_LABELS } from '@/lib/pricing';
 import { computeSurgeMultiplier } from '@/lib/surge';
 import { geocodeAddress } from '@/lib/geocode';
+import { calculateTravelFee } from '@/lib/route';
 import { createDepositPayment } from '@/lib/stripe';
 import { jobDateTimeUTC, dayType, formatDateLong, formatTime } from '@/lib/dates';
 import { sendSMS } from '@/lib/sms';
@@ -30,6 +31,7 @@ export async function POST(req) {
       stairs = 0,
       has_freon = false,
       freon_count = 0,
+      truck_size = 15,
       job_date,
       job_time,
       photos = [],
@@ -123,17 +125,9 @@ export async function POST(req) {
     });
 
     // Price is ALWAYS computed server-side.
-    const priced = calculatePrice({
-      load_size,
-      same_day,
-      stairs,
-      has_freon,
-      freon_count,
-      job_date,
-      job_time,
-      surge_multiplier: surge.multiplier,
-      pricingConfig,
-    });
+    // Travel fee is calculated after geocoding (needs customer coords).
+    // We'll compute the priced object below, after geo is available.
+    let priced;
 
     // Geocode for dispatch/quadrant — use Mapbox data from frontend if available, else geocode
     let geo;
@@ -149,6 +143,32 @@ export async function POST(req) {
     } else {
       geo = await geocodeAddress(unit ? `${unit} ${address}` : address);
     }
+
+    // Calculate travel fee: home → U-Haul pickup (Balzac) → customer.
+    // Best-effort — defaults to 0 if geocoding failed.
+    let travelFee = 0;
+    let travelKm = 0;
+    try {
+      const travel = await calculateTravelFee({ lat: geo.lat, lng: geo.lng });
+      travelFee = travel.fee;
+      travelKm = travel.km;
+    } catch (err) {
+      console.error('Travel fee calculation failed:', err.message);
+    }
+
+    priced = calculatePrice({
+      load_size,
+      same_day,
+      stairs,
+      has_freon,
+      freon_count,
+      job_date,
+      job_time,
+      surge_multiplier: surge.multiplier,
+      travel_fee: travelFee,
+      truck_size: [15, 20, 26].includes(Number(truck_size)) ? Number(truck_size) : 15,
+      pricingConfig,
+    });
 
     // Weight safety flag.
     const weight = checkWeightFlag(load_size, ai_weight_estimate_kg, pricingConfig);
@@ -169,6 +189,8 @@ export async function POST(req) {
         job_date,
         job_time,
         surge_multiplier: surge.multiplier,
+        travel_fee: travelFee,
+        truck_size: [15, 20, 26].includes(Number(truck_size)) ? Number(truck_size) : 15,
         pricingConfig,
       }).total;
     }
@@ -193,6 +215,10 @@ export async function POST(req) {
       stairs_fee: priced.stairs_fee,
       has_freon,
       freon_fee: priced.freon_fee,
+      travel_fee: priced.travel_fee,
+      travel_km: travelKm,
+      truck_size: [15, 20, 26].includes(Number(truck_size)) ? Number(truck_size) : 15,
+      truck_fee: priced.truck_fee,
       total_price: priced.total,
       dynamic_multiplier: priced.dynamic_multiplier,
       surge_multiplier: priced.surge_multiplier,
