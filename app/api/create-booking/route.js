@@ -8,6 +8,7 @@ import { createDepositPayment } from '@/lib/stripe';
 import { jobDateTimeUTC, dayType, formatDateLong, formatTime } from '@/lib/dates';
 import { sendSMS } from '@/lib/sms';
 import { sendDepositLink } from '@/lib/messages';
+import { resolveDispatch } from '@/lib/dispatch';
 import { randomBytes } from 'crypto';
 
 export const runtime = 'nodejs';
@@ -274,6 +275,25 @@ export async function POST(req) {
       .from('bookings')
       .update({ tracking_token: trackingToken })
       .eq('id', booking.id);
+
+    // ── Dynamic dispatch (24-hour guarantee) ──────────────
+    // Resolve which crew assignment handles this booking — either
+    // an existing truck with capacity, or a new one. Best-effort:
+    // if it fails, the booking still goes through (admin can assign
+    // manually).
+    try {
+      const dispatch = await resolveDispatch({
+        id: booking.id,
+        job_date,
+        lat: geo.lat,
+        lng: geo.lng,
+        load_size,
+        ai_weight_estimate_kg: ai_weight_estimate_kg || null,
+      });
+      console.log(`[dispatch] booking ${booking.booking_ref}: ${dispatch.action} — ${dispatch.reason}`);
+    } catch (e) {
+      console.error('[dispatch] resolveDispatch failed:', e.message);
+    }
 
     // ── Referral processing (Step 7) ──────────────────────
     // If a referral code was provided, create a pending referral record.

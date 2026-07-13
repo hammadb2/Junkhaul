@@ -82,17 +82,28 @@ export async function GET(req) {
     return NextResponse.json({ assignment: null, bookings: [], partner: null });
   }
 
-  // Get bookings for this date that are confirmed/scheduled
-  const { data: bookings } = await supabaseAdmin
+  // Get bookings for this date that are confirmed/scheduled.
+  // When the employee has a crew_assignment, filter to only their truck's
+  // bookings (multi-truck support). If no assignment or backward-compat
+  // (bookings without crew_assignment_id), show all for the date.
+  let bookingsQuery = supabaseAdmin
     .from('bookings')
     .select(`
       id, name, phone, address, address_data, job_date, time_slot,
       total_price, status, load_size, notes, itemized_items,
-      quadrant, payment_method, payment_status
+      quadrant, payment_method, payment_status, crew_assignment_id
     `)
     .eq('job_date', date)
-    .in('status', ['confirmed', 'scheduled', 'in_progress', 'completed'])
-    .order('time_slot', { ascending: true });
+    .in('status', ['confirmed', 'scheduled', 'in_progress', 'completed']);
+
+  // If the employee has an assignment, filter to their truck's bookings.
+  // Also include unassigned bookings (crew_assignment_id is null) so
+  // legacy bookings still show up.
+  if (assignment) {
+    bookingsQuery = bookingsQuery.or(`crew_assignment_id.eq.${assignment.id},crew_assignment_id.is.null`);
+  }
+
+  const { data: bookings } = await bookingsQuery.order('time_slot', { ascending: true });
 
   // Partner info
   const partnerId = assignment.driver_employee_id === emp.id

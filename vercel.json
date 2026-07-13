@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/run-payroll",
       "schedule": "0 10 * * 5"
+    },
+    {
+      "path": "/api/cron/seed-daily-assignments",
+      "schedule": "0 12 * * *"
     }
   ]
 }
