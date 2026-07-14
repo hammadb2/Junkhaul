@@ -81,7 +81,6 @@ Deno.serve(async () => {
         slot_time: w.slot_time,
         day_type,
         max_jobs: MAX_JOBS,
-        is_available: true,
         window_label: w.label,
         window_start: w.start,
         window_end: w.end,
@@ -89,9 +88,12 @@ Deno.serve(async () => {
     }
   }
 
+  // Update existing rows to the new window format instead of silently
+  // ignoring them. `is_available` is not in the payload so already-booked
+  // rows stay unavailable.
   const { error } = await supabase
     .from('schedule')
-    .upsert(rows, { onConflict: 'slot_date,slot_time', ignoreDuplicates: true });
+    .upsert(rows, { onConflict: 'slot_date,slot_time', ignoreDuplicates: false });
 
   return new Response(
     JSON.stringify({ ok: !error, generated: rows.length, error: error?.message }),
