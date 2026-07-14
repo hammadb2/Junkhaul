@@ -1,0 +1,62 @@
+name: crew_app
+description: Junkhaul Crew App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^3.3.2
+  go_router: ^17.3.0
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
+  dio: ^5.10.0
+  supabase_flutter: 2.15.4
+  mapbox_maps_flutter: 2.25.1
+  flutter_mapbox_animarker: ^0.0.10
+  geolocator: ^14.0.3
+  flutter_foreground_task: ^9.2.2
+  flutter_compass: ^0.8.1
+  sliding_up_panel2: ^3.3.0+1
+  shimmer: ^3.0.0
+  flutter_svg: ^2.3.0
+  cached_network_image: ^3.4.1
+  signature: ^6.3.0
+  flutter_animate: ^4.5.2
+  confetti: ^0.8.0
+  google_fonts: ^8.1.0
+  camera: ^0.12.0+1
+  image: ^4.9.1
+  google_mlkit_text_recognition: ^0.15.1
+  flutter_doc_scanner: 0.0.20
+  firebase_messaging: ^16.4.1
+  flutter_local_notifications: ^22.0.1
+  connectivity_plus: ^7.2.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  sentry_flutter: 9.23.0
+  permission_handler: ^12.0.3
+  workmanager: ^0.9.0+3
+  intl: ^0.20.3
+  url_launcher: ^6.3.2
+  package_info_plus: ^10.2.0
+  flutter_secure_storage: ^10.3.1
+  path_provider: ^2.1.6
+  cookie_jar: ^4.0.8
+  dio_cookie_manager: ^3.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: 2.15.0
+  freezed: ^3.2.5
+  json_serializable: ^6.14.0
+  mockito: ^5.6.4
+
+flutter:
+  uses-material-design: true
