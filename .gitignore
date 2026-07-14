@@ -34,3 +34,6 @@ yarn-error.log*
 supabase/.branches
 supabase/.temp
 .env*
+
+# Flutter secrets (contains API tokens, gitignored)
+apps/crew_app/lib/src/core/secrets.dart
