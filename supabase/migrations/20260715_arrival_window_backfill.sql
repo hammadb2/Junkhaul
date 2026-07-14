@@ -13,7 +13,15 @@ ALTER TABLE schedule
   ADD COLUMN IF NOT EXISTS window_start text,
   ADD COLUMN IF NOT EXISTS window_end text;
 
--- 2. Remove unbooked legacy rows for today onward so they can be regenerated
+-- 2. Relax the day_type check so generate-slots can write weekday/saturday
+--    as well as the legacy thursday/sunday values.
+ALTER TABLE schedule
+  DROP CONSTRAINT IF EXISTS schedule_day_type_check;
+ALTER TABLE schedule
+  ADD CONSTRAINT schedule_day_type_check
+  CHECK (day_type IN ('thursday', 'sunday', 'weekday', 'saturday'));
+
+-- 3. Remove unbooked legacy rows for today onward so they can be regenerated
 --    as windowed slots. These were created by the old generate-slots upsert
 --    and are stuck with window_label IS NULL.
 DELETE FROM schedule
@@ -21,7 +29,7 @@ WHERE slot_date >= CURRENT_DATE
   AND jobs_booked = 0
   AND window_label IS NULL;
 
--- 3. Backfill window labels for rows that already have bookings.
+-- 4. Backfill window labels for rows that already have bookings.
 --    Keep them at max_jobs = 4 (or jobs_booked, if already overbooked)
 --    so we do not silently open up new spots on a customer's already-booked
 --    pinpoint slot.
@@ -39,12 +47,17 @@ SET
     WHEN slot_time IN ('07:30', '09:00') THEN '11:00'
     WHEN slot_time IN ('11:00', '13:00', '15:00') THEN '15:00'
   END,
+  day_type = CASE EXTRACT(DOW FROM slot_date)
+    WHEN 0 THEN 'sunday'
+    WHEN 6 THEN 'saturday'
+    ELSE 'weekday'
+  END,
   max_jobs = GREATEST(jobs_booked, 4),
   is_available = (jobs_booked < GREATEST(jobs_booked, 4))
 WHERE slot_date >= CURRENT_DATE
   AND window_label IS NULL;
 
--- 4. Re-populate standard arrival-window slots from today forward.
+-- 5. Re-populate standard arrival-window slots from today forward.
 --    Generates every day (not just Thu/Sun) and skips statutory holidays.
 --    ON CONFLICT ignores existing bookings (we already backfilled those).
 INSERT INTO schedule (
