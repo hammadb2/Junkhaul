@@ -1,15 +1,34 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
+import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-export async function POST(req) {
-  const body = await req.json().catch(() => ({}));
-  const secret = body.secret || '';
-  if (secret !== 'jh-migrate-2026') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+// NOTE: This route is a one-time schema migration tool whose column additions
+// (crew_photos, reset_token, etc.) have already been applied to production.
+// It is being kept temporarily because it is the ONLY place the schema for the
+// `escalations` and `compensation_log` tables is defined, and both are actively
+// used by lib/vapiTools.js.
+//
+// TODO before deleting this route:
+//   1. Move the `escalations` and `compensation_log` CREATE TABLE statements
+//      (plus their RLS policies) into a new timestamped file under
+//      supabase/migrations/ so the schema is preserved for fresh DBs / DR.
+//   2. Confirm the one-time column additions are already live in production.
+//   3. Then delete this route and remove its references from APP_LOGIC.md,
+//      docs/APP_LOGIC.md, and CREW_APP_DOCUMENTATION.md.
+
+async function checkAuth() {
+  const store = await cookies();
+  const token = store.get(ADMIN_COOKIE)?.value;
+  if (!token) return false;
+  return token === await adminToken();
+}
+
+export async function POST() {
+  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const results = [];
 
