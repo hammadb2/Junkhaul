@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../data/repositories/auth_repository.dart';
@@ -85,7 +86,10 @@ class _ScheduleBody extends StatelessWidget {
         else
           ...bookings.map((b) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _JobListItem(booking: b),
+                child: _JobListItem(
+                  booking: b,
+                  onTap: () => context.go('/job/${b.id}'),
+                ),
               )),
         const SizedBox(height: 80),
       ],
@@ -180,8 +184,9 @@ class _StatCard extends StatelessWidget {
 }
 
 class _JobListItem extends StatelessWidget {
-  const _JobListItem({required this.booking});
+  const _JobListItem({required this.booking, this.onTap});
   final Booking booking;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +194,9 @@ class _JobListItem extends StatelessWidget {
     final timeStr = booking.timeSlot ?? booking.windowLabel ?? '—';
     final priceStr = booking.totalPrice != null ? '\$${booking.totalPrice!.toStringAsFixed(0)}' : '';
 
-    return JhCard(
+    return GestureDetector(
+      onTap: onTap,
+      child: JhCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -229,6 +236,7 @@ class _JobListItem extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 
