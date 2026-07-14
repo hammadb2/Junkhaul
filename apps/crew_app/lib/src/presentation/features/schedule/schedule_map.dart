@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 
 import '../../../domain/models/booking.dart';
@@ -32,6 +35,7 @@ class _ScheduleMapState extends State<ScheduleMap> {
   mapbox.MapboxMap? _mapboxMap;
   mapbox.PointAnnotationManager? _pointAnnotationManager;
   bool _isMapReady = false;
+  Uint8List? _truckMarkerImage;
 
   // Default center: Calgary downtown
   static final _calgaryCenter = mapbox.Point(
@@ -39,10 +43,29 @@ class _ScheduleMapState extends State<ScheduleMap> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    _loadTruckMarker();
+  }
+
+  Future<void> _loadTruckMarker() async {
+    try {
+      final byteData = await rootBundle.load('assets/images/truck_marker_medium.png');
+      _truckMarkerImage = byteData.buffer.asUint8List();
+      if (mounted && _isMapReady) _addMarkers();
+    } catch (e) {
+      // Marker image not available — will use default markers
+      debugPrint('Failed to load truck marker: $e');
+    }
+  }
+
+  @override
   void didUpdateWidget(ScheduleMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.bookings != widget.bookings && _isMapReady) {
-      _addJobMarkers();
+    if ((oldWidget.bookings != widget.bookings ||
+         oldWidget.truckPosition != widget.truckPosition) &&
+        _isMapReady) {
+      _addMarkers();
     }
   }
 
@@ -66,18 +89,14 @@ class _ScheduleMapState extends State<ScheduleMap> {
     // Create the point annotation manager asynchronously
     controller.annotations.createPointAnnotationManager().then((manager) {
       _pointAnnotationManager = manager;
-      _addJobMarkers();
+      _addMarkers();
     });
 
-    // If we have a truck position, fly to it
-    if (widget.truckPosition != null) {
-      _flyToTruck();
-    } else {
-      _fitAllBookings();
-    }
+    // Fit camera to show all markers
+    _fitAllBookings();
   }
 
-  Future<void> _addJobMarkers() async {
+  Future<void> _addMarkers() async {
     final manager = _pointAnnotationManager;
     if (manager == null) return;
 
@@ -89,18 +108,34 @@ class _ScheduleMapState extends State<ScheduleMap> {
       return addr?.lat != null && addr?.lng != null;
     }).toList();
 
+    // Add truck marker if we have a position
+    if (widget.truckPosition != null && _truckMarkerImage != null) {
+      await manager.create(mapbox.PointAnnotationOptions(
+        geometry: mapbox.Point(
+          coordinates: mapbox.Position(widget.truckPosition!.lng, widget.truckPosition!.lat),
+        ),
+        image: _truckMarkerImage,
+        iconSize: 1.0,
+        iconAnchor: mapbox.IconAnchor.CENTER,
+      ));
+    }
+
     if (bookingsWithCoords.isEmpty) return;
 
-    final options = bookingsWithCoords.map((b) {
+    // Add job markers with numbered circles
+    final options = bookingsWithCoords.asMap().entries.map((entry) {
+      final i = entry.key;
+      final b = entry.value;
       return mapbox.PointAnnotationOptions(
         geometry: mapbox.Point(
           coordinates: mapbox.Position(b.addressData!.lng!, b.addressData!.lat!),
         ),
         iconSize: 1.5,
-        textField: b.name ?? 'Job',
-        textOffset: [0.0, -2.0],
-        textSize: 12.0,
-        textColor: 0xFF000000,
+        textField: '${i + 1}',
+        textOffset: [0.0, 0.0],
+        textSize: 14.0,
+        textColor: 0xFFFFFFFF,
+        textAnchor: mapbox.TextAnchor.CENTER,
       );
     }).toList();
 
@@ -119,13 +154,15 @@ class _ScheduleMapState extends State<ScheduleMap> {
       return addr?.lat != null && addr?.lng != null;
     }).toList();
 
-    if (bookingsWithCoords.isEmpty) return;
+    if (bookingsWithCoords.isEmpty && widget.truckPosition == null) return;
 
-    final points = bookingsWithCoords.map((b) {
-      return mapbox.Point(
+    final points = <mapbox.Point>[];
+
+    for (final b in bookingsWithCoords) {
+      points.add(mapbox.Point(
         coordinates: mapbox.Position(b.addressData!.lng!, b.addressData!.lat!),
-      );
-    }).toList();
+      ));
+    }
 
     // Add truck position to bounds if available
     if (widget.truckPosition != null) {
@@ -133,6 +170,8 @@ class _ScheduleMapState extends State<ScheduleMap> {
         coordinates: mapbox.Position(widget.truckPosition!.lng, widget.truckPosition!.lat),
       ));
     }
+
+    if (points.isEmpty) return;
 
     final camera = await map.cameraForCoordinates(
       points,
@@ -147,17 +186,4 @@ class _ScheduleMapState extends State<ScheduleMap> {
     );
   }
 
-  Future<void> _flyToTruck() async {
-    final map = _mapboxMap;
-    final pos = widget.truckPosition;
-    if (map == null || pos == null) return;
-
-    await map.flyTo(
-      mapbox.CameraOptions(
-        center: mapbox.Point(coordinates: mapbox.Position(pos.lng, pos.lat)),
-        zoom: 14.0,
-      ),
-      mapbox.MapAnimationOptions(duration: 800),
-    );
-  }
 }
