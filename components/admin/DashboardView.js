@@ -6,50 +6,27 @@ import { useState, useEffect } from 'react';
 import { IconTruck, IconDollar, IconUsers, IconAlert } from './Icons';
 import { money, badgeStyle } from '@/lib/adminUiHelpers';
 
-const DASH_STATS = [
-  { label: 'Jobs today', value: '6', Icon: IconTruck, iconBg: 'rgba(249,115,22,.12)', delta: '+2 vs last Thu', deltaColor: '#22C55E' },
-  { label: 'Revenue to collect', value: money(1840), Icon: IconDollar, iconBg: 'rgba(34,197,94,.12)', delta: 'On track', deltaColor: '#22C55E' },
-  { label: 'Crew clocked in', value: '3', Icon: IconUsers, iconBg: 'rgba(59,130,246,.12)' },
-  { label: 'Flagged for review', value: '2', Icon: IconAlert, iconBg: 'rgba(245,158,11,.12)', delta: 'Needs attention', deltaColor: '#F59E0B' },
-];
-
-const DASH_JOBS = [
-  { time: '7:30', name: 'Sarah Whitfield', address: '142 Auburn Bay Ave SE', status: 'Confirmed', badge: badgeStyle('rgba(59,130,246,.1)', '#3B82F6') },
-  { time: '9:00', name: 'Marcus Feldman', address: '88 Cranston Dr SE', status: 'En route', badge: badgeStyle('rgba(249,115,22,.1)', '#f97316') },
-  { time: '11:00', name: 'Priya Nandan', address: '220 Copperfield Blvd SE', status: 'Confirmed', badge: badgeStyle('rgba(59,130,246,.1)', '#3B82F6') },
-  { time: '13:00', name: 'Devon Okafor Jr.', address: '55 Panorama Hills Way NW', status: 'Completed', badge: badgeStyle('rgba(34,197,94,.1)', '#22C55E') },
-];
-
-const CREW_STATUS = [
-  { name: 'Marcus Chen', status: '2h 14m', dot: '#22C55E' },
-  { name: 'Devon Okafor', status: '2h 14m', dot: '#22C55E' },
-  { name: 'Ryan Baptiste', status: 'Off shift', dot: 'rgba(0,0,0,.2)' },
-];
-
-const ATTENTION = [
-  { title: 'No-show risk 62% — Feldman job', sub: '9:00 AM · consider a reminder text' },
-  { title: 'Payroll remittance due in 3 days', sub: '$1,240 owed to CRA' },
-];
-
 const CREW_DOT = { active: '#22C55E', clocked_in: '#22C55E', off_shift: 'rgba(0,0,0,.2)' };
 
 export default function DashboardView({ flash }) {
-  const [stats, setStats] = useState(DASH_STATS);
-  const [jobs, setJobs] = useState(DASH_JOBS);
-  const [crewStatus, setCrewStatus] = useState(CREW_STATUS);
-  const [attention, setAttention] = useState(ATTENTION);
+  const [stats, setStats] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [crewStatus, setCrewStatus] = useState([]);
+  const [attention, setAttention] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [ccRes, bkRes] = await Promise.all([
+        const [ccRes, bkRes, crewRes] = await Promise.all([
           fetch('/api/admin/command-center'),
           fetch('/api/admin/bookings'),
+          fetch('/api/admin/crew'),
         ]);
         const cc = ccRes.ok ? await ccRes.json() : null;
         const bk = bkRes.ok ? await bkRes.json() : null;
+        const crewData = crewRes.ok ? await crewRes.json() : null;
         if (cancelled) return;
 
         if (cc) {
@@ -57,18 +34,10 @@ export default function DashboardView({ flash }) {
           const newStats = [
             { label: 'Jobs today', value: String(today.jobs ?? '0'), Icon: IconTruck, iconBg: 'rgba(249,115,22,.12)', delta: '', deltaColor: '#22C55E' },
             { label: 'Revenue to collect', value: money(today.revenue_to_collect ?? 0), Icon: IconDollar, iconBg: 'rgba(34,197,94,.12)', delta: '', deltaColor: '#22C55E' },
-            { label: 'Crew clocked in', value: String((cc.crewStatus || []).filter((c) => c.clocked_in).length || '0'), Icon: IconUsers, iconBg: 'rgba(59,130,246,.12)' },
+            { label: 'Crew clocked in', value: String((crewData?.employees || []).filter((c) => c.clocked_in).length || '0'), Icon: IconUsers, iconBg: 'rgba(59,130,246,.12)' },
             { label: 'Flagged for review', value: String((bk?.stats?.flagged) ?? '0'), Icon: IconAlert, iconBg: 'rgba(245,158,11,.12)', delta: (bk?.stats?.flagged ?? 0) > 0 ? 'Needs attention' : '', deltaColor: '#F59E0B' },
           ];
           setStats(newStats);
-
-          if (Array.isArray(cc.crewStatus)) {
-            setCrewStatus(cc.crewStatus.map((c) => ({
-              name: c.name || c.email || 'Crew',
-              status: c.clocked_in ? (c.clock_in_duration_min ? `${Math.floor(c.clock_in_duration_min / 60)}h ${c.clock_in_duration_min % 60}m` : 'Clocked in') : 'Off shift',
-              dot: c.clocked_in ? '#22C55E' : 'rgba(0,0,0,.2)',
-            })));
-          }
 
           const items = [];
           if (Array.isArray(cc.staleJobs) && cc.staleJobs.length > 0) {
@@ -77,7 +46,15 @@ export default function DashboardView({ flash }) {
           if (Array.isArray(cc.urgentCalls) && cc.urgentCalls.length > 0) {
             items.push({ title: `${cc.urgentCalls.length} urgent call(s) need follow-up`, sub: cc.urgentCalls.map((c) => c.caller_name || c.caller_number).join(', ') });
           }
-          if (items.length > 0) setAttention(items);
+          setAttention(items);
+        }
+
+        if (crewData && Array.isArray(crewData.employees)) {
+          setCrewStatus(crewData.employees.map((e) => ({
+            name: e.name || `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Crew',
+            status: e.clocked_in ? (e.clock_in_duration_min ? `${Math.floor(e.clock_in_duration_min / 60)}h ${e.clock_in_duration_min % 60}m` : 'Clocked in') : 'Off shift',
+            dot: e.clocked_in ? '#22C55E' : 'rgba(0,0,0,.2)',
+          })));
         }
 
         if (bk && Array.isArray(bk.bookings)) {
@@ -104,6 +81,9 @@ export default function DashboardView({ flash }) {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
+  if (stats.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No dashboard data available</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

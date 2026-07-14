@@ -4,26 +4,12 @@
 
 import { useState, useEffect } from 'react';
 
-const FUNNEL = { quoted: 64, touch1: 41, touch2: 22, touch3: 11, converted: 32 };
 const FUNNEL_LABELS = { quoted: 'Quoted', touch1: 'T+1hr', touch2: 'T+20hr', touch3: 'T+47hr', converted: 'Booked' };
 
-const OFFERS = [
-  { phone: '(403) 555-0177', type: 'deadhead', original: 120, discounted: 90 },
-  { phone: '(403) 555-0233', type: 'proactive', original: 240, discounted: 190 },
-  { phone: '(403) 555-0298', type: 'surge-relief', original: 160, discounted: 135 },
-];
-
-const CRONS = [
-  { name: 'generate-slots', status: 'finished' },
-  { name: 'morning-reminders', status: 'finished' },
-  { name: 'day-summary', status: 'finished' },
-  { name: 'no-show-check', status: 'failed' },
-];
-
 export default function GrowthPanel() {
-  const [funnel, setFunnel] = useState(FUNNEL);
-  const [offers, setOffers] = useState(OFFERS);
-  const [crons, setCrons] = useState(CRONS);
+  const [funnel, setFunnel] = useState({ quoted: 0, touch1: 0, touch2: 0, touch3: 0, converted: 0 });
+  const [offers, setOffers] = useState([]);
+  const [crons, setCrons] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,27 +32,29 @@ export default function GrowthPanel() {
         }
 
         if (Array.isArray(data.offers)) {
-          const mapped = data.offers.slice(0, 20).map((o) => ({
+          setOffers(data.offers.slice(0, 20).map((o) => ({
             phone: o.phone || o.customer_phone || '—',
             type: o.offer_type || o.type || '—',
             original: o.original_price || o.list_price || 0,
             discounted: o.offer_price || o.discounted_price || 0,
-          }));
-          if (mapped.length > 0) setOffers(mapped);
+          })));
         }
 
         if (Array.isArray(data.cronHealth)) {
-          const mapped = data.cronHealth.map((c) => ({
+          setCrons(data.cronHealth.map((c) => ({
             name: c.job_name || c.name || '—',
             status: c.last_status || c.status || 'unknown',
-          }));
-          if (mapped.length > 0) setCrons(mapped);
+          })));
         }
-      } catch (e) { /* keep fallback */ }
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
+  if (funnel.quoted === 0 && offers.length === 0 && crons.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No growth data available</div>;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>

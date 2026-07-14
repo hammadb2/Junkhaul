@@ -5,23 +5,14 @@
 import { useState, useEffect } from 'react';
 import { money } from '@/lib/adminUiHelpers';
 
-const TOTAL_EARNED = 18420;
-const TOTAL_PIPELINE = 2960;
-const SOURCES = [ ['web', 22, 14200], ['phone', 7, 3820], ['admin', 3, 1200] ];
-const BY_DATE = [
-  { date: 'Jul 12 (Sun)', jobs: 5, revenue: 1180 },
-  { date: 'Jul 9 (Thu)', jobs: 6, revenue: 1420 },
-  { date: 'Jul 5 (Sun)', jobs: 4, revenue: 960 },
-];
-
 export default function EarningsDashboard() {
-  const [totalEarned, setTotalEarned] = useState(TOTAL_EARNED);
-  const [totalPipeline, setTotalPipeline] = useState(TOTAL_PIPELINE);
-  const [avgJobValue, setAvgJobValue] = useState(233);
-  const [completedJobs, setCompletedJobs] = useState(32);
-  const [upcomingJobs, setUpcomingJobs] = useState(7);
-  const [sources, setSources] = useState(SOURCES);
-  const [byDate, setByDate] = useState(BY_DATE);
+  const [totalEarned, setTotalEarned] = useState(0);
+  const [totalPipeline, setTotalPipeline] = useState(0);
+  const [avgJobValue, setAvgJobValue] = useState(0);
+  const [completedJobs, setCompletedJobs] = useState(0);
+  const [upcomingJobs, setUpcomingJobs] = useState(0);
+  const [sources, setSources] = useState([]);
+  const [byDate, setByDate] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,7 +33,7 @@ export default function EarningsDashboard() {
           const mapped = Object.entries(data.sourceBreakdown).map(([name, info]) => [
             name, info.count || 0, info.revenue || 0,
           ]);
-          if (mapped.length > 0) setSources(mapped);
+          setSources(mapped);
         }
 
         if (data.byDate) {
@@ -57,15 +48,18 @@ export default function EarningsDashboard() {
                 revenue: info.revenue || 0,
               };
             });
-          if (mapped.length > 0) setByDate(mapped);
+          setByDate(mapped);
         }
-      } catch (e) { /* keep fallback */ }
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
 
-  const maxSrc = Math.max(...sources.map((s) => s[2]));
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
+  if (totalEarned === 0 && totalPipeline === 0 && sources.length === 0 && byDate.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No earnings data available</div>;
+
+  const maxSrc = sources.length > 0 ? Math.max(...sources.map((s) => s[2])) : 0;
   const stats = [
     { label: 'Total earned', value: money(totalEarned), color: '#1a1a1a', sub: `${completedJobs} jobs completed` },
     { label: 'In pipeline', value: money(totalPipeline), color: '#f97316', sub: `${upcomingJobs} confirmed upcoming` },

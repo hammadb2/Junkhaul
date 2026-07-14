@@ -39,11 +39,13 @@ export default function ConfigPanel({ flash }) {
           map[c.key] = c.value_type === 'boolean' ? c.value === 'true' : c.value;
         }
         setConfigMap(map);
-      } catch (e) { /* keep fallback */ }
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
 
   const toggle = (key, current) => setEdits((e) => ({ ...e, [key]: !current }));
   const setText = (key) => (ev) => setEdits((e) => ({ ...e, [key]: ev.target.value }));

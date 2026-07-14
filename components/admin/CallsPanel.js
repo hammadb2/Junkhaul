@@ -5,13 +5,6 @@
 import { useState, useEffect } from 'react';
 import { badgeStyle } from '@/lib/adminUiHelpers';
 
-const CALLS = [
-  { id: 'c1', name: 'Marcus Feldman', phone: '(403) 555-0198', sentiment: 'frustrated', summary: 'Upset about a rescheduled pickup time, wants a call back today.', date: 'Jul 13, 2:14 PM' },
-  { id: 'c2', name: 'Aisha Rahman', phone: '(403) 555-0133', sentiment: 'positive', summary: 'Booked a full load pickup for Sunday, asked about freon add-on.', date: 'Jul 13, 11:02 AM' },
-  { id: 'c3', name: 'Unknown', phone: '(403) 555-0410', sentiment: 'neutral', summary: 'General pricing inquiry, no booking made yet.', date: 'Jul 12, 4:40 PM' },
-  { id: 'c4', name: 'Colin Bratz', phone: '(403) 555-0166', sentiment: 'negative', summary: 'Complained about crew being 40 minutes late.', date: 'Jul 11, 9:15 AM' },
-];
-
 const SENT_BADGE = {
   frustrated: badgeStyle('rgba(239,68,68,.12)', '#EF4444'),
   negative: badgeStyle('rgba(245,158,11,.12)', '#F59E0B'),
@@ -20,7 +13,7 @@ const SENT_BADGE = {
 };
 
 export default function CallsPanel() {
-  const [calls, setCalls] = useState(CALLS);
+  const [calls, setCalls] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,12 +33,15 @@ export default function CallsPanel() {
           summary: c.summary || c.transcript || '',
           date: c.call_date ? new Date(c.call_date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) + ', ' + new Date(c.call_date).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }) : '',
         }));
-        setCalls(mapped.length > 0 ? mapped : CALLS);
-      } catch (e) { /* keep fallback */ }
+        setCalls(mapped);
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
+  if (calls.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No calls recorded</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

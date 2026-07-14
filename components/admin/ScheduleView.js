@@ -5,15 +5,9 @@
 import { useState, useEffect } from 'react';
 import { money, badgeStyle } from '@/lib/adminUiHelpers';
 
-const BOOKINGS_BY_DATE = {
-  '2026-07-16': [{ time: '07:30', price: 240 }, { time: '09:00', price: 380 }, { time: '11:00', price: 160 }, { time: '13:00', price: 99 }],
-  '2026-07-19': [{ time: '07:30', price: 380 }, { time: '09:00', price: 240 }, { time: '11:00', price: 160 }],
-};
-const SLOT_TIMES = ['07:30', '09:00', '11:00', '13:00'];
-
 export default function ScheduleView() {
-  const [bookingsByDate, setBookingsByDate] = useState(BOOKINGS_BY_DATE);
-  const [slotTimes, setSlotTimes] = useState(SLOT_TIMES);
+  const [bookingsByDate, setBookingsByDate] = useState({});
+  const [slotTimes, setSlotTimes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,18 +44,21 @@ export default function ScheduleView() {
             }
           }
         }
-        const times = allSlotTimes.size > 0 ? [...allSlotTimes].sort() : SLOT_TIMES;
+        const times = [...allSlotTimes].sort();
 
-        setBookingsByDate(Object.keys(byDate).length > 0 ? byDate : BOOKINGS_BY_DATE);
+        setBookingsByDate(byDate);
         setSlotTimes(times);
       } catch (e) {
-        // keep fallback data
+        /* ignore */
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
+  if (Object.keys(bookingsByDate).length === 0 && slotTimes.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No schedule data available</div>;
 
   const dates = Object.keys(bookingsByDate);
   const totalBooked = dates.reduce((a, d) => a + bookingsByDate[d].length, 0);

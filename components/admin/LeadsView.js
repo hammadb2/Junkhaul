@@ -5,15 +5,6 @@
 import { useState, useEffect } from 'react';
 import { money, badgeStyle, sortRows, LOAD_LABELS } from '@/lib/adminUiHelpers';
 
-const LEADS = [
-  { id: 'l1', name: 'Trevor Amiss', phone: '(403) 555-0301', quoted: '2026-07-13', load: 'half', price: 240, status: 'quoted', lastTouch: 'T+1hr' },
-  { id: 'l2', name: 'Melissa Duong', phone: '(403) 555-0288', quoted: '2026-07-12', load: 'full', price: 380, status: 'engaged', lastTouch: 'T+20hr' },
-  { id: 'l3', name: 'Grant Oyelaran', phone: '(403) 555-0244', quoted: '2026-07-11', load: 'quarter', price: 160, status: 'quoted', lastTouch: 'T+1hr' },
-  { id: 'l4', name: 'Holly Vandenberg', phone: '(403) 555-0219', quoted: '2026-07-10', load: 'single_item', price: 99, status: 'expired', lastTouch: 'T+47hr' },
-  { id: 'l5', name: 'Ibrahim Kassab', phone: '(403) 555-0177', quoted: '2026-07-09', load: 'half', price: 240, status: 'converted', lastTouch: 'Booked' },
-  { id: 'l6', name: 'Paige Sorensen', phone: '(403) 555-0163', quoted: '2026-07-09', load: 'quarter', price: 160, status: 'engaged', lastTouch: 'T+20hr' },
-];
-
 const STATUS_BADGE = {
   quoted: badgeStyle('rgba(59,130,246,.1)', '#3B82F6'),
   engaged: badgeStyle('rgba(245,158,11,.12)', '#F59E0B'),
@@ -23,7 +14,7 @@ const STATUS_BADGE = {
 const TABS = ['all', 'quoted', 'engaged', 'converted', 'expired'];
 
 export default function LeadsView({ flash }) {
-  const [leads, setLeads] = useState(LEADS);
+  const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
@@ -62,12 +53,14 @@ export default function LeadsView({ flash }) {
             lastTouch,
           };
         });
-        setLeads(mapped.length > 0 ? mapped : LEADS);
-      } catch (e) { /* keep fallback */ }
+        setLeads(mapped);
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
 
   const toggleSort = (key) => setSort((prevSort) => { setDir(prevSort === key && dir === 'desc' ? 'asc' : 'desc'); return key; });
   const toggleRow = (id) => setSelected((s) => { const n = { ...s }; if (n[id]) delete n[id]; else n[id] = true; return n; });

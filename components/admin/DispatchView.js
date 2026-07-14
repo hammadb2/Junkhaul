@@ -10,16 +10,6 @@ import { money, badgeStyle, LOAD_LABELS } from '@/lib/adminUiHelpers';
 
 const LiveCrewMap = dynamic(() => import('./LiveCrewMap'), { ssr: false });
 
-const BOOKINGS = [
-  { id: 'b1', date: '2026-07-16', time: '07:30', name: 'Sarah Whitfield', phone: '(403) 555-0142', address: '142 Auburn Bay Ave SE', quadrant: 'SE', load: 'half', price: 240, status: 'confirmed', source: 'web', deposit: true, flagged: false, riskScore: 12 },
-  { id: 'b2', date: '2026-07-16', time: '09:00', name: 'Marcus Feldman', phone: '(403) 555-0198', address: '88 Cranston Dr SE', quadrant: 'SE', load: 'full', price: 380, status: 'confirmed', source: 'phone', deposit: true, flagged: true, riskScore: 62 },
-  { id: 'b3', date: '2026-07-16', time: '11:00', name: 'Priya Nandan', phone: '(403) 555-0111', address: '220 Copperfield Blvd SE', quadrant: 'SE', load: 'quarter', price: 160, status: 'confirmed', source: 'web', deposit: true, flagged: false, riskScore: 8 },
-  { id: 'b4', date: '2026-07-16', time: '13:00', name: 'Devon Okafor Jr.', phone: '(403) 555-0177', address: '55 Panorama Hills Way NW', quadrant: 'NW', load: 'single_item', price: 99, status: 'completed', source: 'web', deposit: true, flagged: false, riskScore: 5 },
-  { id: 'b5', date: '2026-07-19', time: '07:30', name: 'Aisha Rahman', phone: '(403) 555-0133', address: '12 Mahogany Manor SE', quadrant: 'SE', load: 'full', price: 380, status: 'confirmed', source: 'web', deposit: true, flagged: false, riskScore: 10 },
-  { id: 'b6', date: '2026-07-19', time: '09:00', name: 'Colin Bratz', phone: '(403) 555-0166', address: '900 New Brighton Dr SE', quadrant: 'SE', load: 'half', price: 240, status: 'confirmed', source: 'admin', deposit: false, flagged: false, riskScore: 44 },
-  { id: 'b7', date: '2026-07-19', time: '11:00', name: 'Naomi Petrescu', phone: '(403) 555-0122', address: '44 Evergreen Blvd SW', quadrant: 'SW', load: 'quarter', price: 160, status: 'no_show', source: 'web', deposit: true, flagged: false, riskScore: 70 },
-];
-
 const STATUS_BADGE = {
   confirmed: badgeStyle('rgba(59,130,246,.1)', '#3B82F6'),
   completed: badgeStyle('rgba(34,197,94,.1)', '#22C55E'),
@@ -29,10 +19,9 @@ const STATUS_BADGE = {
 const STATUS_LABEL = { confirmed: 'Confirmed', completed: 'Completed', no_show: 'No-show', rescheduled: 'Rescheduled' };
 
 export default function DispatchView({ flash }) {
-  const [bookings, setBookings] = useState(BOOKINGS);
+  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const dates = [...new Set(bookings.map((b) => b.date))];
-  const [activeDate, setActiveDate] = useState(dates[0]);
+  const [activeDate, setActiveDate] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [optimizing, setOptimizing] = useState(false);
   const [optimized, setOptimized] = useState(false);
@@ -61,7 +50,7 @@ export default function DispatchView({ flash }) {
         }));
         setBookings(mapped);
       }
-    } catch (e) { /* keep fallback */ }
+    } catch (e) { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -71,7 +60,11 @@ export default function DispatchView({ flash }) {
     })();
   }, [refreshBookings]);
 
-  const dayBookings = bookings.filter((b) => b.date === activeDate);
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
+
+  const dates = [...new Set(bookings.map((b) => b.date))];
+  const effectiveDate = activeDate || dates[0] || null;
+  const dayBookings = bookings.filter((b) => b.date === effectiveDate);
   const revenue = dayBookings.reduce((a, b) => a + b.price, 0);
   const estProfit = Math.round(revenue * 0.42);
   const margin = revenue ? Math.round((estProfit / revenue) * 100) : 0;
@@ -82,7 +75,7 @@ export default function DispatchView({ flash }) {
       const res = await fetch('/api/admin/optimise-route', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: activeDate }),
+        body: JSON.stringify({ date: effectiveDate }),
       });
       if (res.ok) {
         const { bookings: ordered } = await res.json();
@@ -103,11 +96,11 @@ export default function DispatchView({ flash }) {
             flagged: !!b.flag_for_review,
             riskScore: b.no_show_risk_score || 0,
           }));
-          const otherDays = bookings.filter((b) => b.date !== activeDate);
+          const otherDays = bookings.filter((b) => b.date !== effectiveDate);
           setBookings([...otherDays, ...mapped]);
         }
         setOptimized(true);
-        flash?.('Route optimized for ' + activeDate);
+        flash?.('Route optimized for ' + effectiveDate);
       } else {
         flash?.('Route optimization failed', '#EF4444');
       }
@@ -139,6 +132,9 @@ export default function DispatchView({ flash }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {dates.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No bookings found</div>
+      ) : (<>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
         {dates.map((d) => (
           <button
@@ -146,9 +142,9 @@ export default function DispatchView({ flash }) {
             onClick={() => { setActiveDate(d); setOptimized(false); setExpanded(null); }}
             style={{
               padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-              border: activeDate === d ? 'none' : '1px solid rgba(0,0,0,.08)',
-              background: activeDate === d ? '#f97316' : '#fff',
-              color: activeDate === d ? '#fff' : 'rgba(0,0,0,.65)',
+              border: effectiveDate === d ? 'none' : '1px solid rgba(0,0,0,.08)',
+              background: effectiveDate === d ? '#f97316' : '#fff',
+              color: effectiveDate === d ? '#fff' : 'rgba(0,0,0,.65)',
             }}
           >
             {new Date(d + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -223,7 +219,7 @@ export default function DispatchView({ flash }) {
 
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(0,0,0,.05)', fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>
-          Jobs — {new Date(activeDate + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' })}
+          Jobs — {effectiveDate ? new Date(effectiveDate + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' }) : ''}
         </div>
         {dayBookings.length === 0 ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
@@ -271,6 +267,7 @@ export default function DispatchView({ flash }) {
           );
         })}
       </div>
+      </>)}
     </div>
   );
 }

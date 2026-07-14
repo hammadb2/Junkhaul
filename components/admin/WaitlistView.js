@@ -4,14 +4,8 @@
 import { useState, useEffect } from 'react';
 import { badgeStyle, LOAD_LABELS } from '@/lib/adminUiHelpers';
 
-const INITIAL = [
-  { id: 'w1', name: 'Erik Solheim', phone: '(403) 555-0410', address: 'Cornerstone NE', dayType: 'weekend', load: 'full', joined: '2026-07-11', notified: false },
-  { id: 'w2', name: 'Fatima Al-Sayed', phone: '(403) 555-0392', address: 'Coventry Hills NW', dayType: 'weekday', load: 'half', joined: '2026-07-10', notified: true },
-  { id: 'w3', name: 'Barry Cheung', phone: '(403) 555-0355', address: 'McKenzie Towne SE', dayType: 'weekend', load: 'quarter', joined: '2026-07-09', notified: false },
-];
-
 export default function WaitlistView({ flash }) {
-  const [list, setList] = useState(INITIAL);
+  const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,12 +26,14 @@ export default function WaitlistView({ flash }) {
           joined: w.created_at ? w.created_at.slice(0, 10) : '',
           notified: !!w.notified,
         }));
-        setList(mapped.length > 0 ? mapped : INITIAL);
-      } catch (e) { /* keep fallback */ }
+        setList(mapped);
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
 
   const notify = async (id) => {
     const entry = list.find((w) => w.id === id);

@@ -8,55 +8,63 @@ import { money, badgeStyle } from '@/lib/adminUiHelpers';
 const TABS = ['overview', 'runs', 'remittance', 't4s'];
 const TAB_LABEL = { overview: 'Overview', runs: 'Pay Runs', remittance: 'Remittances', t4s: 'T4s' };
 
-const EMPLOYEES = [
-  { name: 'Marcus Chen', status: 'active', reg: 38.5, ot: 2.0, gross: 19.5 * 40 },
-  { name: 'Devon Okafor', status: 'active', reg: 40, ot: 1.2, gross: 19.5 * 41.2 },
-  { name: 'Ryan Baptiste', status: 'active', reg: 22, ot: 0, gross: 18 * 22 },
-  { name: 'Tyler Fontaine', status: 'pending_verification', reg: 0, ot: 0, gross: 0 },
-];
-
-const RUNS = [
-  { id: 'r1', period: 'Jul 3 – Jul 16, 2026', net: 3910, remit: 910, due: 'Jul 25', status: 'calculated' },
-  { id: 'r2', period: 'Jun 19 – Jul 2, 2026', net: 3640, remit: 858, due: 'Jul 11', status: 'paid' },
-];
 const RUN_BADGE = { calculated: badgeStyle('rgba(245,158,11,.12)', '#F59E0B'), approved: badgeStyle('rgba(59,130,246,.12)', '#3B82F6'), paid: badgeStyle('rgba(34,197,94,.12)', '#22C55E') };
-
-const REMITS = [
-  { id: 'm1', amount: 910, due: 'Jul 25, 2026', status: 'owed' },
-  { id: 'm2', amount: 858, due: 'Jul 11, 2026', status: 'paid' },
-];
-
-const T4S = [
-  { name: 'Marcus Chen', gross: 38200, cpp: 2050, ei: 620, net: 32100 },
-  { name: 'Devon Okafor', gross: 39500, cpp: 2110, ei: 640, net: 33200 },
-];
 
 export default function PayrollPanel({ flash }) {
   const [tab, setTab] = useState('overview');
   const [runOpen, setRunOpen] = useState(false);
   const [runApproved, setRunApproved] = useState({});
   const [remitPaid, setRemitPaid] = useState({});
-  const [employees, setEmployees] = useState(EMPLOYEES);
+  const [employees, setEmployees] = useState([]);
   const [payPreview, setPayPreview] = useState(null);
+  const [runs, setRuns] = useState([]);
+  const [remits, setRemits] = useState([]);
+  const [t4s, setT4s] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/admin/employees');
-        if (!res.ok) return;
-        const { employees: data } = await res.json();
-        if (cancelled || !Array.isArray(data)) return;
-        const mapped = data.map((e) => ({
-          name: e.name || `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Employee',
-          status: e.status || 'active',
-          reg: e.period ? e.period.regular_hours || 0 : 0,
-          ot: e.period ? e.period.overtime_hours || 0 : 0,
-          gross: e.period ? e.period.gross || 0 : 0,
-        }));
-        setEmployees(mapped.length > 0 ? mapped : EMPLOYEES);
-      } catch (e) { /* keep fallback */ }
+        const [empRes, runsRes, remitsRes, t4sRes] = await Promise.all([
+          fetch('/api/admin/employees'),
+          fetch('/api/admin/payroll/run'),
+          fetch('/api/admin/remittance'),
+          fetch('/api/admin/t4s'),
+        ]);
+        if (cancelled) return;
+
+        if (empRes.ok) {
+          const { employees: data } = await empRes.json();
+          if (Array.isArray(data)) {
+            setEmployees(data.map((e) => ({
+              name: e.name || `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Employee',
+              status: e.status || 'active',
+              reg: e.period ? e.period.regular_hours || 0 : 0,
+              ot: e.period ? e.period.overtime_hours || 0 : 0,
+              gross: e.period ? e.period.gross || 0 : 0,
+            })));
+          }
+        }
+
+        if (runsRes.ok) {
+          const data = await runsRes.json();
+          const arr = data.runs || data.pay_runs || [];
+          if (Array.isArray(arr)) setRuns(arr);
+        }
+
+        if (remitsRes.ok) {
+          const data = await remitsRes.json();
+          const arr = data.remittances || data.remits || [];
+          if (Array.isArray(arr)) setRemits(arr);
+        }
+
+        if (t4sRes.ok) {
+          const data = await t4sRes.json();
+          const arr = data.t4s || [];
+          if (Array.isArray(arr)) setT4s(arr);
+        }
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -78,17 +86,19 @@ export default function PayrollPanel({ flash }) {
         const { pay_run } = await res.json();
         setPayPreview(pay_run);
       }
-    } catch (e) { /* keep defaults */ }
+    } catch (e) { /* ignore */ }
   };
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
 
   const stats = [
     { label: 'Total employees', value: employees.length, color: '#1a1a1a' },
     { label: 'Onboarded', value: employees.filter((e) => e.status === 'active' || e.status === 'onboarded').length, color: '#22C55E' },
     { label: 'Pending', value: employees.filter((e) => e.status !== 'active' && e.status !== 'onboarded').length, color: '#F59E0B' },
-    { label: 'Clocked in now', value: 2, color: '#f97316' },
+    { label: 'Clocked in now', value: employees.filter((e) => e.clockedIn).length, color: '#f97316' },
   ];
 
-  const owedTotal = REMITS.filter((r) => (remitPaid[r.id] ? 'paid' : r.status) === 'owed').reduce((a, r) => a + r.amount, 0);
+  const owedTotal = remits.filter((r) => (remitPaid[r.id] ? 'paid' : r.status) === 'owed').reduce((a, r) => a + r.amount, 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -118,9 +128,9 @@ export default function PayrollPanel({ flash }) {
           {runOpen && (
             <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, fontSize: 13 }}>
-                <div><span style={{ color: 'rgba(0,0,0,.45)' }}>Gross</span><div style={{ fontWeight: 700, fontSize: 16, color: '#1a1a1a' }}>{payPreview ? money(payPreview.gross_total || payPreview.gross) : '$4,820.00'}</div></div>
-                <div><span style={{ color: 'rgba(0,0,0,.45)' }}>Net</span><div style={{ fontWeight: 700, fontSize: 16, color: '#22C55E' }}>{payPreview ? money(payPreview.net_total || payPreview.net) : '$3,910.42'}</div></div>
-                <div><span style={{ color: 'rgba(0,0,0,.45)' }}>CRA remittance</span><div style={{ fontWeight: 700, fontSize: 16, color: '#f97316' }}>{payPreview ? money(payPreview.remit_total || payPreview.remit) : '$909.58'}</div></div>
+                <div><span style={{ color: 'rgba(0,0,0,.45)' }}>Gross</span><div style={{ fontWeight: 700, fontSize: 16, color: '#1a1a1a' }}>{payPreview ? money(payPreview.gross_total || payPreview.gross) : '—'}</div></div>
+                <div><span style={{ color: 'rgba(0,0,0,.45)' }}>Net</span><div style={{ fontWeight: 700, fontSize: 16, color: '#22C55E' }}>{payPreview ? money(payPreview.net_total || payPreview.net) : '—'}</div></div>
+                <div><span style={{ color: 'rgba(0,0,0,.45)' }}>CRA remittance</span><div style={{ fontWeight: 700, fontSize: 16, color: '#f97316' }}>{payPreview ? money(payPreview.remit_total || payPreview.remit) : '—'}</div></div>
               </div>
               <button onClick={() => { setRunOpen(false); flash?.('Pay run saved — 4 stubs created'); }} style={{ marginTop: 16, width: '100%', padding: '11px 0', border: 'none', borderRadius: 10, background: '#f97316', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Confirm & save pay run</button>
             </div>
@@ -148,7 +158,9 @@ export default function PayrollPanel({ flash }) {
         </>
       )}
 
-      {tab === 'runs' && RUNS.map((r) => {
+      {tab === 'runs' && (runs.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No pay runs found</div>
+      ) : runs.map((r) => {
         const status = runApproved[r.id] ? 'approved' : r.status;
         return (
           <div key={r.id} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '16px 20px' }}>
@@ -166,15 +178,15 @@ export default function PayrollPanel({ flash }) {
             </div>
           </div>
         );
-      })}
+      }))}
 
       {tab === 'remittance' && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
             {[
-              { label: 'Owed', value: REMITS.filter((r) => (remitPaid[r.id] ? 'paid' : r.status) === 'owed').length, color: '#EF4444' },
+              { label: 'Owed', value: remits.filter((r) => (remitPaid[r.id] ? 'paid' : r.status) === 'owed').length, color: '#EF4444' },
               { label: 'Total owed', value: money(owedTotal), color: '#EF4444' },
-              { label: 'Next due', value: 'Jul 25', color: '#F59E0B' },
+              { label: 'Next due', value: remits.length > 0 ? remits[0].due : '—', color: '#F59E0B' },
             ].map((s) => (
               <div key={s.label} style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.06)', padding: '14px 16px' }}>
                 <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -182,7 +194,9 @@ export default function PayrollPanel({ flash }) {
               </div>
             ))}
           </div>
-          {REMITS.map((r) => {
+          {remits.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No remittances found</div>
+          ) : remits.map((r) => {
             const status = remitPaid[r.id] ? 'paid' : r.status;
             return (
               <div key={r.id} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -203,6 +217,9 @@ export default function PayrollPanel({ flash }) {
       )}
 
       {tab === 't4s' && (
+        t4s.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No T4s found</div>
+        ) : (
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr style={{ background: '#FAFAFA', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
@@ -211,7 +228,7 @@ export default function PayrollPanel({ flash }) {
               ))}
             </tr></thead>
             <tbody>
-              {T4S.map((t) => (
+              {t4s.map((t) => (
                 <tr key={t.name} style={{ borderBottom: '1px solid rgba(0,0,0,.045)' }}>
                   <td style={{ padding: '11px 18px', fontWeight: 600, color: '#1a1a1a' }}>{t.name}</td>
                   <td style={{ padding: '11px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(t.gross)}</td>
@@ -223,6 +240,7 @@ export default function PayrollPanel({ flash }) {
             </tbody>
           </table>
         </div>
+        )
       )}
     </div>
   );

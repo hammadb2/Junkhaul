@@ -6,13 +6,6 @@ import { useState, useEffect } from 'react';
 import { badgeStyle } from '@/lib/adminUiHelpers';
 import { IconAlert } from './Icons';
 
-const CREW = [
-  { name: 'Marcus Chen', email: 'marcus.chen@junkhaul.ca', status: 'active', clockedIn: true, clockedTime: '2h 14m', rate: '$19.50/hr', hours: '38.5h' },
-  { name: 'Devon Okafor', email: 'devon.okafor@junkhaul.ca', status: 'active', clockedIn: true, clockedTime: '2h 14m', rate: '$19.50/hr', hours: '41.2h' },
-  { name: 'Ryan Baptiste', email: 'ryan.baptiste@junkhaul.ca', status: 'active', clockedIn: false, rate: '$18.00/hr', hours: '22.0h' },
-  { name: 'Tyler Fontaine', email: 'tyler.fontaine@junkhaul.ca', status: 'pending_verification', clockedIn: false, rate: '$18.00/hr', hours: '0h' },
-];
-
 const STATUS_BADGE = {
   active: badgeStyle('rgba(34,197,94,.12)', '#22C55E'),
   onboarded: badgeStyle('rgba(34,197,94,.12)', '#22C55E'),
@@ -30,7 +23,7 @@ const SEVERITY_BADGE = {
 
 export default function CrewView() {
   const [tab, setTab] = useState('roster');
-  const [crew, setCrew] = useState(CREW);
+  const [crew, setCrew] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,17 +53,19 @@ export default function CrewView() {
               hours: e.period ? `${e.period.total_hours || 0}h` : '0h',
             };
           });
-          setCrew(mapped.length > 0 ? mapped : CREW);
+          setCrew(mapped);
         }
 
         if (incData && Array.isArray(incData.incidents)) {
           setIncidents(incData.incidents);
         }
-      } catch (e) { /* keep fallback */ }
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
 
   const stats = [
     { label: 'Total crew', value: crew.length, color: '#1a1a1a' },

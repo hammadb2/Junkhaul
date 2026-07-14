@@ -5,16 +5,9 @@
 import { useState, useEffect } from 'react';
 import { money } from '@/lib/adminUiHelpers';
 
-const QUADRANTS = [
-  { name: 'SE', jobs: 24, revenue: 5760, profit: 2420 },
-  { name: 'NW', jobs: 14, revenue: 3080, profit: 1180 },
-  { name: 'NE', jobs: 11, revenue: 2860, profit: 1310 },
-  { name: 'SW', jobs: 9, revenue: 1980, profit: 740 },
-];
-
 export default function IntelPanel() {
   const [days, setDays] = useState(30);
-  const [quadrants, setQuadrants] = useState(QUADRANTS);
+  const [quadrants, setQuadrants] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,19 +20,21 @@ export default function IntelPanel() {
         if (cancelled) return;
         const summary = data.summary || data.quadrants || data;
         if (Array.isArray(summary)) {
-          const mapped = summary.map((q) => ({
+          setQuadrants(summary.map((q) => ({
             name: q.quadrant || q.name,
             jobs: q.total_jobs || q.jobs || 0,
             revenue: q.total_revenue || q.revenue || 0,
             profit: q.total_profit || q.profit || 0,
-          }));
-          if (mapped.length > 0) setQuadrants(mapped);
+          })));
         }
-      } catch (e) { /* keep fallback */ }
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [days]);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
+  if (quadrants.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No quadrant data available</div>;
 
   const maxRev = Math.max(...quadrants.map((q) => q.revenue));
   const maxProfit = Math.max(...quadrants.map((q) => q.profit));

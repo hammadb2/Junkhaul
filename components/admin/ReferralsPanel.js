@@ -5,18 +5,6 @@
 import { useState, useEffect } from 'react';
 import { money, badgeStyle } from '@/lib/adminUiHelpers';
 
-const LEADERBOARD = [
-  { phone: '(403) 555-0120', completed: 6, earned: 150 },
-  { phone: '(403) 555-0288', completed: 4, earned: 100 },
-  { phone: '(403) 555-0344', completed: 3, earned: 75 },
-];
-
-const REFERRALS = [
-  { referrer: '(403) 555-0120', referee: '(403) 555-0399', status: 'completed', reward: '$25 / $25' },
-  { referrer: '(403) 555-0288', referee: '(403) 555-0410', status: 'pending', reward: '$25 / $25' },
-  { referrer: '(403) 555-0344', referee: '(403) 555-0177', status: 'expired', reward: '$25 / $25' },
-];
-
 const STATUS_BADGE = {
   completed: badgeStyle('rgba(34,197,94,.12)', '#22C55E'),
   pending: badgeStyle('rgba(245,158,11,.12)', '#F59E0B'),
@@ -24,8 +12,8 @@ const STATUS_BADGE = {
 };
 
 export default function ReferralsPanel() {
-  const [leaderboard, setLeaderboard] = useState(LEADERBOARD);
-  const [referrals, setReferrals] = useState(REFERRALS);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [referrals, setReferrals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,28 +26,30 @@ export default function ReferralsPanel() {
         if (cancelled) return;
 
         if (Array.isArray(data.leaderboard)) {
-          const mapped = data.leaderboard.map((l) => ({
+          setLeaderboard(data.leaderboard.map((l) => ({
             phone: l.referrer_phone || l.phone || '—',
             completed: l.completed || 0,
             earned: l.total_earned || l.earned || 0,
-          }));
-          if (mapped.length > 0) setLeaderboard(mapped);
+          })));
         }
 
         if (Array.isArray(data.referrals)) {
-          const mapped = data.referrals.map((r) => ({
+          setReferrals(data.referrals.map((r) => ({
             referrer: r.referrer_phone || '—',
             referee: r.referee_phone || '—',
             status: r.status || 'pending',
             reward: `$${r.referrer_reward_amount || 25} / $${r.referee_reward_amount || 25}`,
-          }));
-          if (mapped.length > 0) setReferrals(mapped);
+          })));
         }
-      } catch (e) { /* keep fallback */ }
+      } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
+  if (leaderboard.length === 0 && referrals.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No referrals yet</div>;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
