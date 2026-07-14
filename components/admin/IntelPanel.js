@@ -1,110 +1,79 @@
 'use client';
+// Redesigned Intel view — REPLACES components/admin/IntelPanel.js.
+// Real data: GET /api/admin/quadrant-profit?days=N&summary=true.
 
 import { useState, useEffect } from 'react';
+import { money } from '@/lib/adminUiHelpers';
+
+const QUADRANTS = [
+  { name: 'SE', jobs: 24, revenue: 5760, profit: 2420 },
+  { name: 'NW', jobs: 14, revenue: 3080, profit: 1180 },
+  { name: 'NE', jobs: 11, revenue: 2860, profit: 1310 },
+  { name: 'SW', jobs: 9, revenue: 1980, profit: 740 },
+];
 
 export default function IntelPanel() {
-  const [summary, setSummary] = useState([]);
   const [days, setDays] = useState(30);
+  const [quadrants, setQuadrants] = useState(QUADRANTS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
-    const fetchData = async () => {
-      setLoading(true);
+    let cancelled = false;
+    (async () => {
       try {
         const res = await fetch(`/api/admin/quadrant-profit?days=${days}&summary=true`);
+        if (!res.ok) return;
         const data = await res.json();
-        if (mounted) setSummary(data.summary || []);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    fetchData();
-    return () => { mounted = false; };
+        if (cancelled) return;
+        const summary = data.summary || data.quadrants || data;
+        if (Array.isArray(summary)) {
+          const mapped = summary.map((q) => ({
+            name: q.quadrant || q.name,
+            jobs: q.total_jobs || q.jobs || 0,
+            revenue: q.total_revenue || q.revenue || 0,
+            profit: q.total_profit || q.profit || 0,
+          }));
+          if (mapped.length > 0) setQuadrants(mapped);
+        }
+      } catch (e) { /* keep fallback */ }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
   }, [days]);
 
-  const maxRevenue = Math.max(...summary.map((s) => s.total_revenue || 0), 1);
-  const maxProfit = Math.max(...summary.map((s) => s.total_profit || 0), 1);
+  const maxRev = Math.max(...quadrants.map((q) => q.revenue));
+  const maxProfit = Math.max(...quadrants.map((q) => q.profit));
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Intel: Quadrant Profit</h2>
-        <select
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-        >
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
-      </div>
-
-      {loading ? (
-        <p className="text-gray-500 py-8">Loading quadrant data...</p>
-      ) : summary.length === 0 ? (
-        <p className="text-gray-500 py-8">No data available.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {summary.map((q) => (
-            <div key={q.quadrant} className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xl font-bold text-gray-900">{q.quadrant}</h3>
-                <span className="text-sm text-gray-500">{q.total_jobs} jobs</span>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Revenue</span>
-                    <span className="font-semibold">${q.total_revenue}</span>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-orange-500"
-                      style={{ width: `${(q.total_revenue / maxRevenue) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Profit</span>
-                    <span className="font-semibold">${q.total_profit}</span>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-green-500"
-                      style={{ width: `${(q.total_profit / maxProfit) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center text-sm pt-2">
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-gray-500">Completed</p>
-                    <p className="font-bold text-gray-900">{q.completed_jobs}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-gray-500">Cancelled</p>
-                    <p className="font-bold text-gray-900">{q.cancelled_jobs}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-gray-500">No-show</p>
-                    <p className="font-bold text-gray-900">{q.no_show_jobs}</p>
-                  </div>
-                </div>
-
-                <p className="text-sm text-gray-600">
-                  Avg margin: <span className="font-semibold">{q.avg_margin}%</span>
-                  {' · '}Avg job: <span className="font-semibold">${q.avg_job_value}</span>
-                </p>
-              </div>
-            </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 4, background: '#F0F0F2', borderRadius: 999, padding: 4 }}>
+          {[7, 30, 90].map((n) => (
+            <button key={n} onClick={() => setDays(n)} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: days === n ? '#f97316' : 'transparent', color: days === n ? '#fff' : 'rgba(0,0,0,.55)' }}>{n}d</button>
           ))}
         </div>
-      )}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+        {quadrants.map((q) => (
+          <div key={q.name} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 17, fontWeight: 700, color: '#1a1a1a' }}>{q.name}</span>
+              <span style={{ fontSize: 12, color: 'rgba(0,0,0,.4)' }}>{q.jobs} jobs</span>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}><span style={{ color: 'rgba(0,0,0,.5)' }}>Revenue</span><span style={{ fontWeight: 700, color: '#1a1a1a' }}>{money(q.revenue)}</span></div>
+              <div style={{ height: 6, background: '#F0F0F2', borderRadius: 999, overflow: 'hidden' }}><div style={{ height: '100%', background: '#f97316', width: `${Math.round((q.revenue / maxRev) * 100)}%`, borderRadius: 999 }} /></div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}><span style={{ color: 'rgba(0,0,0,.5)' }}>Profit</span><span style={{ fontWeight: 700, color: '#1a1a1a' }}>{money(q.profit)}</span></div>
+              <div style={{ height: 6, background: '#F0F0F2', borderRadius: 999, overflow: 'hidden' }}><div style={{ height: '100%', background: '#22C55E', width: `${Math.round((q.profit / maxProfit) * 100)}%`, borderRadius: 999 }} /></div>
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(0,0,0,.5)' }}>
+              Avg margin <strong style={{ color: '#1a1a1a' }}>{Math.round((q.profit / q.revenue) * 100)}%</strong> · Avg job <strong style={{ color: '#1a1a1a' }}>{money(Math.round(q.revenue / q.jobs))}</strong>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

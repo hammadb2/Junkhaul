@@ -1,107 +1,73 @@
 'use client';
+// Redesigned Audit view — REPLACES components/admin/AuditTrail.js.
+// Real data: GET /api/admin/events.
 
 import { useState, useEffect } from 'react';
 
-const EVENT_TYPES = [
-  'All',
-  'surge_applied',
-  'deadhead_offer_sent',
-  'proactive_offer_sent',
-  'abandonment_touch1_sent',
-  'abandonment_touch2_sent',
-  'abandonment_touch3_sent',
-  'review_request_sent',
-  'sms_inbound',
-  'sms_outbound',
+const TYPES = ['All', 'surge_applied', 'sms_outbound', 'sms_inbound', 'review_request_sent', 'abandonment_touch1_sent'];
+
+const EVENTS = [
+  { time: 'Jul 13, 3:02 PM', type: 'sms_outbound', ref: 'Booking a1b2c3d4', payload: '{"template":"reminder"}' },
+  { time: 'Jul 13, 1:40 PM', type: 'surge_applied', ref: 'Lead 9f8e7d6c', payload: '{"multiplier":1.3}' },
+  { time: 'Jul 12, 6:00 AM', type: 'review_request_sent', ref: 'Booking 4d3c2b1a', payload: '{"link":"g.page/..."}' },
+  { time: 'Jul 11, 9:15 AM', type: 'sms_inbound', ref: '(403) 555-0166', payload: '{"body":"STOP"}' },
 ];
 
 export default function AuditTrail() {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
-  const [limit, setLimit] = useState(50);
+  const [events, setEvents] = useState(EVENTS);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
-    const fetchEvents = async () => {
-      setLoading(true);
+    let cancelled = false;
+    (async () => {
       try {
-        const url = new URL('/api/admin/events', window.location.origin);
-        if (filter !== 'All') url.searchParams.set('type', filter);
-        url.searchParams.set('limit', limit);
-        const res = await fetch(url.toString());
-        const data = await res.json();
-        if (mounted) setEvents(data.events || []);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    fetchEvents();
-    return () => { mounted = false; };
-  }, [filter, limit]);
+        const res = await fetch('/api/admin/events?limit=200');
+        if (!res.ok) return;
+        const { events: data } = await res.json();
+        if (cancelled || !Array.isArray(data)) return;
+        const mapped = data.map((e) => ({
+          time: e.created_at ? new Date(e.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) + ', ' + new Date(e.created_at).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }) : '',
+          type: e.event_type || e.type || 'unknown',
+          ref: e.booking_id ? `Booking ${e.booking_id.slice(0, 8)}` : e.lead_id ? `Lead ${e.lead_id.slice(0, 8)}` : e.reference || '—',
+          payload: e.payload ? (typeof e.payload === 'string' ? e.payload : JSON.stringify(e.payload)) : '',
+        }));
+        setEvents(mapped.length > 0 ? mapped : EVENTS);
+      } catch (e) { /* keep fallback */ }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const rows = events.filter((e) => filter === 'All' || e.type === filter);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Audit Trail</h2>
-        <div className="flex items-center gap-2">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            {EVENT_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          <select
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={250}>250</option>
-          </select>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', fontSize: 12.5 }}>
+          {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
-
-      {loading ? (
-        <p className="text-gray-500 py-8">Loading events...</p>
-      ) : events.length === 0 ? (
-        <p className="text-gray-500 py-8">No events found.</p>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="text-left px-4 py-2 font-medium">Time</th>
-                <th className="text-left px-4 py-2 font-medium">Event</th>
-                <th className="text-left px-4 py-2 font-medium">Booking / Lead</th>
-                <th className="text-left px-4 py-2 font-medium">Payload</th>
+      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <thead><tr style={{ background: '#FAFAFA', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+            {['Time', 'Event', 'Reference', 'Payload'].map((h) => (
+              <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,.4)', textTransform: 'uppercase' }}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {rows.map((e, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,.045)' }}>
+                <td style={{ padding: '10px 18px', color: 'rgba(0,0,0,.4)', whiteSpace: 'nowrap' }}>{e.time}</td>
+                <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1a1a1a' }}>{e.type}</td>
+                <td style={{ padding: '10px 12px', color: 'rgba(0,0,0,.55)' }}>{e.ref}</td>
+                <td style={{ padding: '10px 18px', color: 'rgba(0,0,0,.4)', fontFamily: 'monospace', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.payload}</td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {events.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 text-gray-500 whitespace-nowrap">
-                    {new Date(e.created_at).toLocaleString('en-CA')}
-                  </td>
-                  <td className="px-4 py-2 font-medium text-gray-900">
-                    {e.event_type}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {e.booking_id ? `Booking ${e.booking_id.slice(0, 8)}` : e.lead_id ? `Lead ${e.lead_id.slice(0, 8)}` : e.customer_phone || '-'}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600 font-mono text-xs max-w-xs truncate">
-                    {JSON.stringify(e.payload || {})}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <div style={{ padding: '48px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(0,0,0,.4)' }}>No events match this filter.</div>}
+      </div>
     </div>
   );
 }

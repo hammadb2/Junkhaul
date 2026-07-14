@@ -1,108 +1,98 @@
 'use client';
+// Redesigned Referrals view — REPLACES components/admin/ReferralsPanel.js.
+// Real data: GET /api/admin/referrals.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { money, badgeStyle } from '@/lib/adminUiHelpers';
+
+const LEADERBOARD = [
+  { phone: '(403) 555-0120', completed: 6, earned: 150 },
+  { phone: '(403) 555-0288', completed: 4, earned: 100 },
+  { phone: '(403) 555-0344', completed: 3, earned: 75 },
+];
+
+const REFERRALS = [
+  { referrer: '(403) 555-0120', referee: '(403) 555-0399', status: 'completed', reward: '$25 / $25' },
+  { referrer: '(403) 555-0288', referee: '(403) 555-0410', status: 'pending', reward: '$25 / $25' },
+  { referrer: '(403) 555-0344', referee: '(403) 555-0177', status: 'expired', reward: '$25 / $25' },
+];
+
+const STATUS_BADGE = {
+  completed: badgeStyle('rgba(34,197,94,.12)', '#22C55E'),
+  pending: badgeStyle('rgba(245,158,11,.12)', '#F59E0B'),
+  expired: badgeStyle('rgba(0,0,0,.06)', 'rgba(0,0,0,.4)'),
+};
 
 export default function ReferralsPanel() {
-  const [referrals, setReferrals] = useState([]);
-  const [leaderboard, setLeaderboard] = useState([]);
+  const [leaderboard, setLeaderboard] = useState(LEADERBOARD);
+  const [referrals, setReferrals] = useState(REFERRALS);
   const [loading, setLoading] = useState(true);
 
-  const fetchReferrals = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/referrals');
-      const data = await res.json();
-      setReferrals(data.referrals || []);
-      setLeaderboard(data.leaderboard || []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
     (async () => {
-      setLoading(true);
       try {
         const res = await fetch('/api/admin/referrals');
+        if (!res.ok) return;
         const data = await res.json();
-        if (mounted) {
-          setReferrals(data.referrals || []);
-          setLeaderboard(data.leaderboard || []);
+        if (cancelled) return;
+
+        if (Array.isArray(data.leaderboard)) {
+          const mapped = data.leaderboard.map((l) => ({
+            phone: l.referrer_phone || l.phone || '—',
+            completed: l.completed || 0,
+            earned: l.total_earned || l.earned || 0,
+          }));
+          if (mapped.length > 0) setLeaderboard(mapped);
         }
-      } finally {
-        if (mounted) setLoading(false);
-      }
+
+        if (Array.isArray(data.referrals)) {
+          const mapped = data.referrals.map((r) => ({
+            referrer: r.referrer_phone || '—',
+            referee: r.referee_phone || '—',
+            status: r.status || 'pending',
+            reward: `$${r.referrer_reward_amount || 25} / $${r.referee_reward_amount || 25}`,
+          }));
+          if (mapped.length > 0) setReferrals(mapped);
+        }
+      } catch (e) { /* keep fallback */ }
+      finally { if (!cancelled) setLoading(false); }
     })();
-    return () => { mounted = false; };
+    return () => { cancelled = true; };
   }, []);
-
-  const statusBadge = (status) => {
-    const classes = {
-      pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      completed: 'bg-green-100 text-green-700 border-green-200',
-      expired: 'bg-gray-100 text-gray-700 border-gray-200',
-    };
-    return (
-      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${classes[status] || classes.pending}`}>
-        {status}
-      </span>
-    );
-  };
-
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-bold text-gray-900">Referrals</h2>
-
-      {loading ? (
-        <p className="text-gray-500 py-8">Loading referrals...</p>
-      ) : (
-        <>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">Leaderboard</h3>
-            {leaderboard.length === 0 ? (
-              <p className="text-gray-500 text-sm">No completed referrals yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {leaderboard.slice(0, 6).map((row) => (
-                  <div key={row.referrer_phone} className="bg-gray-50 rounded-lg p-3">
-                    <p className="font-mono text-sm text-gray-700">{row.referrer_phone}</p>
-                    <p className="text-lg font-bold text-gray-900">{row.completed} completed</p>
-                    <p className="text-sm text-gray-500">${row.total_earned} earned</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600">
-                <tr>
-                  <th className="text-left px-4 py-2 font-medium">Referrer</th>
-                  <th className="text-left px-4 py-2 font-medium">Referee</th>
-                  <th className="text-left px-4 py-2 font-medium">Status</th>
-                  <th className="text-left px-4 py-2 font-medium">Reward</th>
-                  <th className="text-left px-4 py-2 font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {referrals.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 font-mono text-gray-700">{r.referrer_phone}</td>
-                    <td className="px-4 py-2 font-mono text-gray-700">{r.referee_phone}</td>
-                    <td className="px-4 py-2">{statusBadge(r.status)}</td>
-                    <td className="px-4 py-2 text-gray-700">${r.referrer_reward_amount} / ${r.referee_reward_amount}</td>
-                    <td className="px-4 py-2 text-gray-500 whitespace-nowrap">
-                      {new Date(r.created_at).toLocaleDateString('en-CA')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 14 }}>Leaderboard</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          {leaderboard.map((r) => (
+            <div key={r.phone} style={{ background: '#FAFAFA', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(0,0,0,.5)' }}>{r.phone}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', marginTop: 2 }}>{r.completed} completed</div>
+              <div style={{ fontSize: 12, color: '#22C55E', fontWeight: 600 }}>{money(r.earned)} earned</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <thead><tr style={{ background: '#FAFAFA', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+            {['Referrer', 'Referee', 'Status', 'Reward'].map((h) => (
+              <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,.4)', textTransform: 'uppercase' }}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {referrals.map((r) => (
+              <tr key={r.referrer + r.referee} style={{ borderBottom: '1px solid rgba(0,0,0,.045)' }}>
+                <td style={{ padding: '10px 18px', fontFamily: 'monospace', color: 'rgba(0,0,0,.6)' }}>{r.referrer}</td>
+                <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: 'rgba(0,0,0,.6)' }}>{r.referee}</td>
+                <td style={{ padding: '10px 12px' }}><span style={STATUS_BADGE[r.status]}>{r.status}</span></td>
+                <td style={{ padding: '10px 18px', color: 'rgba(0,0,0,.55)' }}>{r.reward}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

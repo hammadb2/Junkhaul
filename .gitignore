@@ -37,3 +37,4 @@ supabase/.temp
 
 # Flutter secrets (contains API tokens, gitignored)
 apps/crew_app/lib/src/core/secrets.dart
+apps/crew_app/android/build/
