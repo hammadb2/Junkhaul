@@ -17,6 +17,7 @@
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
+import { buildItemizedQuote } from '@/lib/itemPricing';
 import crypto from 'crypto';
 import sharp from 'sharp';
 
@@ -527,13 +528,23 @@ export async function POST(req) {
     // Build a compatibility `analysis` object so the existing booking
     // page can consume the response without a major refactor.
     const allItems = perImageResults.flatMap((r) => r.scan.items);
-    const hasFreon = allItems.some((i) =>
-      /refrigerator|freezer|fridge|air conditioner|ac unit|water cooler/i.test(i.label)
-    );
-    const freonCount = allItems.filter((i) =>
-      /refrigerator|freezer|fridge|air conditioner|ac unit|water cooler/i.test(i.label)
-    ).reduce((sum, i) => sum + i.count, 0);
+    const freonRegex = /refrigerator|freezer|fridge|air conditioner|ac unit|water cooler|dehumidifier/i;
+    const hasFreon = allItems.some((i) => freonRegex.test(i.label));
+    const freonCount = allItems.filter((i) => freonRegex.test(i.label)).reduce((sum, i) => sum + i.count, 0);
     const hasHazmat = allItems.some((i) => i.hazard_flag);
+
+    // Map Gemini scan items to the shape buildItemizedQuote expects:
+    //   { name, quantity, is_freon, is_hazmat, estimated_weight_kg }
+    // Gemini gives us: { label, count, hazard_flag, est_volume_cuft_each, condition }
+    const itemsForQuote = allItems.map((i) => ({
+      name: i.label,
+      quantity: i.count,
+      is_freon: freonRegex.test(i.label),
+      is_hazmat: i.hazard_flag,
+      estimated_weight_kg: Math.round((i.est_volume_cuft_each || 20) * 0.45), // rough cuft→kg
+    }));
+
+    const itemized = buildItemizedQuote(itemsForQuote, { stairs: 0, same_day: false });
 
     const analysis = {
       load_size: bookingQuote.load_size,
@@ -549,13 +560,7 @@ export async function POST(req) {
         : bookingQuote.hazard_review_required
           ? 'Hazardous items detected'
           : null,
-      items_detected: allItems.map((i) => ({
-        item: i.label,
-        count: i.count,
-        condition: i.condition,
-        confidence: i.confidence,
-        volume_cuft: i.est_volume_cuft_each * i.count,
-      })),
+      items_detected: itemsForQuote,
       estimated_volume_cuft: bookingQuote.total_est_volume_cuft,
       photo_quote_tier: bookingQuote.tier,
       items_needing_confirmation: bookingQuote.items_needing_confirmation,
@@ -567,6 +572,7 @@ export async function POST(req) {
       images: perImageResults.map((r) => ({ image_id: r.image_id, cached: r.cached })),
       quote: bookingQuote,
       analysis,
+      itemized,
       photoUrls,
     });
   } catch (err) {
