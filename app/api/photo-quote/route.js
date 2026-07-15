@@ -23,7 +23,7 @@ import crypto from 'crypto';
 import sharp from 'sharp';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -58,11 +58,13 @@ async function enhanceImage(imageBuffer) {
 }
 
 // ---------------------------------------------------------------------
-// STEP 0: Split the image into overlapping quadrant crops in addition to
-// the full frame. Vision models default to reporting the 4-6 most
-// visually prominent objects in a photo and silently drop background /
-// cluttered detail. Crops force the model to actually look at every
-// corner instead of skimming the whole frame once.
+// STEP 0: Split the image into a 3x3 overlapping grid (9 crops) in
+// addition to the full frame. Vision models default to reporting the
+// 4-6 most visually prominent objects and silently drop background /
+// cluttered detail. A 3x3 grid with 15% overlap forces the model to
+// actually look at every region — center, edges, and corners — instead
+// of skimming the whole frame once. Each crop is also upscaled 1.5x
+// so small/partially-visible items become detectable.
 // ---------------------------------------------------------------------
 async function buildImageTiles(enhancedBuffer) {
   const img = sharp(enhancedBuffer);
@@ -70,27 +72,51 @@ async function buildImageTiles(enhancedBuffer) {
   const w = meta.width;
   const h = meta.height;
 
-  const overlapX = Math.round(w * 0.1);
-  const overlapY = Math.round(h * 0.1);
-  const halfW = Math.round(w / 2);
-  const halfH = Math.round(h / 2);
+  const overlap = 0.15; // 15% overlap on each side
+  const cols = 3;
+  const rows = 3;
+  const cellW = Math.round(w / cols);
+  const cellH = Math.round(h / rows);
+  const overlapX = Math.round(cellW * overlap);
+  const overlapY = Math.round(cellH * overlap);
 
-  const regions = [
-    { label: 'top_left', left: 0, top: 0, width: halfW + overlapX, height: halfH + overlapY },
-    { label: 'top_right', left: Math.max(0, halfW - overlapX), top: 0, width: w - (halfW - overlapX), height: halfH + overlapY },
-    { label: 'bottom_left', left: 0, top: Math.max(0, halfH - overlapY), width: halfW + overlapX, height: h - (halfH - overlapY) },
-    { label: 'bottom_right', left: Math.max(0, halfW - overlapX), top: Math.max(0, halfH - overlapY), width: w - (halfW - overlapX), height: h - (halfH - overlapY) },
+  const regions = [];
+  const labels = [
+    'top_left', 'top_center', 'top_right',
+    'mid_left', 'center', 'mid_right',
+    'bot_left', 'bot_center', 'bot_right',
   ];
 
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const left = Math.max(0, col * cellW - overlapX);
+      const top = Math.max(0, row * cellH - overlapY);
+      const right = Math.min(w, (col + 1) * cellW + overlapX);
+      const bottom = Math.min(h, (row + 1) * cellH + overlapY);
+      regions.push({
+        label: labels[row * cols + col],
+        left, top,
+        width: right - left,
+        height: bottom - top,
+      });
+    }
+  }
+
   const crops = await Promise.all(
-    regions.map(async (r) => ({
-      label: r.label,
-      base64: (await img.clone().extract({
-        left: r.left, top: r.top,
-        width: Math.min(r.width, w - r.left),
-        height: Math.min(r.height, h - r.top),
-      }).jpeg({ quality: 92 }).toBuffer()).toString('base64'),
-    }))
+    regions.map(async (r) => {
+      const cropBuf = await img.clone()
+        .extract({
+          left: r.left, top: r.top,
+          width: Math.min(r.width, w - r.left),
+          height: Math.min(r.height, h - r.top),
+        })
+        .resize({ width: Math.min(r.width, w - r.left) * 1.5, withoutEnlargement: false })
+        .sharpen({ sigma: 0.8 })
+        .normalize()
+        .jpeg({ quality: 92 })
+        .toBuffer();
+      return { label: r.label, base64: cropBuf.toString('base64') };
+    })
   );
 
   return crops;
@@ -136,7 +162,7 @@ const SCAN_SCHEMA = {
           visual_evidence: { type: 'string' },
           source_region: {
             type: 'string',
-            enum: ['full_image', 'top_left', 'top_right', 'bottom_left', 'bottom_right'],
+            enum: ['full_image', 'top_left', 'top_center', 'top_right', 'mid_left', 'center', 'mid_right', 'bot_left', 'bot_center', 'bot_right'],
           },
         },
         required: ['label', 'count', 'est_volume_cuft_each', 'est_weight_kg_each', 'condition', 'hazard_flag', 'confidence', 'visual_evidence', 'source_region'],
@@ -149,24 +175,43 @@ const SCAN_SCHEMA = {
 };
 
 const SCAN_PROMPT = `You are given the SAME photo multiple times: once as the
-full image, and again as four overlapping close-up crops (top_left,
-top_right, bottom_left, bottom_right). This is deliberate -- cluttered
-scenes hide items behind/under/beside other items, and a single glance at
-the full image misses them.
+full image, and again as NINE overlapping close-up crops on a 3x3 grid
+(top_left, top_center, top_right, mid_left, center, mid_right, bot_left,
+bot_center, bot_right). Each crop is zoomed 1.5x so you can see detail
+that is invisible in the full frame. This is deliberate -- cluttered
+scenes hide items behind, under, beside, and between other items, and a
+single glance at the full image misses most of them.
 
 Your job: produce an EXHAUSTIVE inventory, not just the most obvious
 objects. Work region by region:
-1. For each of the 4 crops, individually list every distinct object you can
-   see in that crop, including partially-obscured, stacked, or small items
-   (individual boxes, buckets, tools, plants, containers -- do not lump
-   multiple distinct boxes into one line, count each one you can
-   distinguish).
-2. Then merge the four regional lists into one final item list, removing
+1. For each of the 9 crops, individually list every distinct object you
+   can see in that crop. Look CAREFULLY -- scan every pixel:
+   - Items partially visible behind other items (a chair leg poking out,
+     a box edge behind a sofa, a tool on a shelf behind paint cans)
+   - Items under or stacked beneath other items (something peeking out
+     from under a tarp, the corner of a mattress under boxes)
+   - Small items that are easy to overlook (buckets, tools, lamps,
+     small appliances, bags, loose lumber, pipes, bike helmets)
+   - Items in shadows or dark corners -- the crops have been
+     contrast-enhanced specifically so you can see into shadows
+   - Items visible through doorways or openings to other rooms
+   - Count EVERY individual box, bag, bin, or container -- do not lump
+     multiple distinct boxes into one line. If you can see 6 separate
+     boxes, list 6 boxes.
+2. Then merge the nine regional lists into one final item list, removing
    duplicates where the same object appears in two overlapping crops
    (use source_region + position to judge overlap).
 3. Rate scene_density honestly first -- if you mark it "cluttered" or
    "packed" but then only return 4-5 items total, that is a contradiction;
-   go back and look again before finalizing.
+   go back and look again before finalizing. A truly cluttered garage
+   should have 15-30+ distinct items. A packed one can have 40+.
+
+CRITICAL -- DO NOT SKIP ITEMS. If you can see even 10% of an object
+behind something else, LIST IT. If there is a shape that might be an
+item but you are not sure, LIST IT with confidence "low" and describe
+what you see in visual_evidence. It is far better to over-detect (and
+let the customer remove false positives) than to under-detect and miss
+a chargeable item.
 
 CATEGORIZATION RULE -- do not guess appliance/brand categories from vague
 shape alone. Only label something as a specific known category
@@ -181,7 +226,9 @@ fees to something you are only guessing at from silhouette.
 For each item, estimate volume in cubic feet using visible reference
 objects in frame (a standard doorway is ~80in tall, a dining chair seat is
 ~18in high, a bankers box is roughly 1.3 cuft, etc) -- reason from what is
-actually visible in THIS photo, not a generic category default.
+actually visible in THIS photo, not a generic category default. If only
+part of an item is visible, estimate the FULL size of the item, not just
+the visible portion.
 
 Also estimate weight in kg for each item type (est_weight_kg_each). Reason
 from the material and visible size: a fabric sofa is ~45kg, a refrigerator
@@ -206,17 +253,18 @@ async function scanImageWithGemini(rawImageBuffer, mimeType) {
     })),
   ];
 
+  // Build the parts array dynamically: full image + 9 labeled crops
+  const parts = [{ text: 'FULL IMAGE:' }, imageParts[0]];
+  for (const tile of tiles) {
+    parts.push({ text: `CROP: ${tile.label}` });
+    parts.push(imageParts[tiles.indexOf(tile) + 1]);
+  }
+  parts.push({ text: SCAN_PROMPT });
+
   const requestBody = JSON.stringify({
     contents: [
       {
-        parts: [
-          { text: 'FULL IMAGE:' }, imageParts[0],
-          { text: 'CROP: top_left' }, imageParts[1],
-          { text: 'CROP: top_right' }, imageParts[2],
-          { text: 'CROP: bottom_left' }, imageParts[3],
-          { text: 'CROP: bottom_right' }, imageParts[4],
-          { text: SCAN_PROMPT },
-        ],
+        parts,
       },
     ],
     generationConfig: {
@@ -281,11 +329,17 @@ async function scanImageWithGemini(rawImageBuffer, mimeType) {
 // Same label + non-adjacent regions = genuinely separate, counts summed.
 // ---------------------------------------------------------------------
 const REGION_ADJACENCY = {
-  full_image: ['top_left', 'top_right', 'bottom_left', 'bottom_right'],
-  top_left: ['top_right', 'bottom_left', 'full_image'],
-  top_right: ['top_left', 'bottom_right', 'full_image'],
-  bottom_left: ['top_left', 'bottom_right', 'full_image'],
-  bottom_right: ['top_right', 'bottom_left', 'full_image'],
+  full_image: ['top_left', 'top_center', 'top_right', 'mid_left', 'center', 'mid_right', 'bot_left', 'bot_center', 'bot_right'],
+  // 3x3 grid: each region overlaps with its 8 neighbors (15% overlap)
+  top_left:    ['top_center', 'mid_left', 'center', 'full_image'],
+  top_center:  ['top_left', 'top_right', 'mid_left', 'center', 'mid_right', 'full_image'],
+  top_right:   ['top_center', 'center', 'mid_right', 'full_image'],
+  mid_left:    ['top_left', 'top_center', 'center', 'bot_left', 'bot_center', 'full_image'],
+  center:      ['top_left', 'top_center', 'top_right', 'mid_left', 'mid_right', 'bot_left', 'bot_center', 'bot_right', 'full_image'],
+  mid_right:   ['top_center', 'top_right', 'center', 'bot_center', 'bot_right', 'full_image'],
+  bot_left:    ['mid_left', 'center', 'bot_center', 'full_image'],
+  bot_center:  ['mid_left', 'center', 'mid_right', 'bot_left', 'bot_right', 'full_image'],
+  bot_right:   ['center', 'mid_right', 'bot_center', 'full_image'],
 };
 
 function normalizeLabel(label) {
