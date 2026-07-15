@@ -34,7 +34,7 @@ export default function IntelPanel() {
   }, [days]);
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
-  if (quadrants.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No quadrant data available</div>;
+  if (quadrants.length === 0) return <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No quadrant data available</div>;
 
   const maxRev = Math.max(...quadrants.map((q) => q.revenue));
   const maxProfit = Math.max(...quadrants.map((q) => q.profit));
@@ -48,7 +48,7 @@ export default function IntelPanel() {
           ))}
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+      <div className="admin-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
         {quadrants.map((q) => (
           <div key={q.name} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -64,7 +64,7 @@ export default function IntelPanel() {
               <div style={{ height: 6, background: '#F0F0F2', borderRadius: 999, overflow: 'hidden' }}><div style={{ height: '100%', background: '#22C55E', width: `${Math.round((q.profit / maxProfit) * 100)}%`, borderRadius: 999 }} /></div>
             </div>
             <div style={{ fontSize: 12, color: 'rgba(0,0,0,.5)' }}>
-              Avg margin <strong style={{ color: '#1a1a1a' }}>{Math.round((q.profit / q.revenue) * 100)}%</strong> · Avg job <strong style={{ color: '#1a1a1a' }}>{money(Math.round(q.revenue / q.jobs))}</strong>
+              Avg margin <strong style={{ color: '#1a1a1a' }}>{q.revenue > 0 ? Math.round((q.profit / q.revenue) * 100) : 0}%</strong> · Avg job <strong style={{ color: '#1a1a1a' }}>{money(q.jobs > 0 ? Math.round(q.revenue / q.jobs) : 0)}</strong>
             </div>
           </div>
         ))}

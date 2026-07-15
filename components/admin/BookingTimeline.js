@@ -3,19 +3,19 @@
 import { useState, useEffect } from 'react';
 
 const EVENT_ICONS = {
-  surge_applied: '⚡',
-  deadhead_offer_sent: '📍',
-  proactive_offer_sent: '📍',
-  abandonment_touch1_sent: '💬',
-  abandonment_touch2_sent: '💬',
-  abandonment_touch3_sent: '💬',
-  review_request_sent: '⭐',
-  sms_inbound: '⬇️',
-  sms_outbound: '⬆️',
-  offer_sent: '💰',
-  system_event: '⚙️',
-  message: '💬',
-  offer: '💰',
+  surge_applied: 'S',
+  deadhead_offer_sent: 'D',
+  proactive_offer_sent: 'D',
+  abandonment_touch1_sent: 'M',
+  abandonment_touch2_sent: 'M',
+  abandonment_touch3_sent: 'M',
+  review_request_sent: 'R',
+  sms_inbound: '↓',
+  sms_outbound: '↑',
+  offer_sent: '$',
+  system_event: '⚙',
+  message: 'M',
+  offer: '$',
 };
 
 const EVENT_LABELS = {

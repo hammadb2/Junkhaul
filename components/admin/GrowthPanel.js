@@ -53,7 +53,7 @@ export default function GrowthPanel() {
   }, []);
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
-  if (funnel.quoted === 0 && offers.length === 0 && crons.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No growth data available</div>;
+  if (funnel.quoted === 0 && offers.length === 0 && crons.length === 0) return <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No growth data available</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -63,7 +63,7 @@ export default function GrowthPanel() {
           {Object.keys(funnel).map((k) => (
             <div key={k} style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ height: 8, background: 'rgba(249,115,22,.12)', borderRadius: 999, overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: '#f97316', width: `${Math.round((funnel[k] / funnel.quoted) * 100)}%`, borderRadius: 999 }} />
+                <div style={{ height: '100%', background: '#f97316', width: `${funnel.quoted > 0 ? Math.round((funnel[k] / funnel.quoted) * 100) : 0}%`, borderRadius: 999 }} />
               </div>
               <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.45)', marginTop: 8, fontWeight: 500 }}>{FUNNEL_LABELS[k]}</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>{funnel[k]}</div>
@@ -86,7 +86,7 @@ export default function GrowthPanel() {
                 <td style={{ padding: '10px 12px', color: 'rgba(0,0,0,.55)' }}>{o.type}</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right', color: 'rgba(0,0,0,.4)', textDecoration: 'line-through' }}>${o.original}</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#1a1a1a' }}>${o.discounted}</td>
-                <td style={{ padding: '10px 18px', textAlign: 'right', color: '#f97316', fontWeight: 600 }}>{Math.round((1 - o.discounted / o.original) * 100)}%</td>
+                <td style={{ padding: '10px 18px', textAlign: 'right', color: '#f97316', fontWeight: 600 }}>{o.original > 0 ? Math.round((1 - o.discounted / o.original) * 100) : 0}%</td>
               </tr>
             ))}
           </tbody>
@@ -94,7 +94,7 @@ export default function GrowthPanel() {
       </div>
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 12 }}>Cron health</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
+        <div className="admin-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
           {crons.map((j) => (
             <div key={j.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FAFAFA', borderRadius: 10, padding: '10px 14px' }}>
               <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1a1a1a' }}>{j.name}</span>

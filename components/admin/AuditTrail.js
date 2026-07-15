@@ -39,7 +39,7 @@ export default function AuditTrail() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', gap: 8 }}>
-        <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', fontSize: 12.5 }}>
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter by event type" style={{ padding: '8px 12px', borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', fontSize: 12.5 }}>
           {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>

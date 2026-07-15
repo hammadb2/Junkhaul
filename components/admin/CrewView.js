@@ -84,10 +84,10 @@ export default function CrewView() {
 
       {tab === 'roster' && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="admin-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             {stats.map((s) => (
-              <div key={s.label} style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.06)', padding: '14px 16px' }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
+              <div key={s.label} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
                 <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.42)', marginTop: 2, fontWeight: 500 }}>{s.label}</div>
               </div>
             ))}

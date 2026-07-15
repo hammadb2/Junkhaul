@@ -13,6 +13,7 @@ export default function DashboardView({ flash }) {
   const [jobs, setJobs] = useState([]);
   const [crewStatus, setCrewStatus] = useState([]);
   const [attention, setAttention] = useState([]);
+  const [todayDate, setTodayDate] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function DashboardView({ flash }) {
 
         if (cc) {
           const today = cc.today || {};
+          setTodayDate(today.date || null);
           const newStats = [
             { label: 'Jobs today', value: String(today.jobs ?? '0'), Icon: IconTruck, iconBg: 'rgba(249,115,22,.12)', delta: '', deltaColor: '#22C55E' },
             { label: 'Revenue to collect', value: money(today.revenue_to_collect ?? 0), Icon: IconDollar, iconBg: 'rgba(34,197,94,.12)', delta: '', deltaColor: '#22C55E' },
@@ -83,11 +85,11 @@ export default function DashboardView({ flash }) {
   }, []);
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
-  if (stats.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No dashboard data available</div>;
+  if (stats.length === 0) return <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No dashboard data available</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+      <div className="admin-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
         {stats.map((s) => (
           <div key={s.label} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
             <div style={{ width: 32, height: 32, borderRadius: 9, background: s.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
@@ -104,7 +106,7 @@ export default function DashboardView({ flash }) {
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 14.5, fontWeight: 700, color: '#1a1a1a' }}>Today&apos;s route</div>
-            <span style={{ fontSize: 12, color: 'rgba(0,0,0,.4)', fontWeight: 500 }}>Thursday, Jul 16</span>
+            <span style={{ fontSize: 12, color: 'rgba(0,0,0,.4)', fontWeight: 500 }}>{todayDate ? new Date(todayDate + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Today'}</span>
           </div>
           {jobs.map((j) => (
             <div key={j.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', borderBottom: '1px solid rgba(0,0,0,.045)' }}>

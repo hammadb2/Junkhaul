@@ -57,7 +57,7 @@ export default function EarningsDashboard() {
   }, []);
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
-  if (totalEarned === 0 && totalPipeline === 0 && sources.length === 0 && byDate.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No earnings data available</div>;
+  if (totalEarned === 0 && totalPipeline === 0 && sources.length === 0 && byDate.length === 0) return <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No earnings data available</div>;
 
   const maxSrc = sources.length > 0 ? Math.max(...sources.map((s) => s[2])) : 0;
   const stats = [
@@ -69,10 +69,10 @@ export default function EarningsDashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+      <div className="admin-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
         {stats.map((s) => (
           <div key={s.label} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: s.color, fontVariantNumeric: 'tabular-nums', letterSpacing: '-.01em' }}>{s.value}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: s.color, fontVariantNumeric: 'tabular-nums', letterSpacing: '-.01em' }}>{s.value}</div>
             <div style={{ fontSize: 12.5, color: 'rgba(0,0,0,.45)', marginTop: 2, fontWeight: 500 }}>{s.label}</div>
             {s.sub && <div style={{ fontSize: 11, color: 'rgba(0,0,0,.35)', marginTop: 4 }}>{s.sub}</div>}
           </div>

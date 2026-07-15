@@ -4,7 +4,7 @@
 // (the `<aside>` / topbar JSX and the `NAV` array). Section bodies now live
 // in their own component files (imported below) instead of being inline.
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   IconHome, IconTruck, IconCalendar, IconClipboard, IconHourglass, IconDollar, IconWallet,
   IconUsers, IconTrending, IconPhone, IconDiamond, IconLink, IconSettings, IconHistory,
@@ -34,7 +34,7 @@ const NAV = [
     { id: 'dispatch', label: 'Dispatch', Icon: IconTruck },
     { id: 'schedule', label: 'Schedule', Icon: IconCalendar },
     { id: 'leads', label: 'Leads', Icon: IconClipboard },
-    { id: 'waitlist', label: 'Waitlist', Icon: IconHourglass, badge: 3 },
+    { id: 'waitlist', label: 'Waitlist', Icon: IconHourglass },
   ]},
   { label: 'Finance', items: [
     { id: 'earnings', label: 'Earnings', Icon: IconDollar },
@@ -45,7 +45,7 @@ const NAV = [
   ]},
   { label: 'Growth', items: [
     { id: 'growth', label: 'Growth', Icon: IconTrending },
-    { id: 'calls', label: 'Calls', Icon: IconPhone, badge: 2 },
+    { id: 'calls', label: 'Calls', Icon: IconPhone },
     { id: 'intel', label: 'Intel', Icon: IconDiamond },
     { id: 'referrals', label: 'Referrals', Icon: IconLink },
   ]},
@@ -82,6 +82,11 @@ const VIEWS = {
 export default function AdminLayout({ onLogout }) {
   const [view, setView] = useState('dashboard');
   const [toast, setToast] = useState(null);
+  const [badges, setBadges] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
 
   // Pass this down to section components so any action (save, notify, etc.)
   // can surface a consistent top-right confirmation toast.
@@ -90,12 +95,121 @@ export default function AdminLayout({ onLogout }) {
     setTimeout(() => setToast(null), 2600);
   };
 
+  // Fetch dynamic badge counts (waitlist entries needing notification, negative-sentiment calls)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [waitlistRes, callsRes] = await Promise.all([
+          fetch('/api/admin/waitlist'),
+          fetch('/api/admin/call-history'),
+        ]);
+        const waitlistData = waitlistRes.ok ? await waitlistRes.json() : null;
+        const callsData = callsRes.ok ? await callsRes.json() : null;
+        if (cancelled) return;
+
+        const waitlistCount = (waitlistData?.waitlist || []).filter(w => !w.notified).length;
+        const callsCount = (callsData?.calls || []).filter(c =>
+          c.sentiment === 'frustrated' || c.sentiment === 'negative'
+        ).length;
+
+        setBadges({ waitlist: waitlistCount, calls: callsCount });
+      } catch (e) { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Refresh badges every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      (async () => {
+        try {
+          const [waitlistRes, callsRes] = await Promise.all([
+            fetch('/api/admin/waitlist'),
+            fetch('/api/admin/call-history'),
+          ]);
+          const waitlistData = waitlistRes.ok ? await waitlistRes.json() : null;
+          const callsData = callsRes.ok ? await callsRes.json() : null;
+
+          const waitlistCount = (waitlistData?.waitlist || []).filter(w => !w.notified).length;
+          const callsCount = (callsData?.calls || []).filter(c =>
+            c.sentiment === 'frustrated' || c.sentiment === 'negative'
+          ).length;
+
+          setBadges({ waitlist: waitlistCount, calls: callsCount });
+        } catch (e) { /* silent */ }
+      })();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch notifications (stale cron jobs, urgent calls, unnotified waitlist entries)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/command-center');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        const notifs = [];
+        if (Array.isArray(data.staleJobs)) {
+          for (const job of data.staleJobs) {
+            notifs.push({ type: 'cron', text: `Cron job stale: ${job.job_name}`, color: '#F59E0B' });
+          }
+        }
+        if (Array.isArray(data.urgentCalls)) {
+          for (const call of data.urgentCalls) {
+            notifs.push({ type: 'call', text: `Urgent call: ${call.caller_name || call.caller_number}`, color: '#EF4444' });
+          }
+        }
+        if (badges.waitlist > 0) {
+          notifs.push({ type: 'waitlist', text: `${badges.waitlist} waitlist entries need notification`, color: '#3B82F6' });
+        }
+        setNotifications(notifs);
+      } catch (e) { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [badges.waitlist]);
+
+  // Search bookings by name or phone
+  const handleSearch = async (e) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    if (q.length < 2) {
+      setSearchResults(null);
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/bookings');
+      if (!res.ok) return;
+      const { bookings } = await res.json();
+      if (!Array.isArray(bookings)) return;
+      const filtered = bookings.filter(b =>
+        (b.name || '').toLowerCase().includes(q.toLowerCase()) ||
+        (b.phone || '').includes(q)
+      ).slice(0, 8);
+      setSearchResults(filtered);
+    } catch (err) { /* silent */ }
+  };
+
   const [meta0, meta1] = VIEW_META[view];
   const ActiveView = VIEWS[view];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100dvh', background: '#F5F5F7' }}>
-      <aside style={{ width: 232, minWidth: 232, background: '#fff', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100dvh', overflowY: 'auto', borderRight: '1px solid rgba(0,0,0,.07)' }}>
+    <div style={{ display: 'flex', minHeight: '100dvh', background: '#F5F5F7' }} onClick={() => { setShowNotifs(false); setSearchResults(null); }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .admin-sidebar { display: none !important; }
+          .admin-stat-grid { grid-template-columns: 1fr 1fr !important; }
+          .admin-content { padding: 16px !important; }
+        }
+        @media (max-width: 480px) {
+          .admin-stat-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+      <aside className="admin-sidebar" style={{ width: 232, minWidth: 232, background: '#fff', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100dvh', overflowY: 'auto', borderRight: '1px solid rgba(0,0,0,.07)' }}>
         <div style={{ padding: '20px 18px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(0,0,0,.06)' }}>
           <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', fontSize: 13, flexShrink: 0 }}>JH</div>
           <div>
@@ -125,8 +239,8 @@ export default function AdminLayout({ onLogout }) {
                   >
                     <span style={{ width: 18, height: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon size={18} /></span>
                     <span style={{ flex: 1 }}>{item.label}</span>
-                    {item.badge && (
-                      <span style={{ background: '#EF4444', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, minWidth: 16, textAlign: 'center' }}>{item.badge}</span>
+                    {badges[item.id] > 0 && (
+                      <span style={{ background: '#EF4444', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, minWidth: 16, textAlign: 'center' }}>{badges[item.id]}</span>
                     )}
                   </button>
                 );
@@ -159,14 +273,61 @@ export default function AdminLayout({ onLogout }) {
             <div style={{ fontSize: 12.5, color: 'rgba(0,0,0,.42)', marginTop: 1 }}>{meta1}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
               <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)' }}><IconSearch /></span>
-              <input placeholder="Search..." style={{ padding: '8px 12px 8px 32px', borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', background: '#F5F5F7', fontSize: 13, width: 200, outline: 'none' }} />
+              <input
+                value={searchQuery}
+                onChange={handleSearch}
+                placeholder="Search bookings..."
+                aria-label="Search bookings"
+                style={{ padding: '8px 12px 8px 32px', borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', background: '#F5F5F7', fontSize: 13, width: 200, outline: 'none' }}
+              />
+              {searchResults && searchResults.length > 0 && (
+                <div style={{ position: 'absolute', top: 60, right: 80, width: 340, maxHeight: 400, overflowY: 'auto', background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.08)', boxShadow: '0 12px 32px rgba(0,0,0,.12)', zIndex: 200 }}>
+                  {searchResults.map((b) => (
+                    <div key={b.id} onClick={() => { setView('dispatch'); setSearchResults(null); setSearchQuery(''); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,.04)', cursor: 'pointer' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>{b.name || 'Unknown'}</div>
+                        <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.42)' }}>{b.phone || ''} · {b.address || ''}</div>
+                      </div>
+                      <span style={{ fontSize: 11, color: 'rgba(0,0,0,.4)', fontWeight: 600 }}>{b.job_date}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {searchQuery.length >= 2 && searchResults && searchResults.length === 0 && (
+                <div style={{ position: 'absolute', top: 60, right: 80, width: 340, background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.08)', boxShadow: '0 12px 32px rgba(0,0,0,.12)', zIndex: 200, padding: '20px 16px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 12.5 }}>
+                  No bookings found for &quot;{searchQuery}&quot;
+                </div>
+              )}
             </div>
-            <button style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
-              <IconBell />
-              <span style={{ position: 'absolute', top: 6, right: 7, width: 7, height: 7, borderRadius: '50%', background: '#EF4444', border: '1.5px solid #fff' }} />
-            </button>
+            <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setShowNotifs(s => !s)}
+                style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}
+              >
+                <IconBell />
+                {notifications.length > 0 && (
+                  <span style={{ position: 'absolute', top: 6, right: 7, width: 7, height: 7, borderRadius: '50%', background: '#EF4444', border: '1.5px solid #fff' }} />
+                )}
+              </button>
+              {showNotifs && (
+                <div style={{ position: 'absolute', top: 60, right: 28, width: 340, maxHeight: 400, overflowY: 'auto', background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.08)', boxShadow: '0 12px 32px rgba(0,0,0,.12)', zIndex: 200 }}>
+                  <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(0,0,0,.06)', fontSize: 13, fontWeight: 700, color: '#1a1a1a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Notifications
+                    <span style={{ fontSize: 11, color: 'rgba(0,0,0,.4)', fontWeight: 500 }}>{notifications.length} item(s)</span>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '24px 18px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 12.5 }}>All caught up — no alerts.</div>
+                  ) : notifications.map((n, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'start', gap: 10, padding: '12px 18px', borderBottom: '1px solid rgba(0,0,0,.04)' }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: n.color, marginTop: 5, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12.5, color: '#1a1a1a', fontWeight: 500 }}>{n.text}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -177,7 +338,7 @@ export default function AdminLayout({ onLogout }) {
           </div>
         )}
 
-        <div style={{ flex: 1, padding: '24px 28px', maxWidth: 1400, width: '100%', margin: '0 auto' }}>
+        <div className="admin-content" style={{ flex: 1, padding: '24px 28px', maxWidth: 1400, width: '100%', margin: '0 auto' }}>
           <ActiveView flash={flash} />
         </div>
       </main>

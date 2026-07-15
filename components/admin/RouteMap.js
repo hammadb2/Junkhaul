@@ -33,7 +33,7 @@ export default function RouteMap({ stops = [] }) {
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <Marker position={[DEPOT.lat, DEPOT.lng]} icon={numberIcon('🏠', '#111827')}>
+      <Marker position={[DEPOT.lat, DEPOT.lng]} icon={numberIcon('D', '#111827')}>
         <Popup>U-Haul depot, 2615 12 St NE</Popup>
       </Marker>
       {located.map((s) => (

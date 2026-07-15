@@ -41,7 +41,7 @@ export default function CallsPanel() {
   }, []);
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
-  if (calls.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No calls recorded</div>;
+  if (calls.length === 0) return <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No calls recorded</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -55,7 +55,7 @@ export default function CallsPanel() {
           </tr></thead>
           <tbody>
             {calls.map((c) => (
-              <tr key={c.id} onClick={() => setSelected(c)} style={{ borderBottom: '1px solid rgba(0,0,0,.045)', cursor: 'pointer' }}>
+              <tr key={c.id} onClick={() => setSelected(c)} onKeyDown={(e) => { if (e.key === 'Enter') setSelected(c); }} tabIndex={0} style={{ borderBottom: '1px solid rgba(0,0,0,.045)', cursor: 'pointer' }}>
                 <td style={{ padding: '11px 18px' }}><span style={SENT_BADGE[c.sentiment]}>{c.sentiment}</span></td>
                 <td style={{ padding: '11px 12px' }}><div style={{ fontWeight: 600, color: '#1a1a1a' }}>{c.name}</div><div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.4)', fontFamily: 'monospace' }}>{c.phone}</div></td>
                 <td style={{ padding: '11px 12px', color: 'rgba(0,0,0,.55)', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.summary}</td>
@@ -79,7 +79,7 @@ export default function CallsPanel() {
               <div style={{ marginTop: 6 }}><strong style={{ color: '#1a1a1a' }}>Summary</strong></div>
               <div style={{ background: '#FAFAFA', borderRadius: 10, padding: 12, fontSize: 12.5, lineHeight: 1.5 }}>{selected.summary}</div>
             </div>
-            <button onClick={() => window.open(`tel:${selected.phone}`)} style={{ marginTop: 16, width: '100%', padding: '11px 0', border: 'none', borderRadius: 10, background: '#f97316', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📞 Call back</button>
+            <button onClick={() => window.open(`tel:${selected.phone}`)} style={{ marginTop: 16, width: '100%', padding: '11px 0', border: 'none', borderRadius: 10, background: '#f97316', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Call back</button>
           </div>
         </div>
       )}

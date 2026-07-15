@@ -38,7 +38,7 @@ export default function ReferralsPanel() {
             referrer: r.referrer_phone || '—',
             referee: r.referee_phone || '—',
             status: r.status || 'pending',
-            reward: `$${r.referrer_reward_amount || 25} / $${r.referee_reward_amount || 25}`,
+            reward: `$${r.referrer_reward_amount || r.referrer_reward || 25} / $${r.referee_reward_amount || r.referee_reward || 25}`,
           })));
         }
       } catch (e) { /* ignore */ }
@@ -48,13 +48,13 @@ export default function ReferralsPanel() {
   }, []);
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
-  if (leaderboard.length === 0 && referrals.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No referrals yet</div>;
+  if (leaderboard.length === 0 && referrals.length === 0) return <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No referrals yet</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 14 }}>Leaderboard</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+        <div className="admin-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
           {leaderboard.map((r) => (
             <div key={r.phone} style={{ background: '#FAFAFA', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(0,0,0,.5)' }}>{r.phone}</div>

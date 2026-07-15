@@ -81,12 +81,41 @@ export default function LeadsView({ flash }) {
       {selectedCount > 0 ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#1a1a1a', borderRadius: 12, padding: '10px 16px' }}>
           <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{selectedCount} selected</span>
-          <button onClick={() => flash?.(`Sent follow-up SMS to ${selectedCount} lead(s)`)} style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 8, border: 'none', background: '#f97316', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Send follow-up SMS</button>
+          <button onClick={async () => {
+            const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+            if (selectedIds.length === 0) {
+              flash?.('Select leads first', '#F59E0B');
+              return;
+            }
+            try {
+              const res = await fetch('/api/admin/leads/send-sms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  leads: selectedIds.map((id) => rows.find((r) => r.id === id)).filter(Boolean),
+                }),
+              });
+              if (res.ok) {
+                flash?.(`Follow-up SMS sent to ${selectedIds.length} lead(s)`);
+                setSelected({});
+                // Refresh leads
+                const leadsRes = await fetch('/api/admin/leads');
+                if (leadsRes.ok) {
+                  const data = await leadsRes.json();
+                  setLeads(data.leads || []);
+                }
+              } else {
+                flash?.('Failed to send SMS', '#EF4444');
+              }
+            } catch (e) {
+              flash?.('Failed to send SMS', '#EF4444');
+            }
+          }} style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 8, border: 'none', background: '#f97316', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Send follow-up SMS</button>
           <button onClick={() => setSelected({})} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,.2)', background: 'transparent', color: 'rgba(255,255,255,.7)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Clear</button>
         </div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search leads..." style={{ flex: 1, minWidth: 200, maxWidth: 280, padding: '8px 12px', borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', fontSize: 13, outline: 'none' }} />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search leads..." aria-label="Search leads" style={{ flex: 1, minWidth: 200, maxWidth: 280, padding: '8px 12px', borderRadius: 9, border: '1px solid rgba(0,0,0,.08)', fontSize: 13, outline: 'none' }} />
           <div style={{ display: 'flex', gap: 4, background: '#F0F0F2', borderRadius: 999, padding: 3 }}>
             {TABS.map((t) => (
               <button key={t} onClick={() => setStatus(t)} style={{ padding: '7px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: status === t ? '#f97316' : 'transparent', color: status === t ? '#fff' : 'rgba(0,0,0,.55)' }}>

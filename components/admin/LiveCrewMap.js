@@ -27,9 +27,9 @@ const truckIcon = (initial, color = '#f97316') =>
 
 const depotIcon = L.divIcon({
   className: 'jh-depot-marker',
-  html: `<div style="background:#1a1a1a;color:#fff;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)">🏠</div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+  html: `<div style="background:#1a1a1a;color:#fff;width:32px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);letter-spacing:.02em">DEPOT</div>`,
+  iconSize: [32, 20],
+  iconAnchor: [16, 10],
 });
 
 const severityColor = (updatedAt) => {

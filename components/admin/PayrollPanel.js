@@ -21,6 +21,8 @@ export default function PayrollPanel({ flash }) {
   const [remits, setRemits] = useState([]);
   const [t4s, setT4s] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [periodStart, setPeriodStart] = useState(null);
+  const [periodEnd, setPeriodEnd] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +63,7 @@ export default function PayrollPanel({ flash }) {
 
         if (t4sRes.ok) {
           const data = await t4sRes.json();
-          const arr = data.t4s || [];
+          const arr = data.t4_slips || data.t4s || [];
           if (Array.isArray(arr)) setT4s(arr);
         }
       } catch (e) { /* ignore */ }
@@ -77,10 +79,14 @@ export default function PayrollPanel({ flash }) {
       const periodStart = new Date(now);
       periodStart.setDate(periodStart.getDate() - 14);
       const fmt = (d) => d.toISOString().slice(0, 10);
+      const startStr = fmt(periodStart);
+      const endStr = fmt(periodEnd);
+      setPeriodStart(startStr);
+      setPeriodEnd(endStr);
       const res = await fetch('/api/admin/payroll/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ period_start: fmt(periodStart), period_end: fmt(periodEnd) }),
+        body: JSON.stringify({ period_start: startStr, period_end: endStr }),
       });
       if (res.ok) {
         const { pay_run } = await res.json();
@@ -95,7 +101,7 @@ export default function PayrollPanel({ flash }) {
     { label: 'Total employees', value: employees.length, color: '#1a1a1a' },
     { label: 'Onboarded', value: employees.filter((e) => e.status === 'active' || e.status === 'onboarded').length, color: '#22C55E' },
     { label: 'Pending', value: employees.filter((e) => e.status !== 'active' && e.status !== 'onboarded').length, color: '#F59E0B' },
-    { label: 'Clocked in now', value: employees.filter((e) => e.clockedIn).length, color: '#f97316' },
+    { label: 'Clocked in now', value: employees.filter((e) => e.clocked_in).length, color: '#f97316' },
   ];
 
   const owedTotal = remits.filter((r) => (remitPaid[r.id] ? 'paid' : r.status) === 'owed').reduce((a, r) => a + r.amount, 0);
@@ -110,10 +116,10 @@ export default function PayrollPanel({ flash }) {
 
       {tab === 'overview' && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="admin-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             {stats.map((s) => (
-              <div key={s.label} style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.06)', padding: '14px 16px' }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
+              <div key={s.label} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
                 <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.42)', marginTop: 2, fontWeight: 500 }}>{s.label}</div>
               </div>
             ))}
@@ -121,9 +127,35 @@ export default function PayrollPanel({ flash }) {
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>Run payroll</div>
-              <div style={{ fontSize: 12, color: 'rgba(0,0,0,.42)', marginTop: 2 }}>Calculate and create pay stubs for the current pay period (Jul 3 – Jul 16).</div>
+              <div style={{ fontSize: 12, color: 'rgba(0,0,0,.42)', marginTop: 2 }}>Calculate and create pay stubs for the current pay period{periodStart && periodEnd ? ` (${new Date(periodStart + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })} – ${new Date(periodEnd + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })})` : ''}.</div>
             </div>
-            <button onClick={() => { setRunOpen((o) => !o); if (!runOpen) previewPayRun(); }} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#f97316', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>{runOpen ? 'Cancel' : '+ New pay run'}</button>
+            <button onClick={async () => {
+              const today = new Date();
+              const period_start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+              const period_end = today.toISOString().slice(0, 10);
+              try {
+                const res = await fetch('/api/admin/payroll/run', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ period_start, period_end }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  flash?.(`Pay run ${data.pay_run_id || ''} created`);
+                  // Refresh runs
+                  const runsRes = await fetch('/api/admin/payroll/run');
+                  if (runsRes.ok) {
+                    const runsData = await runsRes.json();
+                    setRuns(runsData.pay_runs || runsData.runs || []);
+                  }
+                } else {
+                  const err = await res.json().catch(() => ({}));
+                  flash?.(err.error || 'Failed to create pay run', '#EF4444');
+                }
+              } catch (e) {
+                flash?.('Failed to create pay run', '#EF4444');
+              }
+            }} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#f97316', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ New pay run</button>
           </div>
           {runOpen && (
             <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
@@ -132,7 +164,33 @@ export default function PayrollPanel({ flash }) {
                 <div><span style={{ color: 'rgba(0,0,0,.45)' }}>Net</span><div style={{ fontWeight: 700, fontSize: 16, color: '#22C55E' }}>{payPreview ? money(payPreview.net_total || payPreview.net) : '—'}</div></div>
                 <div><span style={{ color: 'rgba(0,0,0,.45)' }}>CRA remittance</span><div style={{ fontWeight: 700, fontSize: 16, color: '#f97316' }}>{payPreview ? money(payPreview.remit_total || payPreview.remit) : '—'}</div></div>
               </div>
-              <button onClick={() => { setRunOpen(false); flash?.('Pay run saved — 4 stubs created'); }} style={{ marginTop: 16, width: '100%', padding: '11px 0', border: 'none', borderRadius: 10, background: '#f97316', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Confirm & save pay run</button>
+              <button onClick={async () => {
+                try {
+                  const res = await fetch('/api/admin/payroll/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      period_start: periodStart,
+                      period_end: periodEnd,
+                    }),
+                  });
+                  if (res.ok) {
+                    flash?.('Pay run saved successfully');
+                    setRunOpen(false);
+                    setPayPreview(null);
+                    // Refresh runs list
+                    const runsRes = await fetch('/api/admin/payroll/run');
+                    if (runsRes.ok) {
+                      const runsData = await runsRes.json();
+                      setRuns(runsData.pay_runs || runsData.runs || []);
+                    }
+                  } else {
+                    flash?.('Failed to save pay run', '#EF4444');
+                  }
+                } catch (e) {
+                  flash?.('Failed to save pay run', '#EF4444');
+                }
+              }} style={{ marginTop: 16, width: '100%', padding: '11px 0', border: 'none', borderRadius: 10, background: '#f97316', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Confirm & save pay run</button>
             </div>
           )}
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', overflow: 'hidden' }}>
@@ -159,7 +217,7 @@ export default function PayrollPanel({ flash }) {
       )}
 
       {tab === 'runs' && (runs.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No pay runs found</div>
+        <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No pay runs found</div>
       ) : runs.map((r) => {
         const status = runApproved[r.id] ? 'approved' : r.status;
         return (
@@ -182,20 +240,20 @@ export default function PayrollPanel({ flash }) {
 
       {tab === 'remittance' && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+          <div className="admin-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
             {[
               { label: 'Owed', value: remits.filter((r) => (remitPaid[r.id] ? 'paid' : r.status) === 'owed').length, color: '#EF4444' },
               { label: 'Total owed', value: money(owedTotal), color: '#EF4444' },
               { label: 'Next due', value: remits.length > 0 ? remits[0].due : '—', color: '#F59E0B' },
             ].map((s) => (
-              <div key={s.label} style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,.06)', padding: '14px 16px' }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
+              <div key={s.label} style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
                 <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.42)', marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
           </div>
           {remits.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No remittances found</div>
+            <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No remittances found</div>
           ) : remits.map((r) => {
             const status = remitPaid[r.id] ? 'paid' : r.status;
             return (
@@ -218,7 +276,7 @@ export default function PayrollPanel({ flash }) {
 
       {tab === 't4s' && (
         t4s.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No T4s found</div>
+          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No T4s found</div>
         ) : (
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
