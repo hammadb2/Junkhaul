@@ -81,27 +81,92 @@ export async function GET(req) {
   let days = Object.values(grouped);
 
   // Apply landfill feasibility check per window if we have load_size + address.
-  // This hides windows where the crew can't make the landfill before closing.
+  // OPTIMIZED: geocode + driving times are computed ONCE, then reused for all slots.
   if (loadSize && address) {
-    for (const day of days) {
-      const feasibleSlots = [];
-      for (const slot of day.slots) {
-        if (slot.window_end) {
-          // It's a window — run the feasibility check
-          const feasible = await isWindowFeasible({
-            dateStr: day.date,
-            windowEnd: slot.window_end,
-            loadSize,
-            jobAddress: address,
-          });
-          if (feasible) feasibleSlots.push(slot);
-        } else {
-          // Legacy pinpoint slot — keep it (no window constraint)
-          feasibleSlots.push(slot);
-        }
-      }
-      day.slots = feasibleSlots;
+    // Pre-compute geocoding and driving times once for the entire request
+    const { geocodeAddress, drivingTimeMinutes, getValidLandfillsForDate, getOnsiteDuration, getUnloadBuffer, timeToMinutes } = await import('@/lib/slotAvailability');
+
+    // Geocode the address ONCE
+    let jobCoords = null;
+    try {
+      jobCoords = await geocodeAddress(address);
+    } catch (e) {
+      console.error('[slots] Geocoding failed:', e.message);
     }
+
+    // Get landfills for the first date (they're the same for all dates except Sunday)
+    // We'll check per-date below, but pre-compute driving times for the common case
+    const onsiteDuration = await getOnsiteDuration(loadSize);
+    const unloadBuffer = await getUnloadBuffer();
+
+    // If we can't geocode, skip feasibility (show all slots)
+    if (jobCoords) {
+      // Pre-compute driving time from depot to job (same for all slots)
+      const DEPOT = { lat: 51.2128, lng: -114.0081 };
+      const driveDepotToJob = await drivingTimeMinutes(DEPOT, jobCoords);
+
+      // Pre-compute driving times to ALL landfills (same for all slots)
+      const { data: allLandfills } = await supabaseAdmin
+        .from('landfills')
+        .select('*')
+        .order('name');
+
+      const landfillDriveTimes = [];
+      for (const landfill of (allLandfills || [])) {
+        if (!landfill.lat || !landfill.lng) continue;
+        const driveMin = await drivingTimeMinutes(jobCoords, { lat: landfill.lat, lng: landfill.lng });
+        landfillDriveTimes.push({ landfill, driveMin });
+      }
+
+      // Now check feasibility per slot using pre-computed values (no more API calls)
+      for (const day of days) {
+        const dayDow = new Date(day.date + 'T12:00:00Z').getUTCDay();
+        const dayMonth = new Date(day.date + 'T12:00:00Z').getUTCMonth() + 1;
+        const isWinter = dayMonth >= 11 || dayMonth <= 3;
+        const isSunday = dayDow === 0;
+        const isWeekday = dayDow >= 1 && dayDow <= 5;
+
+        // Filter landfills valid for this day
+        const validLandfillTimes = landfillDriveTimes.filter(({ landfill }) => {
+          if (isSunday) {
+            if (!landfill.sunday_open) return false;
+            if (landfill.summer_only_sunday && isWinter) return false;
+            return true;
+          }
+          if (isWeekday) return landfill.monday_to_friday !== false;
+          return true;
+        });
+
+        if (validLandfillTimes.length === 0) {
+          day.slots = [];
+          continue;
+        }
+
+        const earliestClose = validLandfillTimes.reduce((earliest, { landfill }) => {
+          const close = landfill.close_time || '16:00';
+          return close < earliest ? close : earliest;
+        }, '23:59');
+
+        const landfillCloseMinutes = timeToMinutes(earliestClose);
+        const minDriveToLandfill = Math.min(...validLandfillTimes.map(({ driveMin }) => driveMin));
+        const totalAfterArrival = onsiteDuration + minDriveToLandfill + unloadBuffer;
+        const latestArrival = landfillCloseMinutes - totalAfterArrival;
+
+        const feasibleSlots = [];
+        for (const slot of day.slots) {
+          if (slot.window_end) {
+            const windowEndMinutes = timeToMinutes(slot.window_end);
+            if (windowEndMinutes <= latestArrival) {
+              feasibleSlots.push(slot);
+            }
+          } else {
+            feasibleSlots.push(slot);
+          }
+        }
+        day.slots = feasibleSlots;
+      }
+    }
+
     // Remove days with no feasible slots
     days = days.filter((d) => d.slots.length > 0);
   }
@@ -144,18 +209,45 @@ export async function GET(req) {
       ];
 
       // Apply landfill feasibility to custom slots too
+      // Uses pre-computed driving times (no new API calls)
       let feasibleSlots = slots;
-      if (loadSize && address) {
-        feasibleSlots = [];
-        for (const slot of slots) {
-          const feasible = await isWindowFeasible({
-            dateStr,
-            windowEnd: slot.window_end,
-            loadSize,
-            jobAddress: address,
+      if (loadSize && address && jobCoords) {
+        const dayDow = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+        const dayMonth = new Date(dateStr + 'T12:00:00Z').getUTCMonth() + 1;
+        const isWinter = dayMonth >= 11 || dayMonth <= 3;
+        const isSunday = dayDow === 0;
+        const isWeekday = dayDow >= 1 && dayDow <= 5;
+
+        const validLandfillTimes = landfillDriveTimes.filter(({ landfill }) => {
+          if (isSunday) {
+            if (!landfill.sunday_open) return false;
+            if (landfill.summer_only_sunday && isWinter) return false;
+            return true;
+          }
+          if (isWeekday) return landfill.monday_to_friday !== false;
+          return true;
+        });
+
+        if (validLandfillTimes.length === 0) {
+          feasibleSlots = [];
+        } else {
+          const earliestClose = validLandfillTimes.reduce((earliest, { landfill }) => {
+            const close = landfill.close_time || '16:00';
+            return close < earliest ? close : earliest;
+          }, '23:59');
+          const landfillCloseMinutes = timeToMinutes(earliestClose);
+          const minDriveToLandfill = Math.min(...validLandfillTimes.map(({ driveMin }) => driveMin));
+          const totalAfterArrival = onsiteDuration + minDriveToLandfill + unloadBuffer;
+          const latestArrival = landfillCloseMinutes - totalAfterArrival;
+
+          feasibleSlots = slots.filter((slot) => {
+            if (!slot.window_end) return true;
+            return timeToMinutes(slot.window_end) <= latestArrival;
           });
-          if (feasible) feasibleSlots.push(slot);
         }
+      } else if (loadSize && address && !jobCoords) {
+        // Can't geocode — keep all slots
+        feasibleSlots = slots;
       }
 
       if (feasibleSlots.length > 0) {

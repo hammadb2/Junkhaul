@@ -19,25 +19,25 @@ export default function PoliciesPage() {
     <div className="min-h-screen bg-white">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <div className="mb-8 pb-6 border-b border-gray-200">
-          <Link href="/" className="text-[#c4810e] hover:underline text-sm">&larr; Back to Junk Haul Calgary</Link>
+          <Link href="/" className="text-[#f97316] hover:underline text-sm">&larr; Back to Junk Haul Calgary</Link>
         </div>
-        <div className="mb-2 text-sm font-semibold text-[#c4810e] tracking-wide">JUNK HAUL CALGARY</div>
-        <h1 className="text-3xl font-bold text-[#1a3a5c] mb-2">Policies</h1>
+        <div className="mb-2 text-sm font-semibold text-[#f97316] tracking-wide">JUNK HAUL CALGARY</div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Policies</h1>
         <p className="mb-8 text-gray-600">All Junk Haul Calgary policies in one place. Effective July 14, 2026.</p>
         <div className="space-y-4">
           {policies.map((p) => (
             <Link
               key={p.href}
               href={p.href}
-              className="block p-6 rounded-lg border border-gray-200 hover:border-[#c4810e] hover:shadow-md transition-all"
+              className="block p-6 rounded-lg border border-gray-200 hover:border-[#f97316] hover:shadow-md transition-all"
             >
-              <h2 className="text-lg font-semibold text-[#1a3a5c] mb-1">{p.title}</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">{p.title}</h2>
               <p className="text-sm text-gray-600">{p.desc}</p>
             </Link>
           ))}
         </div>
         <div className="mt-12 pt-6 border-t border-gray-200 text-sm text-gray-500">
-          <p>Questions about our policies? Contact us at <a href="tel:5873254317" className="text-[#c4810e] hover:underline">(587) 325-4317</a> or <a href="mailto:info@junkhaul.ca" className="text-[#c4810e] hover:underline">info@junkhaul.ca</a></p>
+          <p>Questions about our policies? Contact us at <a href="tel:5873254317" className="text-[#f97316] hover:underline">(587) 325-4317</a> or <a href="mailto:info@junkhaul.ca" className="text-[#f97316] hover:underline">info@junkhaul.ca</a></p>
         </div>
       </div>
     </div>
