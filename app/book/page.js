@@ -959,6 +959,17 @@ function ReviewStep({ state, update, price, onNext }) {
     ? 20
     : 15;
 
+  // Build a weight lookup from AI detection so we can show kg as secondary text on priced items
+  const aiWeightByName = {};
+  if (state.analysis?.items_detected) {
+    for (const d of state.analysis.items_detected) {
+      if (d.estimated_weight_kg) aiWeightByName[d.name?.toLowerCase()] = d.estimated_weight_kg;
+    }
+  }
+
+  // Hazmat items from the priced list — these are the specific, distinguishable items
+  const hazmatItems = items.filter((i) => i.is_hazmat);
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -967,7 +978,7 @@ function ReviewStep({ state, update, price, onNext }) {
           <p className="text-gray-500 text-sm mt-1">
             We estimated <b>{LOAD_LABELS[state.analysis.load_size]}</b>
             {state.analysis.confidence ? ` (${state.analysis.confidence} confidence)` : ''}.
-            Adjust your items, load size, and add-ons below.
+            Adjust your items and add-ons below.
           </p>
         )}
         {!state.analysis && (
@@ -977,102 +988,102 @@ function ReviewStep({ state, update, price, onNext }) {
         )}
       </div>
 
-      {/* ===== ITEMIZED ITEM LIST (from ItemsStep) — only if AI detected items ===== */}
+      {/* ===== SECTION: YOUR ITEMS (priced, interactive — the single source of truth) ===== */}
       {hasItems && (
         <>
-          {/* Hazmat / cannot-take warning */}
-          {(items.some((i) => i.is_hazmat) || (state.analysis?.has_hazmat && state.analysis?.hazmat_description)) && (
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Your items</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          {/* Single hazmat warning — points at specific named items */}
+          {hazmatItems.length > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-              <p className="text-sm font-medium text-red-700">
-                {state.analysis?.has_hazmat && state.analysis?.hazmat_description && !items.some((i) => i.is_hazmat)
-                  ? 'Action needed before pickup:'
-                  : 'Items we cannot take:'}
-              </p>
-              {items.filter((i) => i.is_hazmat).length > 0 && (
-                <ul className="text-sm text-red-600 mt-1">
-                  {items.filter((i) => i.is_hazmat).map((i, idx) => (
-                    <li key={idx}>• {i.name} — please remove before pickup</li>
-                  ))}
-                </ul>
-              )}
-              {state.analysis?.has_hazmat && state.analysis?.hazmat_description && !items.some((i) => i.is_hazmat) && (
-                <p className="text-sm text-red-600 mt-1">• {state.analysis.hazmat_description}</p>
-              )}
+              <p className="text-sm font-medium text-red-700">We can&apos;t take these — please remove before pickup:</p>
+              <ul className="text-sm text-red-600 mt-1 space-y-0.5">
+                {hazmatItems.map((i, idx) => (
+                  <li key={idx}>• {i.name}{i.quantity > 1 ? ` (${i.quantity}x)` : ''}</li>
+                ))}
+              </ul>
             </div>
           )}
 
-          {/* Item list */}
+          {/* Item list — single inventory, priced, interactive */}
           <div className="space-y-2">
-            {items.map((item, idx) => (
-              <div key={idx} className={`bg-white rounded-xl border p-3 ${item.is_hazmat ? 'border-red-200 opacity-60' : item.disposal === 'donate' ? 'border-green-200' : 'border-gray-200'}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900 text-sm">{item.name}</span>
-                      {item.is_freon && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Freon</span>}
-                      {item.note && <span className="text-[10px] text-gray-400">{item.note}</span>}
+            {items.map((item, idx) => {
+              const weightKg = aiWeightByName[item.name?.toLowerCase()];
+              return (
+                <div key={idx} className={`bg-white rounded-xl border p-3 ${item.is_hazmat ? 'border-red-200 opacity-60' : item.disposal === 'donate' ? 'border-green-200' : 'border-gray-200'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 text-sm">{item.name}</span>
+                        {item.is_freon && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Freon</span>}
+                        {weightKg && <span className="text-[10px] text-gray-400">~{weightKg}kg</span>}
+                        {item.note && <span className="text-[10px] text-gray-400">{item.note}</span>}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {item.disposal === 'donate' ? (
+                          <span className="text-green-600 font-medium">Free — donated to charity</span>
+                        ) : item.is_hazmat ? (
+                          <span className="text-red-600">Cannot take</span>
+                        ) : (
+                          <span>${item.unit_price} each × {item.quantity} = ${item.line_total}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {item.disposal === 'donate' ? (
-                        <span className="text-green-600 font-medium">Free — donated to charity</span>
-                      ) : item.is_hazmat ? (
-                        <span className="text-red-600">Cannot take</span>
-                      ) : (
-                        <span>${item.unit_price} each × {item.quantity} = ${item.line_total}</span>
+                    <button
+                      onClick={() => removeItem(idx)}
+                      className="text-gray-300 hover:text-red-500 text-sm"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Quantity + disposal toggle */}
+                  {!item.is_hazmat && (
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateQty(idx, -1)}
+                          className="w-7 h-7 rounded-full border border-gray-300 text-sm"
+                        >−</button>
+                        <span className="text-sm w-4 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => updateQty(idx, 1)}
+                          className="w-7 h-7 rounded-full border border-gray-300 text-sm"
+                        >+</button>
+                      </div>
+
+                      {item.donatable && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => toggleDisposal(idx, 'dump')}
+                            className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+                              item.disposal === 'dump'
+                                ? 'bg-gray-900 text-white'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}
+                          >
+                            Dump
+                          </button>
+                          <button
+                            onClick={() => toggleDisposal(idx, 'donate')}
+                            className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+                              item.disposal === 'donate'
+                                ? 'bg-green-600 text-white'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}
+                          >
+                            Donate (free)
+                          </button>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <button
-                    onClick={() => removeItem(idx)}
-                    className="text-gray-300 hover:text-red-500 text-sm"
-                  >
-                    ✕
-                  </button>
+                  )}
                 </div>
-
-                {/* Quantity + disposal toggle */}
-                {!item.is_hazmat && (
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateQty(idx, -1)}
-                        className="w-7 h-7 rounded-full border border-gray-300 text-sm"
-                      >−</button>
-                      <span className="text-sm w-4 text-center">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQty(idx, 1)}
-                        className="w-7 h-7 rounded-full border border-gray-300 text-sm"
-                      >+</button>
-                    </div>
-
-                    {item.donatable && (
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => toggleDisposal(idx, 'dump')}
-                          className={`text-xs px-3 py-1.5 rounded-full font-medium ${
-                            item.disposal === 'dump'
-                              ? 'bg-gray-900 text-white'
-                              : 'bg-gray-100 text-gray-500'
-                          }`}
-                        >
-                          Dump
-                        </button>
-                        <button
-                          onClick={() => toggleDisposal(idx, 'donate')}
-                          className={`text-xs px-3 py-1.5 rounded-full font-medium ${
-                            item.disposal === 'donate'
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-100 text-gray-500'
-                          }`}
-                        >
-                          Donate (free)
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Add item */}
@@ -1085,7 +1096,7 @@ function ReviewStep({ state, update, price, onNext }) {
             update({ itemized: recalced });
           }} />
 
-          {/* Running total for items */}
+          {/* Item subtotal breakdown — no duplicate "Your price" here */}
           <div className="bg-gray-50 rounded-xl p-3 space-y-1">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Items to dump</span>
@@ -1104,59 +1115,56 @@ function ReviewStep({ state, update, price, onNext }) {
                 </p>
               </div>
             )}
-            <div className="border-t border-gray-200 pt-2 flex justify-between">
-              <span className="font-semibold text-gray-900">Your price</span>
-              <span className="text-2xl font-bold text-gray-900">${itemized.total}</span>
-            </div>
           </div>
         </>
       )}
 
-      {/* ===== AI BREAKDOWN (from LoadStep) ===== */}
-      {state.analysis?.items_detected?.length > 0 && (
-        <div className="bg-blue-50 rounded-xl p-3 space-y-2">
-          <p className="text-xs font-semibold text-blue-900">Here&apos;s what we see in your photos:</p>
-          <ul className="text-sm text-blue-800 space-y-1">
-            {state.analysis.items_detected.map((item, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="text-blue-400 mt-0.5">•</span>
-                <span>
-                  {item.quantity > 1 ? `${item.quantity}x ` : ''}{item.name}
-                  {item.is_freon && <span className="text-blue-600 font-medium"> (freon +${PRICING.freon_per_item})</span>}
-                  {item.is_hazmat && <span className="text-red-600 font-medium"> (cannot take)</span>}
-                  {item.estimated_weight_kg && <span className="text-blue-400"> ~{item.estimated_weight_kg}kg</span>}
-                </span>
-              </li>
+      {/* ===== SECTION: FLAT-RATE PRICING (optional alternative when items exist) ===== */}
+      {hasItems ? (
+        <details className="mt-1">
+          <summary className="cursor-pointer text-sm text-gray-400 hover:text-gray-600 font-medium select-none">
+            Prefer flat-rate pricing instead?
+          </summary>
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            {LOADS.map((l) => (
+              <LoadCard
+                key={l.key}
+                selected={state.load_size === l.key}
+                onClick={() => {
+                  // Switching to flat-rate: clear itemized pricing
+                  update({ load_size: l.key, itemized: null });
+                }}
+              >
+                <div className="font-semibold text-gray-900">{l.title}</div>
+                <div className="text-xs text-gray-500 mt-0.5 h-8">{l.desc}</div>
+                <div className="font-bold text-orange-500 mt-1">${l.price}</div>
+              </LoadCard>
             ))}
-          </ul>
-          {state.analysis.notes && (
-            <p className="text-xs text-blue-600 italic">{state.analysis.notes}</p>
-          )}
-          {state.analysis.has_hazmat && (
-            <p className="text-xs text-red-600 font-medium bg-red-50 rounded p-2">
-              ⚠️ {state.analysis.hazmat_description || 'We cannot take some items in your photo (e.g. paint, chemicals, propane, food, tires). Please remove them before pickup.'}
-            </p>
-          )}
-          <p className="text-xs text-blue-500">Wrong? Adjust your load size and add-ons below.</p>
-        </div>
+          </div>
+        </details>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Load size</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {LOADS.map((l) => (
+              <LoadCard
+                key={l.key}
+                selected={state.load_size === l.key}
+                onClick={() => update({ load_size: l.key })}
+              >
+                <div className="font-semibold text-gray-900">{l.title}</div>
+                <div className="text-xs text-gray-500 mt-0.5 h-8">{l.desc}</div>
+                <div className="font-bold text-orange-500 mt-1">${l.price}</div>
+              </LoadCard>
+            ))}
+          </div>
+        </>
       )}
 
-      {/* ===== LOAD SIZE SELECTOR (from LoadStep) ===== */}
-      <div className="grid grid-cols-2 gap-3">
-        {LOADS.map((l) => (
-          <LoadCard
-            key={l.key}
-            selected={state.load_size === l.key}
-            onClick={() => update({ load_size: l.key })}
-          >
-            <div className="font-semibold text-gray-900">{l.title}</div>
-            <div className="text-xs text-gray-500 mt-0.5 h-8">{l.desc}</div>
-            <div className="font-bold text-orange-500 mt-1">${l.price}</div>
-          </LoadCard>
-        ))}
-      </div>
-
-      {/* ===== TRUCK SIZE UPSELL (from LoadStep) ===== */}
+      {/* ===== TRUCK SIZE UPSELL ===== */}
       {showTruckUpsell && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
           <div>
@@ -1247,8 +1255,12 @@ function ReviewStep({ state, update, price, onNext }) {
         </div>
       )}
 
-      {/* ===== ADD-ONS: freon + stairs (from LoadStep) ===== */}
-      <div className="space-y-3 mt-2">
+      {/* ===== SECTION: ADD-ONS ===== */}
+      <div className="flex items-center gap-2 mt-1">
+        <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Add-ons</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+      <div className="space-y-3">
         {/* Freon: per-item count */}
         <div className="flex items-center justify-between">
           <div>
@@ -1319,23 +1331,41 @@ function ReviewStep({ state, update, price, onNext }) {
         )}
       </div>
 
-      {/* ===== PRICE + BREAKDOWN (from LoadStep) ===== */}
-      <div className="mt-4 flex items-end justify-between">
-        <span className="text-gray-500">Your price</span>
-        <span className="text-3xl font-bold text-gray-900">
-          $<AnimatedPrice price={hasItems ? itemized.total : price.total} />
-        </span>
+      {/* ===== SECTION: YOUR PRICE (single, authoritative total) ===== */}
+      <div className="flex items-center gap-2 mt-2">
+        <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Your price</span>
+        <div className="flex-1 h-px bg-gray-200" />
       </div>
+      <div className="bg-gray-50 rounded-xl p-4">
+        <div className="flex items-end justify-between mb-3">
+          <div>
+            <span className="text-3xl font-bold text-gray-900">
+              $<AnimatedPrice price={hasItems ? itemized.total : price.total} />
+            </span>
+            <span className="text-sm text-gray-400 ml-2">total</span>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-gray-400">Deposit today</div>
+            <div className="text-sm font-semibold text-gray-700">$50</div>
+          </div>
+        </div>
 
-      {/* Price breakdown */}
-      <div className="text-xs text-gray-400 space-y-0.5">
-        <div className="flex justify-between"><span>Base ({LOAD_LABELS[state.load_size]})</span><span>${price.base_price}</span></div>
-        {price.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span><span>${price.freon_fee}</span></div>}
-        {price.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span><span>${price.stairs_fee}</span></div>}
-        {price.same_day_fee > 0 && <div className="flex justify-between"><span>Same-day</span><span>${price.same_day_fee}</span></div>}
-        {price.truck_fee > 0 && <div className="flex justify-between"><span>Larger truck ({TRUCK_SIZES[state.truck_size || 15]?.label})</span><span>+${price.truck_fee}</span></div>}
-        <div className="flex justify-between font-medium text-gray-600 pt-1 border-t"><span>Deposit today</span><span>$50</span></div>
-        <div className="flex justify-between font-medium text-gray-600"><span>Balance on pickup</span><span>${hasItems ? itemized.balance_due : price.balance_due}</span></div>
+        {/* Price breakdown */}
+        <div className="text-xs text-gray-500 space-y-0.5 border-t border-gray-200 pt-2">
+          {hasItems ? (
+            <>
+              <div className="flex justify-between"><span>Itemized quote ({items.length} item{items.length > 1 ? 's' : ''})</span><span>${itemized.subtotal || itemized.total}</span></div>
+              {itemized.is_minimum && <div className="flex justify-between"><span>Minimum charge adjustment</span><span>+$99</span></div>}
+            </>
+          ) : (
+            <div className="flex justify-between"><span>Base ({LOAD_LABELS[state.load_size]})</span><span>${price.base_price}</span></div>
+          )}
+          {price.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span><span>${price.freon_fee}</span></div>}
+          {price.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span><span>${price.stairs_fee}</span></div>}
+          {price.same_day_fee > 0 && <div className="flex justify-between"><span>Same-day</span><span>${price.same_day_fee}</span></div>}
+          {price.truck_fee > 0 && <div className="flex justify-between"><span>Larger truck ({TRUCK_SIZES[state.truck_size || 15]?.label})</span><span>+${price.truck_fee}</span></div>}
+          <div className="flex justify-between font-medium text-gray-600 pt-1 border-t border-gray-200"><span>Balance on pickup</span><span>${hasItems ? itemized.balance_due : price.balance_due}</span></div>
+        </div>
       </div>
 
       <BookButton onClick={onNext}>Choose a time →</BookButton>
