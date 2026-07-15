@@ -104,13 +104,15 @@ async function buildImageTiles(enhancedBuffer) {
 
   const crops = await Promise.all(
     regions.map(async (r) => {
+      const cropW = Math.min(r.width, w - r.left);
+      const cropH = Math.min(r.height, h - r.top);
       const cropBuf = await img.clone()
         .extract({
           left: r.left, top: r.top,
-          width: Math.min(r.width, w - r.left),
-          height: Math.min(r.height, h - r.top),
+          width: cropW,
+          height: cropH,
         })
-        .resize({ width: Math.min(r.width, w - r.left) * 1.5, withoutEnlargement: false })
+        .resize({ width: Math.round(cropW * 1.5), withoutEnlargement: false })
         .sharpen({ sigma: 0.8 })
         .normalize()
         .jpeg({ quality: 92 })
@@ -665,7 +667,7 @@ export async function POST(req) {
   } catch (err) {
     console.error('photo-quote error:', err);
     return NextResponse.json(
-      { error: 'Could not analyse photos right now. Please pick your load size manually.', debug: err.message, stack: err.stack?.split('\n').slice(0, 5) },
+      { error: 'Could not analyse photos right now. Please pick your load size manually.' },
       { status: 500 }
     );
   }
