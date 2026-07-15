@@ -15,9 +15,12 @@ export const runtime = 'nodejs';
 //   load_size — single_item | quarter | half | full
 //   address   — job address text (for geocoding + drive time)
 //
-// The 24-hour minimum advance booking rule is enforced here
-// (unchanged from the original logic). The landfill closing
-// constraint is checked per-window via isWindowFeasible().
+// Same-day booking is allowed. The only gates are:
+//   1. The slot hasn't already passed (for today)
+//   2. The slot has remaining capacity
+//   3. isWindowFeasible() passes (landfill closing constraint)
+// If same-day capacity is full, that's a dispatch/staffing
+// problem — not something to hide by flooring the date.
 // ============================================================
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
@@ -26,20 +29,6 @@ export async function GET(req) {
 
   const { date: today, hour, minute } = edmontonNowParts();
   const currentTimeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-
-  // 24-hour minimum: compute the earliest allowed datetime
-  const now = new Date();
-  const earliest = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const earliestEdmonton = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Edmonton',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(earliest);
-  const eDate = earliestEdmonton.find(p => p.type === 'year')?.value + '-' +
-    earliestEdmonton.find(p => p.type === 'month')?.value + '-' +
-    earliestEdmonton.find(p => p.type === 'day')?.value;
-  const eTime = (earliestEdmonton.find(p => p.type === 'hour')?.value || '00') + ':' +
-    (earliestEdmonton.find(p => p.type === 'minute')?.value || '00');
 
   const { data, error } = await supabaseAdmin
     .from('schedule')
@@ -58,9 +47,6 @@ export async function GET(req) {
     if (slot.jobs_booked >= slot.max_jobs) continue;
     // Hide past time slots for today
     if (slot.slot_date === today && slot.slot_time <= currentTimeStr) continue;
-    // Enforce 24-hour minimum: skip slots before earliest allowed time
-    if (slot.slot_date < eDate) continue;
-    if (slot.slot_date === eDate && slot.slot_time <= eTime) continue;
 
     if (!grouped[slot.slot_date]) {
       grouped[slot.slot_date] = {
@@ -123,7 +109,7 @@ export async function GET(req) {
   // If no slots available, return info for custom slot selection
   if (days.length === 0) {
     const customDays = [];
-    const checkDate = new Date(eDate + 'T00:00:00');
+    const checkDate = new Date(today + 'T00:00:00');
     const morningStart = await getStringConfig('dispatch_morning_window_start') || '07:30';
     const morningEnd = await getStringConfig('dispatch_morning_window_end') || '11:00';
     const afternoonStart = await getStringConfig('dispatch_afternoon_window_start') || '11:00';
@@ -182,8 +168,8 @@ export async function GET(req) {
         });
       }
     }
-    return NextResponse.json({ days: customDays, no_standard_slots: true, earliest_date: eDate });
+    return NextResponse.json({ days: customDays, no_standard_slots: true, earliest_date: today });
   }
 
-  return NextResponse.json({ days, earliest_date: eDate });
+  return NextResponse.json({ days, earliest_date: today });
 }
