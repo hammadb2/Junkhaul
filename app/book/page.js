@@ -726,7 +726,7 @@ function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(photos ? { photos } : { description }),
+        body: JSON.stringify(photos ? { photos, phone: capturedPhone || null, sessionId: sessionId || null } : { description }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
