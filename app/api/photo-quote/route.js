@@ -18,6 +18,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { buildItemizedQuote } from '@/lib/itemPricing';
+import { TRUCK_SIZES } from '@/lib/pricingConstants';
 import crypto from 'crypto';
 import sharp from 'sharp';
 
@@ -125,6 +126,7 @@ const SCAN_SCHEMA = {
           label: { type: 'string' },
           count: { type: 'integer' },
           est_volume_cuft_each: { type: 'number' },
+          est_weight_kg_each: { type: 'number', description: 'Estimated weight of ONE unit in kg. Reason from material + visible size. A standard sofa is ~45kg, a fridge ~70kg, a mattress ~25kg, a bankers box ~15kg, a dining chair ~8kg.' },
           condition: { type: 'string', enum: ['good', 'fair', 'poor'] },
           hazard_flag: { type: 'boolean' },
           confidence: {
@@ -137,7 +139,7 @@ const SCAN_SCHEMA = {
             enum: ['full_image', 'top_left', 'top_right', 'bottom_left', 'bottom_right'],
           },
         },
-        required: ['label', 'count', 'est_volume_cuft_each', 'condition', 'hazard_flag', 'confidence', 'visual_evidence', 'source_region'],
+        required: ['label', 'count', 'est_volume_cuft_each', 'est_weight_kg_each', 'condition', 'hazard_flag', 'confidence', 'visual_evidence', 'source_region'],
       },
     },
     reasoning: { type: 'string' },
@@ -180,6 +182,12 @@ For each item, estimate volume in cubic feet using visible reference
 objects in frame (a standard doorway is ~80in tall, a dining chair seat is
 ~18in high, a bankers box is roughly 1.3 cuft, etc) -- reason from what is
 actually visible in THIS photo, not a generic category default.
+
+Also estimate weight in kg for each item type (est_weight_kg_each). Reason
+from the material and visible size: a fabric sofa is ~45kg, a refrigerator
+~70kg, a mattress ~25kg, a bankers box full of papers ~15kg, a wooden
+dining chair ~8kg, a tube TV ~30kg, a metal filing cabinet ~50kg. If you
+cannot see the material clearly, estimate conservatively (slightly heavy).
 
 Flag any item that looks hazardous (paint cans, propane, chemicals,
 anything asbestos-suspect). Return ONLY the JSON matching the schema.`;
@@ -533,15 +541,37 @@ export async function POST(req) {
     const freonCount = allItems.filter((i) => freonRegex.test(i.label)).reduce((sum, i) => sum + i.count, 0);
     const hasHazmat = allItems.some((i) => i.hazard_flag);
 
+    // Total weight: use Gemini's per-item weight estimate, fallback to
+    // volume-based rough conversion if the model didn't return one.
+    const totalWeightKg = allItems.reduce((sum, i) => {
+      const perUnit = i.est_weight_kg_each || Math.round((i.est_volume_cuft_each || 20) * 0.45);
+      return sum + perUnit * i.count;
+    }, 0);
+    const totalWeightLbs = Math.round(totalWeightKg * 2.20462);
+    const totalVolumeCuft = bookingQuote.total_est_volume_cuft;
+
+    // Recommend the smallest truck that handles BOTH volume and weight.
+    // 15ft: 764 cuft / 6385 lbs  |  20ft: 1016 cuft / 5700 lbs  |  26ft: 1682 cuft / 12859 lbs
+    // Note: 20ft carries LESS weight than 15ft (heavier truck body).
+    // So if weight > 5700 lbs, skip 20ft and go straight to 26ft.
+    let recommendedTruckSize = 15;
+    if (totalVolumeCuft > TRUCK_SIZES[15].volume_cuft || totalWeightLbs > TRUCK_SIZES[15].max_load_lbs) {
+      if (totalWeightLbs > TRUCK_SIZES[20].max_load_lbs || totalVolumeCuft > TRUCK_SIZES[20].volume_cuft) {
+        recommendedTruckSize = 26;
+      } else {
+        recommendedTruckSize = 20;
+      }
+    }
+
     // Map Gemini scan items to the shape buildItemizedQuote expects:
     //   { name, quantity, is_freon, is_hazmat, estimated_weight_kg }
-    // Gemini gives us: { label, count, hazard_flag, est_volume_cuft_each, condition }
+    // Gemini gives us: { label, count, hazard_flag, est_volume_cuft_each, est_weight_kg_each, condition }
     const itemsForQuote = allItems.map((i) => ({
       name: i.label,
       quantity: i.count,
       is_freon: freonRegex.test(i.label),
       is_hazmat: i.hazard_flag,
-      estimated_weight_kg: Math.round((i.est_volume_cuft_each || 20) * 0.45), // rough cuft→kg
+      estimated_weight_kg: i.est_weight_kg_each || Math.round((i.est_volume_cuft_each || 20) * 0.45),
     }));
 
     const itemized = buildItemizedQuote(itemsForQuote, { stairs: 0, same_day: false });
@@ -561,7 +591,10 @@ export async function POST(req) {
           ? 'Hazardous items detected'
           : null,
       items_detected: itemsForQuote,
-      estimated_volume_cuft: bookingQuote.total_est_volume_cuft,
+      estimated_volume_cuft: totalVolumeCuft,
+      estimated_weight_kg: totalWeightKg,
+      estimated_weight_lbs: totalWeightLbs,
+      recommended_truck_size: recommendedTruckSize,
       photo_quote_tier: bookingQuote.tier,
       items_needing_confirmation: bookingQuote.items_needing_confirmation,
       possible_cross_photo_duplicates: bookingQuote.possible_cross_photo_duplicates,

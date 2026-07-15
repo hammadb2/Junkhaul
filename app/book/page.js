@@ -832,6 +832,7 @@ function PhotoStep({ state, update, capturedPhone, sessionId, variant, onNext })
         photoUrls: data.photoUrls || [],
         photo_skipped: false,
         itemized: data.itemized || null,
+        truck_size: data.analysis.recommended_truck_size || 15,
         possible_cross_photo_duplicates: data.analysis.possible_cross_photo_duplicates || [],
         photo_quote_tier: data.analysis.photo_quote_tier || null,
       });
@@ -1031,17 +1032,21 @@ function ReviewStep({ state, update, price, onNext }) {
 
   // ---- LoadStep computed values ----
   // Truck size upsell trigger: show when full load is selected OR
-  // AI weight estimate approaches/exceeds the 15ft capacity.
-  // AI weight is in kg; convert to lbs for threshold comparison.
+  // AI weight/volume exceeds the 15ft capacity.
   const aiWeightLbs = state.analysis?.estimated_weight_kg
     ? Math.round(state.analysis.estimated_weight_kg * 2.20462)
-    : 0;
+    : (state.analysis?.estimated_weight_lbs || 0);
+  const aiVolumeCuft = state.analysis?.estimated_volume_cuft || 0;
+  const recommendedTruck = state.analysis?.recommended_truck_size || 15;
   const showTruckUpsell =
     state.load_size === 'full' ||
+    recommendedTruck > 15 ||
     aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_20ft_lbs;
 
-  // Flat-rate comparison: calculate the flat-rate total for the AI-suggested load size
-  // so we can recommend it if it's cheaper than the itemized quote
+  // Flat-rate comparison: calculate the flat-rate total for the AI-suggested
+  // load size + the truck size that can actually handle the volume/weight.
+  // Don't suggest a flat-rate that physically won't fit in the truck.
+  const flatRateTruckSize = hasItems ? (state.analysis?.recommended_truck_size || state.truck_size || 15) : 15;
   const flatRateTotal = hasItems ? (() => {
     const flatPrice = calculatePrice({
       load_size: state.analysis?.load_size || state.load_size,
@@ -1049,7 +1054,7 @@ function ReviewStep({ state, update, price, onNext }) {
       stairs: state.stairs,
       has_freon: state.freon_count > 0,
       freon_count: state.freon_count,
-      truck_size: state.truck_size || 15,
+      truck_size: flatRateTruckSize,
     });
     return flatPrice.total;
   })() : 0;
@@ -1058,8 +1063,12 @@ function ReviewStep({ state, update, price, onNext }) {
   const flatRateCheaper = hasItems && flatRateTotal > 0 && flatRateTotal < itemizedTotal;
   const savingsAmount = flatRateCheaper ? itemizedTotal - flatRateTotal : 0;
 
-  // Auto-suggest a truck size based on AI weight (customer can override).
-  const suggestedTruckSize = aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_26ft_lbs
+  // Auto-suggest a truck size based on AI weight + volume (customer can override).
+  // Prefer the server-side recommendation (which checks both volume AND weight
+  // against actual truck capacities), fall back to the weight-only heuristic.
+  const suggestedTruckSize = recommendedTruck > 15
+    ? recommendedTruck
+    : aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_26ft_lbs
     ? 26
     : aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_20ft_lbs
     ? 20
@@ -1234,12 +1243,27 @@ function ReviewStep({ state, update, price, onNext }) {
                 <div>
                   <span className="text-sm font-semibold text-green-800">Flat rate could save you ${savingsAmount}</span>
                   <p className="text-xs text-green-600 mt-0.5">
-                    {LOAD_LABELS[state.analysis?.load_size || state.load_size]} at ${flatRateTotal} vs itemized at ${itemizedTotal}
+                    {LOAD_LABELS[state.analysis?.load_size || state.load_size]}
+                    {flatRateTruckSize > 15 && ` + ${TRUCK_SIZES[flatRateTruckSize]?.label} truck`}
+                    {' '}at ${flatRateTotal} vs itemized at ${itemizedTotal}
                   </p>
+                  {flatRateTruckSize > 15 && (
+                    <p className="text-[11px] text-green-600 mt-0.5">
+                      {aiVolumeCuft > TRUCK_SIZES[15].volume_cuft
+                        ? `Your load is ~${Math.round(aiVolumeCuft)} cu ft — won't fit in the 15ft (${TRUCK_SIZES[15].volume_cuft} cu ft), so the ${TRUCK_SIZES[flatRateTruckSize]?.label} is included.`
+                        : aiWeightLbs > TRUCK_SIZES[15].max_load_lbs
+                          ? `Your load is ~${aiWeightLbs} lbs — too heavy for the 15ft (${TRUCK_SIZES[15].max_load_lbs} lbs max), so the ${TRUCK_SIZES[flatRateTruckSize]?.label} is included.`
+                          : null}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={() => {
-                    update({ load_size: state.analysis?.load_size || state.load_size, itemized: null });
+                    update({
+                      load_size: state.analysis?.load_size || state.load_size,
+                      truck_size: flatRateTruckSize,
+                      itemized: null,
+                    });
                   }}
                   className="text-xs px-3 py-2 rounded-lg bg-green-600 text-white font-medium whitespace-nowrap"
                 >
@@ -1311,28 +1335,45 @@ function ReviewStep({ state, update, price, onNext }) {
               Hide
             </button>
           </div>
+          {aiVolumeCuft > 0 && (
+            <div className="text-xs text-gray-500">
+              Your load: ~{Math.round(aiVolumeCuft)} cu ft
+              {aiWeightLbs > 0 && `, ~${aiWeightLbs} lbs`}
+              {' '}— needs to fit in the truck.
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2">
-            {[15, 20, 26].map((size) => (
-              <button
-                key={size}
-                onClick={() => update({ truck_size: size })}
-                className={`rounded-lg p-2 text-center border-2 transition-colors ${
-                  (state.truck_size || 15) === size
-                    ? 'border-orange-500 bg-white'
-                    : 'border-gray-200 bg-white hover:border-orange-300'
-                }`}
-              >
-                <div className="text-sm font-bold text-gray-900">{TRUCK_SIZES[size].label}</div>
-                <div className="text-[10px] text-gray-500">{TRUCK_SIZES[size].volume_cuft} cu ft</div>
-                <div className="text-xs font-medium text-orange-600 mt-0.5">
-                  {TRUCK_SIZES[size].fee === 0 ? 'Included' : `+$${TRUCK_SIZES[size].fee}`}
-                </div>
-              </button>
-            ))}
+            {[15, 20, 26].map((size) => {
+              const fits = aiVolumeCuft <= TRUCK_SIZES[size].volume_cuft && aiWeightLbs <= TRUCK_SIZES[size].max_load_lbs;
+              const tooSmall = (aiVolumeCuft > 0 || aiWeightLbs > 0) && !fits;
+              return (
+                <button
+                  key={size}
+                  onClick={() => update({ truck_size: size })}
+                  className={`rounded-lg p-2 text-center border-2 transition-colors relative ${
+                    (state.truck_size || 15) === size
+                      ? 'border-orange-500 bg-white'
+                      : tooSmall
+                        ? 'border-gray-200 bg-gray-50 opacity-60 hover:border-orange-300'
+                        : 'border-gray-200 bg-white hover:border-orange-300'
+                  }`}
+                >
+                  <div className="text-sm font-bold text-gray-900">{TRUCK_SIZES[size].label}</div>
+                  <div className="text-[10px] text-gray-500">{TRUCK_SIZES[size].volume_cuft} cu ft</div>
+                  <div className="text-[10px] text-gray-400">{TRUCK_SIZES[size].max_load_lbs.toLocaleString()} lbs</div>
+                  <div className="text-xs font-medium text-orange-600 mt-0.5">
+                    {TRUCK_SIZES[size].fee === 0 ? 'Included' : `+$${TRUCK_SIZES[size].fee}`}
+                  </div>
+                  {tooSmall && (
+                    <div className="text-[9px] text-red-500 font-medium mt-0.5">Too small</div>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          {suggestedTruckSize === 26 && aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_26ft_lbs && (
+          {suggestedTruckSize === 26 && aiWeightLbs > TRUCK_SIZES[20].max_load_lbs && (
             <p className="text-xs text-gray-500">
-              Your load is heavy enough that the 20ft won&apos;t help (it carries less weight than the 15ft). The 26ft is the right choice.
+              Your load is heavy enough ({aiWeightLbs} lbs) that the 20ft won&apos;t help (it carries less weight than the 15ft). The 26ft is the right choice.
             </p>
           )}
         </div>
