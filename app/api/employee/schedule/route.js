@@ -40,12 +40,12 @@ export async function GET(req) {
 
     const { data: weekBookings } = await supabaseAdmin
       .from('bookings')
-      .select('id, name, address, job_date, time_slot, total_price, status, load_size')
+      .select('id, name, address, job_date, job_time, total_price, status, load_size')
       .gte('job_date', startDate)
       .lte('job_date', endDate)
       .in('status', ['confirmed', 'scheduled', 'in_progress', 'completed'])
       .order('job_date', { ascending: true })
-      .order('time_slot', { ascending: true });
+      .order('job_time', { ascending: true });
 
     // Group by date
     const days = [];
@@ -89,8 +89,8 @@ export async function GET(req) {
   let bookingsQuery = supabaseAdmin
     .from('bookings')
     .select(`
-      id, name, phone, address, address_data, job_date, time_slot,
-      total_price, status, load_size, notes, itemized_items,
+      id, name, phone, address, address_data, job_date, job_time,
+      total_price, status, load_size, notes, customer_notes,
       quadrant, payment_method, payment_status, crew_assignment_id
     `)
     .eq('job_date', date)
@@ -103,7 +103,7 @@ export async function GET(req) {
     bookingsQuery = bookingsQuery.or(`crew_assignment_id.eq.${assignment.id},crew_assignment_id.is.null`);
   }
 
-  const { data: bookings } = await bookingsQuery.order('time_slot', { ascending: true });
+  const { data: bookings } = await bookingsQuery.order('job_time', { ascending: true });
 
   // Partner info
   const partnerId = assignment.driver_employee_id === emp.id
@@ -146,7 +146,11 @@ export async function GET(req) {
   return NextResponse.json({
     assignment,
     partner,
-    bookings: bookings || [],
+    bookings: (bookings || []).map((b) => ({
+      ...b,
+      time_slot: b.time_slot || b.job_time || null,
+      itemized_items: b.itemized_items || [],
+    })),
     open_sessions: openSessions || [],
     completed_sessions: completedSessions || [],
     open_shift: openShift || null,
