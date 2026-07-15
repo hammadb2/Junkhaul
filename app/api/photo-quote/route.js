@@ -191,11 +191,9 @@ async function scanImageWithGemini(rawImageBuffer, mimeType) {
   const imageParts = [
     {
       inline_data: { mime_type: 'image/jpeg', data: enhancedBase64 },
-      media_resolution: 'MEDIA_RESOLUTION_HIGH',
     },
     ...tiles.map((t) => ({
       inline_data: { mime_type: 'image/jpeg', data: t.base64 },
-      media_resolution: 'MEDIA_RESOLUTION_HIGH',
     })),
   ];
 
@@ -574,7 +572,7 @@ export async function POST(req) {
   } catch (err) {
     console.error('photo-quote error:', err);
     return NextResponse.json(
-      { error: 'Could not analyse photos right now. Please pick your load size manually.', debug: err.message, stack: err.stack?.split('\n').slice(0, 5) },
+      { error: 'Could not analyse photos right now. Please pick your load size manually.' },
       { status: 500 }
     );
   }
