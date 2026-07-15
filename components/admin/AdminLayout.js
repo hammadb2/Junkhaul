@@ -25,6 +25,7 @@ import IntelPanel from './IntelPanel';
 import ReferralsPanel from './ReferralsPanel';
 import ConfigPanel from './ConfigPanel';
 import AuditTrail from './AuditTrail';
+import DispatchLogView from './DispatchLogView';
 
 const NAV = [
   { label: 'Overview', items: [
@@ -51,6 +52,7 @@ const NAV = [
   ]},
   { label: 'System', items: [
     { id: 'config', label: 'Config', Icon: IconSettings },
+    { id: 'dispatchlog', label: 'Dispatch Log', Icon: IconPhone },
     { id: 'audit', label: 'Audit', Icon: IconHistory },
   ]},
 ];
@@ -70,13 +72,14 @@ const VIEW_META = {
   referrals: ['Referrals', 'Referral program performance'],
   config: ['Config', 'System settings & kill switches'],
   audit: ['Audit', 'System event log'],
+  dispatchlog: ['Dispatch Log', 'AI dispatch agent action history'],
 };
 
 const VIEWS = {
   dashboard: DashboardView, dispatch: DispatchView, schedule: ScheduleView, leads: LeadsView,
   waitlist: WaitlistView, earnings: EarningsDashboard, crew: CrewView, payroll: PayrollPanel,
   growth: GrowthPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
-  config: ConfigPanel, audit: AuditTrail,
+  config: ConfigPanel, audit: AuditTrail, dispatchlog: DispatchLogView,
 };
 
 export default function AdminLayout({ onLogout }) {

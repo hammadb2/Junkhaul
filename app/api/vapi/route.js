@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { runVapiTool } from '@/lib/vapiTools';
+import { runDispatchTool } from '@/lib/dispatchTools';
 import { sendSMS } from '@/lib/sms';
+
+// Determine if this message is from the Dispatch (crew-facing) agent.
+function isDispatchAgent(message) {
+  const DISPATCH_ID = process.env.VAPI_DISPATCH_AGENT_ID || 'dispatch-agent-pending';
+  const assistantId = message.assistant?.id || message.assistantId || '';
+  const assistantName = message.assistant?.name || '';
+  return assistantId === DISPATCH_ID || assistantName === 'Dispatch' || assistantName === 'dispatch';
+}
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -37,6 +46,8 @@ export async function POST(req) {
 
   // ── Tool calls (current Vapi format) ──
   if (message.type === 'tool-calls' && Array.isArray(message.toolCallList)) {
+    const useDispatch = isDispatchAgent(message);
+    const runner = useDispatch ? runDispatchTool : runVapiTool;
     const results = [];
     for (const call of message.toolCallList) {
       const name = call.function?.name || call.name;
@@ -44,7 +55,12 @@ export async function POST(req) {
       if (typeof args === 'string') {
         try { args = JSON.parse(args); } catch { args = {}; }
       }
-      const result = await runVapiTool(name, args);
+      // Inject caller phone into args for dispatch tools (for audit logging)
+      if (useDispatch) {
+        const callerNumber = message.call?.customer?.number || message.customer?.number || '';
+        args._caller_phone = callerNumber;
+      }
+      const result = await runner(name, args);
       results.push({ toolCallId: call.id, result });
     }
     return NextResponse.json({ results });
@@ -56,7 +72,13 @@ export async function POST(req) {
     if (typeof args === 'string') {
       try { args = JSON.parse(args); } catch { args = {}; }
     }
-    const result = await runVapiTool(message.functionCall.name, args);
+    const useDispatch = isDispatchAgent(message);
+    if (useDispatch) {
+      const callerNumber = message.call?.customer?.number || message.customer?.number || '';
+      args._caller_phone = callerNumber;
+    }
+    const runner = useDispatch ? runDispatchTool : runVapiTool;
+    const result = await runner(message.functionCall.name, args);
     return NextResponse.json({ result });
   }
 
@@ -74,13 +96,16 @@ export async function POST(req) {
     const SALES_ID = process.env.VAPI_BOOKING_AGENT_ID || '8a7d8d53-3749-4814-bd36-39239e8a9c86';
     const SERVICE_ID = process.env.VAPI_CS_AGENT_ID || '897317d8-f5fa-4e90-b0ef-d9d1ca3a945b';
     const REFUNDS_ID = '204b8b2f-325b-4d2b-95da-613ed0c51c68';
+    const DISPATCH_ID = process.env.VAPI_DISPATCH_AGENT_ID || 'dispatch-agent-pending';
     const agentType =
       assistantId === SALES_ID ? 'sales'
       : assistantId === SERVICE_ID ? 'service'
       : assistantId === REFUNDS_ID ? 'refunds'
+      : assistantId === DISPATCH_ID ? 'dispatch'
       : assistantName === 'Casey' ? 'sales'
       : assistantName === 'Jordan' ? 'service'
       : assistantName === 'Riley' ? 'refunds'
+      : assistantName === 'Dispatch' ? 'dispatch'
       : 'unknown';
 
     try {
@@ -113,7 +138,7 @@ export async function POST(req) {
     // Check if this was a transfer from the greeter (short, no real conversation)
     const wasGreeterTransfer = durationSeconds < 15 && agentType === 'unknown';
 
-    if (callerNumber && customerHungUp && !bookingCompleted && !wasGreeterTransfer) {
+    if (callerNumber && customerHungUp && !bookingCompleted && !wasGreeterTransfer && agentType !== 'dispatch') {
       try {
         const isFrustrated = detectFrustration(durationSeconds, endedReason, transcript, agentType);
         const smsMsg = isFrustrated
