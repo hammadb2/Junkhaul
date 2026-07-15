@@ -51,6 +51,7 @@ export default function DispatchView({ flash }) {
           deposit: !!b.deposit_paid,
           flagged: !!b.flag_for_review,
           riskScore: b.no_show_risk_score || 0,
+          possibleCrossPhotoDuplicates: b.possible_cross_photo_duplicates || null,
         }));
         setBookings(mapped);
       }
@@ -260,6 +261,11 @@ export default function DispatchView({ flash }) {
                     <span>Risk score: <strong style={{ color: b.riskScore >= 50 ? '#EF4444' : 'rgba(0,0,0,.55)' }}>{b.riskScore}%</strong></span>
                     <span>Source: {b.source}</span>
                   </div>
+                  {b.possibleCrossPhotoDuplicates?.length > 0 && (
+                    <div style={{ fontSize: 12, color: '#7c3aed', background: 'rgba(124,58,237,.06)', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
+                      🔍 Possible cross-photo duplicates — confirm at pickup: {b.possibleCrossPhotoDuplicates.join(', ')}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button onClick={act('/api/admin/complete', { booking_id: b.id }, `Marked ${b.name}'s job complete`)} style={{ padding: '8px 14px', borderRadius: 9, border: 'none', background: '#22C55E', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Mark complete</button>
                     <button onClick={act('/api/admin/mark-arrived', { booking_id: b.id }, `Marked crew arrived at ${b.name}'s job`)} style={{ padding: '8px 14px', borderRadius: 9, border: '1.5px solid rgba(59,130,246,.3)', background: '#fff', color: '#3B82F6', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Mark arrived</button>

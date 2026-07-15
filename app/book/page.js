@@ -795,13 +795,26 @@ function PhotoStep({ state, update, capturedPhone, sessionId, variant, onNext })
     setAnalyzing(true);
     setError(null);
     try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(photos ? { photos, phone: capturedPhone || null, sessionId: sessionId || null } : { description }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Analysis failed');
+      // Photo path: send all photos in ONE request to /api/photo-quote
+      // (multi-image support). Description path still uses /api/analyze.
+      let data;
+      if (photos) {
+        const res = await fetch('/api/photo-quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images: photos.map((p) => ({ imageBase64: p })) }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Analysis failed');
+      } else {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Analysis failed');
+      }
 
       // Photo unusable (e.g. intimate content accidentally in frame) — ask the
       // customer to retake. Never describe why. No analysis is returned.
@@ -819,6 +832,8 @@ function PhotoStep({ state, update, capturedPhone, sessionId, variant, onNext })
         photoUrls: data.photoUrls || [],
         photo_skipped: false,
         itemized: data.itemized || null,
+        possible_cross_photo_duplicates: data.analysis.possible_cross_photo_duplicates || [],
+        photo_quote_tier: data.analysis.photo_quote_tier || null,
       });
       if (sessionId && data.analysis) {
         const priceEstimate = calculatePrice({
@@ -1740,6 +1755,8 @@ function DetailsStep({ state, update, price, onCreated }) {
           referral_code: state.referral_code || null,
           is_custom_slot: state.is_custom_slot || false,
           itemized_items: state.itemized?.items || null,
+          possible_cross_photo_duplicates: state.possible_cross_photo_duplicates || null,
+          photo_quote_tier: state.photo_quote_tier || null,
         }),
       });
       const data = await res.json();
