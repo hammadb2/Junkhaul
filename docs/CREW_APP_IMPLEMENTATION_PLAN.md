@@ -38,7 +38,7 @@ Before writing code, settle these:
 
 Goal: Confirm the existing Next.js routes can be called from Flutter and identify missing backend work before the Flutter app is built.
 
-**Important:** This audit was re-done from `origin/main` (`app/api/employee/*` and `app/api/crew/*`) by reading each route file directly. The previous plan was based on the stale `devin/1783223164-junkhaul-platform` branch.
+**Important:** This audit was re-done from `origin/main` (`app/api/employee/*` and `app/api/crew/*`) by reading each route file directly. The previous plan was based on a stale branch.
 
 ### 1.1 Auth model (source of truth)
 
