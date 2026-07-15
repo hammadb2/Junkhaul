@@ -5,7 +5,7 @@ import { MapPin, Search } from 'lucide-react';
 
 // ============================================================
 // AddressAutocomplete — Mapbox-powered address search.
-// Works in both light and dark themes via the `dark` prop.
+// Light theme only — brand rule: no dark mode.
 // Returns the full Mapbox feature object to the parent via onSelect.
 // ============================================================
 
@@ -15,7 +15,6 @@ export default function AddressAutocomplete({
   onSelect,
   placeholder = 'Start typing address...',
   className = '',
-  dark = false,
   style = {},
 }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -91,22 +90,22 @@ export default function AddressAutocomplete({
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
-  // Theme-based styles
-  const inputBg = dark ? '#1A1A1E' : '#fff';
-  const inputBorder = dark ? 'rgba(255,255,255,0.08)' : '#d1d5db';
-  const inputColor = dark ? 'rgba(255,255,255,0.9)' : '#111827';
-  const dropdownBg = dark ? '#161618' : '#fff';
-  const dropdownBorder = dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
-  const itemActive = dark ? 'rgba(249,115,22,0.12)' : '#fff7ed';
-  const mainText = dark ? 'rgba(255,255,255,0.9)' : '#111827';
-  const subText = dark ? 'rgba(255,255,255,0.4)' : '#6b7280';
-  const loadingColor = dark ? 'rgba(255,255,255,0.4)' : '#9ca3af';
-  const noResultColor = dark ? 'rgba(255,255,255,0.3)' : '#9ca3af';
+  // Light theme styles (brand rule: light backgrounds only)
+  const inputBg = '#fff';
+  const inputBorder = '#d1d5db';
+  const inputColor = '#111827';
+  const dropdownBg = '#fff';
+  const dropdownBorder = '#e5e7eb';
+  const itemActive = '#fff7ed';
+  const mainText = '#111827';
+  const subText = '#6b7280';
+  const loadingColor = '#9ca3af';
+  const noResultColor = '#9ca3af';
 
   const showResults = showDropdown && (loading || suggestions.length > 0 || (hasSearched && suggestions.length === 0));
 
-  const errorColor = dark ? 'rgba(255,200,100,0.7)' : '#b45309';
-  const errorBg = dark ? 'rgba(255,200,100,0.08)' : '#fffbeb';
+  const errorColor = '#b45309';
+  const errorBg = '#fffbeb';
 
   return (
     <div style={{ position: 'relative', zIndex: 9999 }}>
@@ -181,7 +180,7 @@ export default function AddressAutocomplete({
                   padding: '12px 16px',
                   background: highlighted === i ? itemActive : 'transparent',
                   border: 'none',
-                  borderBottom: i < suggestions.length - 1 ? `1px solid ${dark ? 'rgba(255,255,255,0.04)' : '#f3f4f6'}` : 'none',
+                  borderBottom: i < suggestions.length - 1 ? `1px solid #f3f4f6` : 'none',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,

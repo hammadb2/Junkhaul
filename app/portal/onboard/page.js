@@ -865,7 +865,7 @@ function OnboardInner() {
   return null;
 }
 
-// ============ TD1 shared fields (dark theme) ============
+// ============ TD1 shared fields (light theme) ============
 function Td1FieldsDark({ form, setForm, basic, spousalDefault }) {
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const autoTotal = (Number(form.spousal_amount) || 0) + (Number(form.other_deductions) || 0) + basic;

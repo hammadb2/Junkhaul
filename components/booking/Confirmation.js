@@ -66,6 +66,11 @@ export default function Confirmation({ booking }) {
       </div>
 
       <p className="text-sm text-gray-500">
+        On pickup day, you&apos;ll get a live tracking link — watch your crew on
+        the map in real time, just like a rideshare.
+      </p>
+
+      <p className="text-sm text-gray-500">
         We&apos;ll text you the morning of your pickup. Need to change something?
         Just reply to that text.
       </p>

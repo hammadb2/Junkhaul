@@ -10,7 +10,15 @@ export default function Home() {
   const anim = (props) => (reduced ? {} : props);
 
   return (
-    <main className="min-h-dvh flex flex-col px-6 py-6 max-w-md mx-auto">
+    <>
+      <style>{`
+        body { background: #F5F5F7; }
+        @media (max-width: 480px) { body { background: #fff; } }
+      `}</style>
+      <main
+        className="min-h-dvh flex flex-col px-6 py-6 mx-auto"
+        style={{ maxWidth: '480px', margin: '0 auto', minHeight: '100vh', background: '#fff' }}
+      >
       <motion.div
         initial={anim({ y: -20, opacity: 0 })}
         animate={{ y: 0, opacity: 1 }}
@@ -35,7 +43,7 @@ export default function Home() {
             Gone today.
           </h1>
           <p className="mt-3 text-base text-gray-500">
-            Book in 60 seconds. Instant price. No hidden fees.
+            Get your price in 60 seconds. Instant price. No hidden fees.
           </p>
         </div>
 
@@ -93,6 +101,7 @@ export default function Home() {
           <Link href="/appliance-removal" className="underline">Appliance Removal</Link>
         </div>
       </div>
-    </main>
+      </main>
+    </>
   );
 }

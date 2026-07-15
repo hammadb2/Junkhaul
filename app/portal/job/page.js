@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Navigation, CreditCard, Banknote, Trash2, Warehouse, Camera, Check, CheckCircle, Eraser, Truck, ChevronRight, Send, MapPin, Flag } from 'lucide-react';
 
 // ============================================================
-// /portal/job — full job workflow stepper (dark theme).
+// /portal/job — full job workflow stepper (light theme).
 // En Route -> Arrived -> Payment -> Load -> Route -> Drop -> Signature -> EOD
 // ============================================================
 

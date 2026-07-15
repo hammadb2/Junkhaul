@@ -5,7 +5,7 @@ import GA4 from '@/components/GA4';
 export const metadata = {
   title: 'Junk Haul Calgary — Same Day Junk Removal',
   description:
-    'Calgary junk removal. Book in 60 seconds, get an instant price from photos, same-day pickup available. Fully licensed and insured. Canadian owned and operated.',
+    'Calgary junk removal. Get your price in 60 seconds, get an instant price from photos, same-day pickup available. Fully licensed and insured. Canadian owned and operated.',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://junkhaul.ca'),
   manifest: '/manifest.json',
   icons: {

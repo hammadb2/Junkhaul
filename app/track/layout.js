@@ -2,17 +2,17 @@
 
 import { useEffect } from 'react';
 
-// The track page is intentionally dark-themed (customer tracking link).
-// Force dark mode so the dark-card/glass-bar classes render correctly.
+// The track page uses the site's default light theme.
+// No dark-mode override — brand rule is light backgrounds only.
 export default function TrackLayout({ children }) {
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
     const root = document.documentElement;
+    // Ensure any lingering dark theme is removed.
     const prevTheme = root.getAttribute('data-theme');
-    root.setAttribute('data-theme', 'dark');
+    if (prevTheme === 'dark') root.removeAttribute('data-theme');
     return () => {
-      if (prevTheme === null) root.removeAttribute('data-theme');
-      else root.setAttribute('data-theme', prevTheme);
+      if (prevTheme === 'dark') root.setAttribute('data-theme', prevTheme);
     };
   }, []);
 

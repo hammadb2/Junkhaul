@@ -6,7 +6,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { Star, Phone, MessageSquare, Mail, MapPin, CheckCircle, Circle, Truck, Home, ChevronRight } from 'lucide-react';
 
 // ============================================================
-// /track/[token] — customer tracking portal (dark theme).
+// /track/[token] — customer tracking portal (light theme).
 // Auto-refreshes every 15 seconds. Public — token IS the auth.
 // ============================================================
 
@@ -22,13 +22,13 @@ const STATUS_LABEL = {
 };
 const LOAD_LABELS = { single_item: '1-2 items', quarter: 'Small load', half: 'Half load', full: 'Full load' };
 
-const D = '#0A0A0B';
-const CARD = '#161618';
-const INPUT = '#1A1A1E';
+const D = '#F5F5F7';
+const CARD = '#FFFFFF';
+const INPUT = '#F5F5F7';
 const ORANGE = '#f97316';
-const TXT = 'rgba(255,255,255,0.9)';
-const TXT2 = 'rgba(255,255,255,0.6)';
-const TXT3 = 'rgba(255,255,255,0.4)';
+const TXT = '#1a1a1a';
+const TXT2 = 'rgba(0,0,0,0.5)';
+const TXT3 = 'rgba(0,0,0,0.35)';
 
 export default function TrackPage({ params }) {
   const { token } = params;
@@ -130,11 +130,11 @@ function Header({ status }) {
         {STATUS_STEPS.map((s, i) => {
           const done = i < currentIdx;
           const current = i === currentIdx;
-          const color = done ? '#22C55E' : current ? ORANGE : 'rgba(255,255,255,0.2)';
+          const color = done ? '#22C55E' : current ? ORANGE : 'rgba(0,0,0,0.15)';
           return (
             <div key={s} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
               {i < STATUS_STEPS.length - 1 && (
-                <div style={{ position: 'absolute', top: 12, left: '50%', width: '100%', height: 2, background: done ? '#22C55E' : 'rgba(255,255,255,0.1)' }} />
+                <div style={{ position: 'absolute', top: 12, left: '50%', width: '100%', height: 2, background: done ? '#22C55E' : 'rgba(0,0,0,0.08)' }} />
               )}
               <div style={{ width: 24, height: 24, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, border: current ? `2px solid ${ORANGE}` : 'none' }}>
                 {done && <CheckCircle size={14} color="white" />}
@@ -182,7 +182,7 @@ function JobSummary({ booking }) {
           </div>
         </div>
         {items.length > 0 && (
-          <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             <div style={{ fontSize: 12, color: TXT3, marginBottom: 6 }}>Items</div>
             {items.map((it, i) => (
               <div key={i} style={{ fontSize: 14, color: TXT2, padding: '2px 0', display: 'flex', gap: 8 }}>
@@ -193,14 +193,14 @@ function JobSummary({ booking }) {
           </div>
         )}
         {Number(booking.travel_fee || 0) > 0 && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: TXT2 }}>Travel Charge</span>
               <span className="tabular" style={{ color: TXT, fontWeight: 600 }}>${Number(booking.travel_fee).toFixed(0)}</span>
             </div>
           </div>
         )}
-        <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
+        <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
           <div>
             <div style={{ fontSize: 12, color: TXT3 }}>Deposit</div>
             <div className="tabular" style={{ fontWeight: 700, color: TXT, fontSize: 14 }}>${Number(booking.deposit_amount || 0).toFixed(0)}</div>
@@ -238,9 +238,9 @@ function CrewCard({ crew, status }) {
             {crew.map((c, i) => (
               <div key={i} style={{ marginLeft: i > 0 ? -12 : 0, position: 'relative' }}>
                 {c.selfie_url ? (
-                  <img src={c.selfie_url} alt={c.first_name || 'Crew'} style={{ width: 52, height: 52, borderRadius: '50%', border: '3px solid #161618', objectFit: 'cover', boxShadow: '0 0 12px rgba(249,115,22,0.3)' }} />
+                  <img src={c.selfie_url} alt={c.first_name || 'Crew'} style={{ width: 52, height: 52, borderRadius: '50%', border: '3px solid #FFFFFF', objectFit: 'cover', boxShadow: '0 0 12px rgba(249,115,22,0.3)' }} />
                 ) : (
-                  <div style={{ width: 52, height: 52, borderRadius: '50%', border: '3px solid #161618', background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: ORANGE, fontWeight: 700, fontSize: 18 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: '50%', border: '3px solid #FFFFFF', background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: ORANGE, fontWeight: 700, fontSize: 18 }}>
                     {(c.first_name || '?')[0]}
                   </div>
                 )}
@@ -286,7 +286,7 @@ function LiveMap({ crewLoc, booking }) {
     window.mapboxgl.accessToken = MAPBOX_TOKEN;
     const dest = [booking.lng, booking.lat];
     const start = crewLoc ? [crewLoc.lng, crewLoc.lat] : dest;
-    const map = new window.mapboxgl.Map({ container: mapRef.current, style: 'mapbox://styles/mapbox/dark-v11', center: start, zoom: 13 });
+    const map = new window.mapboxgl.Map({ container: mapRef.current, style: 'mapbox://styles/mapbox/streets-v12', center: start, zoom: 13 });
     mapInstance.current = map;
     map.on('load', () => {
       setMapReady(true);
@@ -427,7 +427,7 @@ function PayBalance({ booking, balanceDue, onPaid }) {
       <div className="dark-card" style={{ padding: 20 }}>
         <div style={{ fontWeight: 600, color: TXT, marginBottom: 4 }}>Pay Balance</div>
         <div className="tabular" style={{ fontSize: 28, fontWeight: 800, color: ORANGE, marginBottom: 16 }}>${balanceDue.toFixed(2)}</div>
-        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'night', variables: { colorPrimary: ORANGE } } }}>
+        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: ORANGE } } }}>
           <BalanceForm bookingId={booking.id} email={booking.email} onPaid={onPaid} />
         </Elements>
       </div>
@@ -575,14 +575,14 @@ function FeedbackSection({ token, done, onDone }) {
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button key={n} onClick={() => setRating(n)} onMouseEnter={() => setHover(n)} onMouseLeave={() => setHover(0)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }} aria-label={`${n} stars`}>
-            <Star size={32} fill={(hover || rating) >= n ? ORANGE : 'none'} color={(hover || rating) >= n ? ORANGE : 'rgba(255,255,255,0.2)'} />
+            <Star size={32} fill={(hover || rating) >= n ? ORANGE : 'none'} color={(hover || rating) >= n ? ORANGE : 'rgba(0,0,0,0.15)'} />
           </button>
         ))}
       </div>
       {rating > 0 && (
         <>
-          <textarea value={review} onChange={(e) => setReview(e.target.value)} placeholder="Tell us how we did (optional)..." rows={3} className="dark-input" style={{ width: '100%', padding: '12px 16px', fontSize: 14, color: TXT, background: INPUT, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, resize: 'none', marginBottom: 8 }} />
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (optional)" className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 14, color: TXT, background: INPUT, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+          <textarea value={review} onChange={(e) => setReview(e.target.value)} placeholder="Tell us how we did (optional)..." rows={3} className="dark-input" style={{ width: '100%', padding: '12px 16px', fontSize: 14, color: TXT, background: INPUT, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12, resize: 'none', marginBottom: 8 }} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (optional)" className="dark-input" style={{ width: '100%', minHeight: 48, padding: '12px 16px', fontSize: 14, color: TXT, background: INPUT, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12 }} />
         </>
       )}
       {err && <p style={{ color: '#EF4444', fontSize: 14, marginTop: 8 }}>{err}</p>}
@@ -630,18 +630,18 @@ function TipSection({ token, done, onDone }) {
         <div style={{ fontSize: 14, color: TXT2, marginBottom: 16 }}>100% of your tip goes to the crew</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
           {presets.map((p) => (
-            <button key={p} onClick={() => { setAmount(p); setCustom(''); }} className="dark-card" style={{ minHeight: 48, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: amount === p && !custom ? `2px solid ${ORANGE}` : '1px solid rgba(255,255,255,0.06)', background: amount === p && !custom ? 'rgba(249,115,22,0.1)' : CARD, color: amount === p && !custom ? ORANGE : TXT, borderRadius: 12 }}>
+            <button key={p} onClick={() => { setAmount(p); setCustom(''); }} className="dark-card" style={{ minHeight: 48, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: amount === p && !custom ? `2px solid ${ORANGE}` : '1px solid rgba(0,0,0,0.06)', background: amount === p && !custom ? 'rgba(249,115,22,0.1)' : CARD, color: amount === p && !custom ? ORANGE : TXT, borderRadius: 12 }}>
               ${p}
             </button>
           ))}
-          <button onClick={() => setAmount(0)} className="dark-card" style={{ minHeight: 48, fontWeight: 600, fontSize: 12, cursor: 'pointer', border: custom ? `2px solid ${ORANGE}` : '1px solid rgba(255,255,255,0.06)', background: custom ? 'rgba(249,115,22,0.1)' : CARD, color: custom ? ORANGE : TXT, borderRadius: 12 }}>
+          <button onClick={() => setAmount(0)} className="dark-card" style={{ minHeight: 48, fontWeight: 600, fontSize: 12, cursor: 'pointer', border: custom ? `2px solid ${ORANGE}` : '1px solid rgba(0,0,0,0.06)', background: custom ? 'rgba(249,115,22,0.1)' : CARD, color: custom ? ORANGE : TXT, borderRadius: 12 }}>
             Custom
           </button>
         </div>
         {custom !== '' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <span style={{ color: TXT3, fontSize: 14 }}>$</span>
-            <input type="number" min="1" value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Custom amount" className="dark-input tabular" style={{ flex: 1, minHeight: 48, padding: '12px 16px', fontSize: 16, color: TXT, background: INPUT, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }} />
+            <input type="number" min="1" value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Custom amount" className="dark-input tabular" style={{ flex: 1, minHeight: 48, padding: '12px 16px', fontSize: 16, color: TXT, background: INPUT, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12 }} />
           </div>
         )}
         <button onClick={() => startTip(finalAmount)} disabled={!finalAmount || finalAmount < 1} className="btn-primary" style={{ width: '100%', minHeight: 48 }}>
@@ -681,7 +681,7 @@ function TipSection({ token, done, onDone }) {
     <div className="dark-card" style={{ padding: 20 }}>
       <div style={{ fontWeight: 600, color: TXT, marginBottom: 4 }}>Tip Your Crew</div>
       <div className="tabular" style={{ fontSize: 28, fontWeight: 800, color: ORANGE, marginBottom: 16 }}>${finalAmount.toFixed(2)}</div>
-      <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'night', variables: { colorPrimary: ORANGE } } }}>
+      <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: ORANGE } } }}>
         <TipForm amount={finalAmount} onDone={onDone} />
       </Elements>
     </div>
@@ -754,7 +754,7 @@ function Footer() {
   return (
     <div style={{ textAlign: 'center', padding: '24px 24px 0' }}>
       <div style={{ fontSize: 12, color: TXT3 }}>junkhaul.ca · (587) 325-0751</div>
-      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginTop: 4 }}>Calgary&apos;s trusted junk removal team</div>
+      <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.15)', marginTop: 4 }}>Calgary&apos;s trusted junk removal team</div>
     </div>
   );
 }
