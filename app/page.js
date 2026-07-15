@@ -100,6 +100,14 @@ export default function Home() {
           <Link href="/furniture-removal" className="underline">Furniture Removal</Link>
           <Link href="/appliance-removal" className="underline">Appliance Removal</Link>
         </div>
+        <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-gray-400 mt-3">
+          <Link href="/privacy" className="underline">Privacy Policy</Link>
+          <Link href="/crew-privacy" className="underline">Crew Privacy</Link>
+          <Link href="/safety-policy" className="underline">Safety</Link>
+          <Link href="/code-of-conduct" className="underline">Code of Conduct</Link>
+          <Link href="/vehicle-use-policy" className="underline">Vehicle Use</Link>
+          <Link href="/uniform-policy" className="underline">Uniform</Link>
+        </div>
       </div>
       </main>
     </>
