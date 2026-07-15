@@ -574,7 +574,7 @@ export async function POST(req) {
   } catch (err) {
     console.error('photo-quote error:', err);
     return NextResponse.json(
-      { error: 'Could not analyse photos right now. Please pick your load size manually.' },
+      { error: 'Could not analyse photos right now. Please pick your load size manually.', debug: err.message, stack: err.stack?.split('\n').slice(0, 5) },
       { status: 500 }
     );
   }
