@@ -24,7 +24,20 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.5-flash';
+
+// Fallback chain: if the primary model is deprecated (404) or overloaded
+// (503), try the next one. This prevents a single Google-side deprecation
+// from taking the entire photo-quote feature down — the exact outage that
+// happened when gemini-2.5-flash was cut without warning.
+//
+// Order: current-gen Lite first (cheapest, $0.25/M input), then current-gen
+// full Flash as a capacity fallback, then the "latest" alias as a last
+// resort (auto-resolves but could break on future deprecations).
+const GEMINI_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-flash-latest',
+];
 
 // ---------------------------------------------------------------------
 // STEP -1: Enhance BEFORE cropping, not after. Sharpening/denoising a
@@ -186,53 +199,73 @@ async function scanImageWithGemini(rawImageBuffer, mimeType) {
     })),
   ];
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: 'FULL IMAGE:' }, imageParts[0],
-              { text: 'CROP: top_left' }, imageParts[1],
-              { text: 'CROP: top_right' }, imageParts[2],
-              { text: 'CROP: bottom_left' }, imageParts[3],
-              { text: 'CROP: bottom_right' }, imageParts[4],
-              { text: SCAN_PROMPT },
-            ],
-          },
+  const requestBody = JSON.stringify({
+    contents: [
+      {
+        parts: [
+          { text: 'FULL IMAGE:' }, imageParts[0],
+          { text: 'CROP: top_left' }, imageParts[1],
+          { text: 'CROP: top_right' }, imageParts[2],
+          { text: 'CROP: bottom_left' }, imageParts[3],
+          { text: 'CROP: bottom_right' }, imageParts[4],
+          { text: SCAN_PROMPT },
         ],
-        generationConfig: {
-          temperature: 0,
-          topK: 1,
-          responseMimeType: 'application/json',
-          responseSchema: SCAN_SCHEMA,
-        },
-      }),
-    }
-  );
+      },
+    ],
+    generationConfig: {
+      temperature: 0,
+      topK: 1,
+      responseMimeType: 'application/json',
+      responseSchema: SCAN_SCHEMA,
+    },
+  });
 
-  if (!res.ok) {
-    throw new Error(`Gemini scan failed: ${res.status} ${await res.text()}`);
+  // Try each model in the fallback chain. 404 = deprecated, 503 = overloaded
+  // — both are retryable on the next model. Other errors (400, 500) are real
+  // failures and should throw immediately.
+  let lastError;
+  for (const model of GEMINI_MODELS) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody,
+      }
+    );
+
+    if (res.ok) {
+      const data = await res.json();
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) throw new Error(`Gemini (${model}) returned no structured output`);
+      const parsed = JSON.parse(raw);
+
+      const dedupedItems = dedupeItems(parsed.items);
+      const recomputedVolume = dedupedItems.reduce(
+        (sum, i) => sum + i.est_volume_cuft_each * i.count, 0
+      );
+
+      return {
+        ...parsed,
+        items: dedupedItems,
+        total_est_volume_cuft: recomputedVolume,
+        _model_used: model,
+      };
+    }
+
+    const errBody = await res.text();
+    lastError = new Error(`Gemini scan failed (${model}): ${res.status} ${errBody.slice(0, 200)}`);
+
+    // 404 (deprecated) or 503 (overloaded) → try next model in the chain.
+    // Anything else (400 bad request, 401 auth, 429 rate limit) → throw now.
+    if (res.status !== 404 && res.status !== 503) {
+      throw lastError;
+    }
+    console.warn(`photo-quote: model ${model} returned ${res.status}, trying fallback...`);
   }
 
-  const data = await res.json();
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!raw) throw new Error('Gemini returned no structured output');
-  const parsed = JSON.parse(raw);
-
-  const dedupedItems = dedupeItems(parsed.items);
-  const recomputedVolume = dedupedItems.reduce(
-    (sum, i) => sum + i.est_volume_cuft_each * i.count, 0
-  );
-
-  return {
-    ...parsed,
-    items: dedupedItems,
-    total_est_volume_cuft: recomputedVolume,
-  };
+  // All models in the chain failed.
+  throw lastError;
 }
 
 // ---------------------------------------------------------------------
