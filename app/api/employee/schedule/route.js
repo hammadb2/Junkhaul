@@ -67,16 +67,30 @@ export async function GET(req) {
   }
 
   // Find today's crew assignment where this employee is driver or secondary
-  const { data: assignment } = await supabaseAdmin
+  const { data: assignment, error: assignError } = await supabaseAdmin
     .from('crew_assignments')
-    .select(`
-      *,
-      driver:driver_employee_id (id, name, first_name, last_name, phone),
-      secondary:secondary_employee_id (id, name, first_name, last_name, phone)
-    `)
+    .select('*')
     .eq('assignment_date', date)
     .or(`driver_employee_id.eq.${emp.id},secondary_employee_id.eq.${emp.id}`)
     .maybeSingle();
+
+  if (assignError) {
+    console.error('Schedule assignment query error:', assignError);
+  }
+
+  // Fetch driver/secondary names separately if assignment exists
+  if (assignment) {
+    const driverId = assignment.driver_employee_id;
+    const secondaryId = assignment.secondary_employee_id;
+    if (driverId) {
+      const { data: d } = await supabaseAdmin.from('employees').select('id, name, first_name, last_name, phone').eq('id', driverId).maybeSingle();
+      assignment.driver = d;
+    }
+    if (secondaryId) {
+      const { data: s } = await supabaseAdmin.from('employees').select('id, name, first_name, last_name, phone').eq('id', secondaryId).maybeSingle();
+      assignment.secondary = s;
+    }
+  }
 
   if (!assignment) {
     return NextResponse.json({ assignment: null, bookings: [], partner: null });
