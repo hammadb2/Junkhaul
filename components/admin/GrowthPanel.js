@@ -11,6 +11,9 @@ export default function GrowthPanel() {
   const [offers, setOffers] = useState([]);
   const [crons, setCrons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stepFunnel, setStepFunnel] = useState([]);
+  const [stepFunnelMeta, setStepFunnelMeta] = useState({ totalLeads: 0, totalConversions: 0, overallConversionRate: 0, phoneStepDropRate: 0, phoneStepDropOff: 0 });
+  const [variants, setVariants] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -49,14 +52,82 @@ export default function GrowthPanel() {
       } catch (e) { /* ignore */ }
       finally { if (!cancelled) setLoading(false); }
     })();
+
+    // Second fetch — per-step funnel analytics from /api/admin/funnel
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/funnel?days=30');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (Array.isArray(data.funnel)) setStepFunnel(data.funnel);
+        setStepFunnelMeta({
+          totalLeads: data.totalLeads || 0,
+          totalConversions: data.totalConversions || 0,
+          overallConversionRate: data.overallConversionRate || 0,
+          phoneStepDropRate: data.phoneStepDropRate || 0,
+          phoneStepDropOff: data.phoneStepDropOff || 0,
+        });
+        if (data.variants) setVariants(data.variants);
+      } catch (e) { /* ignore */ }
+    })();
+
     return () => { cancelled = true; };
   }, []);
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>Loading…</div>;
-  if (funnel.quoted === 0 && offers.length === 0 && crons.length === 0) return <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No growth data available</div>;
+  if (funnel.quoted === 0 && offers.length === 0 && crons.length === 0 && stepFunnel.length === 0) return <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No growth data available</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 16 }}>Funnel analytics</div>
+        <div style={{ display: 'flex', gap: 28, marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'rgba(0,0,0,.45)', fontWeight: 500, textTransform: 'uppercase' }}>Overall conversion</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#1a1a1a' }}>{stepFunnelMeta.overallConversionRate}%</div>
+            <div style={{ fontSize: 11, color: 'rgba(0,0,0,.4)' }}>{stepFunnelMeta.totalConversions} of {stepFunnelMeta.totalLeads} leads</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: 'rgba(0,0,0,.45)', fontWeight: 500, textTransform: 'uppercase' }}>Phone step drop-off</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: stepFunnelMeta.phoneStepDropRate > 40 ? '#EF4444' : '#1a1a1a' }}>{stepFunnelMeta.phoneStepDropRate}%</div>
+            <div style={{ fontSize: 11, color: stepFunnelMeta.phoneStepDropRate > 40 ? '#EF4444' : 'rgba(0,0,0,.4)' }}>{stepFunnelMeta.phoneStepDropOff} leads lost at phone</div>
+          </div>
+        </div>
+        {stepFunnel.map((f, i) => (
+          <div key={f.step} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span style={{ width: 70, fontSize: 12, color: 'rgba(0,0,0,.6)', textTransform: 'capitalize' }}>{f.step}</span>
+            <div style={{ flex: 1, height: 24, background: '#F5F5F7', borderRadius: 6, overflow: 'hidden' }}>
+              <div style={{ width: `${f.pctOfTotal}%`, height: '100%', background: f.step === 'phone' && f.dropRate > 40 ? '#EF4444' : '#f97316', borderRadius: 6, transition: 'width 0.3s' }} />
+            </div>
+            <span style={{ width: 50, fontSize: 12, fontWeight: 600, color: '#1a1a1a', textAlign: 'right' }}>{f.pctOfTotal}%</span>
+            {f.dropRate > 0 && <span style={{ width: 55, fontSize: 11, color: '#EF4444' }}>-{f.dropRate}%</span>}
+          </div>
+        ))}
+        {Object.keys(variants).length > 1 && (
+          <div style={{ marginTop: 18 }}>
+            <h4 style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', margin: '0 0 8px' }}>A/B Test Results</h4>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead><tr style={{ background: '#FAFAFA', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+                {['Variant', 'Leads', 'Conversions', 'Rate', 'Phone drop-off'].map((h, i) => (
+                  <th key={h} style={{ textAlign: i >= 1 ? 'right' : 'left', padding: i === 0 ? '8px 14px' : '8px 12px', fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,.4)', textTransform: 'uppercase' }}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {Object.entries(variants).map(([name, v]) => (
+                  <tr key={name} style={{ borderBottom: '1px solid rgba(0,0,0,.045)' }}>
+                    <td style={{ padding: '8px 14px', fontWeight: 600, color: '#1a1a1a' }}>{name}</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: 'rgba(0,0,0,.6)' }}>{v.total}</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: 'rgba(0,0,0,.6)' }}>{v.converted}</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#1a1a1a' }}>{v.conversionRate}%</td>
+                    <td style={{ padding: '8px 14px', textAlign: 'right', color: v.funnel[0]?.dropRate > 40 ? '#EF4444' : '#f97316', fontWeight: 600 }}>{v.funnel[0]?.dropRate || 0}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: '18px 20px' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 16 }}>Abandonment funnel</div>
         <div style={{ display: 'flex', gap: 14 }}>

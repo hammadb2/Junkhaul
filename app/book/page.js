@@ -26,7 +26,8 @@ const LOADS = [
   { key: 'full', title: 'Full load', desc: 'Garage / estate cleanout', price: 380 },
 ];
 
-const STEPS = ['phone', 'address', 'photos', 'review', 'schedule', 'details', 'payment', 'done'];
+const STEPS_BASE = ['phone', 'address', 'photos', 'review', 'schedule', 'details', 'payment', 'done'];
+const STEPS_PRICE_FIRST = ['address', 'photos', 'review', 'phone', 'schedule', 'details', 'payment', 'done'];
 
 const STORAGE_KEY = 'jh_booking_state';
 
@@ -77,6 +78,7 @@ const isInCalgary = (data) => {
 };
 
 export default function BookPage() {
+  const [phoneGatePosition, setPhoneGatePosition] = useState('phone_first');
   const [sessionId] = useState(() => {
     if (typeof window === 'undefined') return crypto.randomUUID();
     const existing = localStorage.getItem('jh_session');
@@ -125,7 +127,16 @@ export default function BookPage() {
   const [booking, setBooking] = useState(null);
 
   const update = (patch) => setState((s) => ({ ...s, ...patch }));
+
+  // Step order is config-driven (A/B test: phone gate first vs price first).
+  const STEPS = phoneGatePosition === 'price_first' ? STEPS_PRICE_FIRST : STEPS_BASE;
   const stepIndex = STEPS.indexOf(step);
+
+  // Map of current step -> next step, depends on the variant.
+  const nextStepMap = phoneGatePosition === 'price_first'
+    ? { address: 'photos', photos: 'review', review: 'phone', phone: 'schedule', schedule: 'details', details: 'payment' }
+    : { phone: 'address', address: 'photos', photos: 'review', review: 'schedule', schedule: 'details', details: 'payment' };
+  const getNextStep = (current) => nextStepMap[current] || 'done';
 
   // Rehydrate booking state from localStorage on mount so a refresh /
   // background-tab switch during AI photo analysis doesn't lose progress.
@@ -152,19 +163,44 @@ export default function BookPage() {
     } catch (e) { /* silent — quota or serialization */ }
   }, [state]);
 
+  // Fetch the phone-gate position (A/B variant) from config on mount. This
+  // is config-driven (not random): the operator sets
+  // booking_phone_gate_position to 'phone_first' (default) or 'price_first'.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/config/booking-flow')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const pos = data?.phone_gate_position === 'price_first' ? 'price_first' : 'phone_first';
+        setPhoneGatePosition(pos);
+        // For the price_first variant, the first step is 'address' (no phone
+        // gate up front). If we defaulted to 'phone' and the user hasn't
+        // captured a phone yet, jump them to 'address'.
+        if (pos === 'price_first' && !capturedPhone) {
+          setStep((s) => (s === 'phone' ? 'address' : s));
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Funnel tracking — fire a lightweight capture-lead update on every
-  // step change so we know where each lead dropped off.
+  // step change so we know where each lead dropped off. Works with
+  // session_id alone so the price_first variant can track steps before the
+  // phone is captured (phone is sent as 'pending' in that case).
   const goToStep = (nextStep) => {
     setStep(nextStep);
-    if (capturedPhone && sessionId) {
+    if (sessionId) {
       fetch('/api/capture-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: capturedPhone,
+          phone: capturedPhone || 'pending',
           session_id: sessionId,
           action: 'step',
           step_name: nextStep,
+          ab_variant: phoneGatePosition,
         }),
       }).catch(() => {});
     }
@@ -198,11 +234,11 @@ export default function BookPage() {
         </Link>
         {step !== 'done' && (
           <div className="flex gap-1">
-            {STEPS.slice(1, 7).map((s, i) => (
+            {STEPS.slice(1, -1).map((s, i) => (
               <div
                 key={s}
                 className={`h-1.5 w-6 rounded-full ${
-                  i <= stepIndex ? 'bg-orange-500' : 'bg-gray-200'
+                  i + 1 <= stepIndex ? 'bg-orange-500' : 'bg-gray-200'
                 }`}
               />
             ))}
@@ -224,9 +260,10 @@ export default function BookPage() {
               sessionId={sessionId}
               state={state}
               update={update}
+              variant={phoneGatePosition}
               onNext={(phone) => {
                 setCapturedPhone(phone);
-                goToStep('address');
+                goToStep(getNextStep('phone'));
               }}
             />
           )}
@@ -235,7 +272,8 @@ export default function BookPage() {
               state={state}
               update={update}
               sessionId={sessionId}
-              onNext={() => goToStep('photos')}
+              variant={phoneGatePosition}
+              onNext={() => goToStep(getNextStep('address'))}
             />
           )}
           {step === 'photos' && (
@@ -244,7 +282,8 @@ export default function BookPage() {
               update={update}
               capturedPhone={capturedPhone}
               sessionId={sessionId}
-              onNext={() => goToStep('review')}
+              variant={phoneGatePosition}
+              onNext={() => goToStep(getNextStep('photos'))}
             />
           )}
           {step === 'review' && (
@@ -252,14 +291,14 @@ export default function BookPage() {
               state={state}
               update={update}
               price={price}
-              onNext={() => goToStep('schedule')}
+              onNext={() => goToStep(getNextStep('review'))}
             />
           )}
           {step === 'schedule' && (
             <ScheduleStep
               state={state}
               update={update}
-              onNext={() => goToStep('details')}
+              onNext={() => goToStep(getNextStep('schedule'))}
             />
           )}
           {step === 'details' && (
@@ -269,7 +308,7 @@ export default function BookPage() {
               price={price}
               onCreated={(b) => {
                 setBooking(b);
-                goToStep('payment');
+                goToStep(getNextStep('details'));
                 if (capturedPhone) {
                   fetch('/api/capture-lead', {
                     method: 'POST',
@@ -301,7 +340,7 @@ export default function BookPage() {
                     address: state.unit ? `${state.unit}-${state.address}` : state.address,
                     phone: state.phone,
                   }));
-                  goToStep('done');
+                  goToStep(getNextStep('payment'));
                 }}
               />
             </div>
@@ -341,10 +380,11 @@ export default function BookPage() {
 // ============================================================
 // STEP 0 — PHONE ONLY
 // ============================================================
-function PhoneStep({ sessionId, state, update, onNext }) {
+function PhoneStep({ sessionId, state, update, variant, onNext }) {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const isPriceFirst = variant === 'price_first';
 
   const formatPhone = (raw) => {
     const digits = raw.replace(/\D/g, '').slice(0, 10);
@@ -373,7 +413,7 @@ function PhoneStep({ sessionId, state, update, onNext }) {
       const res = await fetch('/api/capture-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneToSend, session_id: sessionId, action: 'init', source: 'web', ...utm }),
+        body: JSON.stringify({ phone: phoneToSend, session_id: sessionId, action: 'init', source: 'web', ab_variant: variant, ...utm }),
       });
       if (!res.ok) throw new Error('Failed');
       localStorage.setItem('jh_phone', phoneToSend);
@@ -395,8 +435,14 @@ function PhoneStep({ sessionId, state, update, onNext }) {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Get your instant price</h2>
-        <p className="mt-2 text-gray-500 text-sm">Enter your mobile number and we&apos;ll text you your quote. No spam, ever.</p>
+        <h2 className="text-2xl font-bold text-gray-900">
+          {isPriceFirst ? 'Almost there — what\u2019s your number?' : 'Get your instant price'}
+        </h2>
+        <p className="mt-2 text-gray-500 text-sm">
+          {isPriceFirst
+            ? 'Last step before booking — we\u2019ll text you a confirmation. No spam, ever.'
+            : 'Enter your mobile number and we\u2019ll text you your quote. No spam, ever.'}
+        </p>
       </div>
 
       <input
@@ -427,7 +473,7 @@ function PhoneStep({ sessionId, state, update, onNext }) {
 // ============================================================
 // STEP 1 — ADDRESS (with Mapbox autocomplete)
 // ============================================================
-function AddressStep({ state, update, sessionId, onNext }) {
+function AddressStep({ state, update, sessionId, variant, onNext }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -442,11 +488,12 @@ function AddressStep({ state, update, sessionId, onNext }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            phone: state.phone,
+            phone: state.phone || 'pending',
             session_id: sessionId,
             action: 'out_of_area',
             address: state.address,
             address_data: state.address_data,
+            ab_variant: variant,
           }),
         }).catch(() => {});
         setSubmitting(false);
@@ -464,6 +511,31 @@ function AddressStep({ state, update, sessionId, onNext }) {
             action: 'update',
             address: state.address,
             address_data: state.address_data,
+            ab_variant: variant,
+          }),
+        }).catch(() => {});
+      } else {
+        // price_first variant: no phone yet, so create the lead row now
+        // (with phone='pending') so step tracking + price reveal have a row
+        // to update. The address is attached here; the real phone is filled
+        // in later at the phone step (a second 'init' upserts by session_id).
+        const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+        fetch('/api/capture-lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: 'pending',
+            session_id: sessionId,
+            action: 'init',
+            source: 'web',
+            address: state.address,
+            address_data: state.address_data,
+            ab_variant: variant,
+            utm_source: urlParams.get('utm_source') || null,
+            utm_medium: urlParams.get('utm_medium') || null,
+            utm_campaign: urlParams.get('utm_campaign') || null,
+            gclid: urlParams.get('gclid') || null,
+            fbclid: urlParams.get('fbclid') || null,
           }),
         }).catch(() => {});
       }
@@ -657,7 +729,7 @@ function OutOfAreaNotice({ state, sessionId }) {
 // ============================================================
 // STEP 1 — PHOTOS
 // ============================================================
-function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
+function PhotoStep({ state, update, capturedPhone, sessionId, variant, onNext }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [showDescribe, setShowDescribe] = useState(false);
@@ -748,7 +820,7 @@ function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
         photo_skipped: false,
         itemized: data.itemized || null,
       });
-      if (capturedPhone && data.analysis) {
+      if (sessionId && data.analysis) {
         const priceEstimate = calculatePrice({
           load_size: data.analysis.load_size,
           same_day: false,
@@ -760,13 +832,14 @@ function PhotoStep({ state, update, capturedPhone, sessionId, onNext }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            phone: capturedPhone,
+            phone: capturedPhone || 'pending',
             session_id: sessionId,
             action: 'price_reveal',
             ai_price_estimate: priceEstimate.total,
             load_size: data.analysis.load_size,
             photos: data.photoUrls || [],
             itemized: data.itemized || null,
+            ab_variant: variant,
           }),
         }).catch(() => {});
       }

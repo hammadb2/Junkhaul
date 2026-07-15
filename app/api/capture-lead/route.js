@@ -7,26 +7,45 @@ export const runtime = 'nodejs';
 
 export async function POST(req) {
   const { phone, session_id, action, ...rest } = await req.json();
-  if (!phone || !session_id) return NextResponse.json({ error: 'phone and session_id required' }, { status: 400 });
+  // session_id is always required; phone may be 'pending' for the
+  // price_first variant where the lead row is created before the phone is
+  // captured (address step). All DB writes key off session_id, so a pending
+  // phone is fine — SMS sending is guarded internally on hasRealPhone.
+  if (!session_id) return NextResponse.json({ error: 'session_id required' }, { status: 400 });
+  const hasRealPhone = phone && phone !== 'pending';
 
   if (action === 'init') {
+    // For the price_first variant, 'init' may be called with phone='pending'
+    // (at the address step) to create the lead row before the phone is known.
+    // In that case we skip the welcome SMS — it's sent later when the real
+    // phone is captured (a second 'init' upserts by session_id).
+    const leadRow = {
+      phone,
+      session_id,
+      source: rest.source || 'web',
+      // UTM / click-ID capture at first touch (Step 2)
+      utm_source: rest.utm_source || null,
+      utm_medium: rest.utm_medium || null,
+      utm_campaign: rest.utm_campaign || null,
+      gclid: rest.gclid || null,
+      fbclid: rest.fbclid || null,
+      updated_at: new Date().toISOString(),
+    };
+    // price_first: the address may already be known at init time, so attach it.
+    if (rest.address) leadRow.address = rest.address;
+    if (rest.address_data) leadRow.address_data = rest.address_data;
+    if (rest.ab_variant) {
+      leadRow.ab_variant = rest.ab_variant;
+      leadRow.ab_variant_assigned_at = new Date().toISOString();
+    }
     const { data, error } = await supabaseAdmin
       .from('leads')
-      .upsert({
-        phone,
-        session_id,
-        source: rest.source || 'web',
-        // UTM / click-ID capture at first touch (Step 2)
-        utm_source: rest.utm_source || null,
-        utm_medium: rest.utm_medium || null,
-        utm_campaign: rest.utm_campaign || null,
-        gclid: rest.gclid || null,
-        fbclid: rest.fbclid || null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'session_id' })
+      .upsert(leadRow, { onConflict: 'session_id' })
       .select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await sendSMS(phone, `Junk Haul Calgary here! Upload your photos and we'll get you an instant price. Questions? Call or text (587) 325-0751`, null, 'lead_welcome');
+    if (hasRealPhone) {
+      await sendSMS(phone, `Junk Haul Calgary here! Upload your photos and we'll get you an instant price. Questions? Call or text (587) 325-0751`, null, 'lead_welcome');
+    }
     return NextResponse.json({ ok: true, lead_id: data.id });
   }
 
@@ -83,21 +102,28 @@ export async function POST(req) {
       }).catch(() => {}); // best-effort — don't fail the quote over history
     }
 
-    if (ai_price_estimate) {
+    if (ai_price_estimate && hasRealPhone) {
       await sendSMS(phone, `Your Junk Haul Calgary quote: $${ai_price_estimate}. $50 deposit locks in your slot. Book here: https://junkhaul.ca/book — quote valid 48 hrs.`, null, 'lead_price_reveal');
     }
     return NextResponse.json({ ok: true });
   }
 
   if (action === 'step') {
-    // Funnel tracking — fire on every step change.
+    // Funnel tracking — fire on every step change. Works with session_id
+    // alone so the price_first variant can track steps before the phone is
+    // captured (phone may be 'pending').
     const { step_name } = rest;
     if (!step_name) return NextResponse.json({ ok: true });
-    await supabaseAdmin.from('leads').update({
+    const stepUpdate = {
       last_step_reached: step_name,
       last_step_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    }).eq('session_id', session_id).catch(() => {});
+    };
+    if (rest.ab_variant) {
+      stepUpdate.ab_variant = rest.ab_variant;
+      stepUpdate.ab_variant_assigned_at = new Date().toISOString();
+    }
+    await supabaseAdmin.from('leads').update(stepUpdate).eq('session_id', session_id).catch(() => {});
     return NextResponse.json({ ok: true });
   }
 
