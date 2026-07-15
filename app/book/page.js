@@ -952,6 +952,24 @@ function ReviewStep({ state, update, price, onNext }) {
     state.load_size === 'full' ||
     aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_20ft_lbs;
 
+  // Flat-rate comparison: calculate the flat-rate total for the AI-suggested load size
+  // so we can recommend it if it's cheaper than the itemized quote
+  const flatRateTotal = hasItems ? (() => {
+    const flatPrice = calculatePrice({
+      load_size: state.analysis?.load_size || state.load_size,
+      same_day: state.same_day,
+      stairs: state.stairs,
+      has_freon: state.freon_count > 0,
+      freon_count: state.freon_count,
+      truck_size: state.truck_size || 15,
+    });
+    return flatPrice.total;
+  })() : 0;
+
+  const itemizedTotal = hasItems ? itemized.total : 0;
+  const flatRateCheaper = hasItems && flatRateTotal > 0 && flatRateTotal < itemizedTotal;
+  const savingsAmount = flatRateCheaper ? itemizedTotal - flatRateTotal : 0;
+
   // Auto-suggest a truck size based on AI weight (customer can override).
   const suggestedTruckSize = aiWeightLbs >= TRUCK_SIZE_WEIGHT_THRESHOLDS.recommend_26ft_lbs
     ? 26
@@ -1121,27 +1139,49 @@ function ReviewStep({ state, update, price, onNext }) {
 
       {/* ===== SECTION: FLAT-RATE PRICING (optional alternative when items exist) ===== */}
       {hasItems ? (
-        <details className="mt-1">
-          <summary className="cursor-pointer text-sm text-gray-400 hover:text-gray-600 font-medium select-none">
-            Prefer flat-rate pricing instead?
-          </summary>
-          <div className="grid grid-cols-2 gap-3 mt-3">
-            {LOADS.map((l) => (
-              <LoadCard
-                key={l.key}
-                selected={state.load_size === l.key}
-                onClick={() => {
-                  // Switching to flat-rate: clear itemized pricing
-                  update({ load_size: l.key, itemized: null });
-                }}
-              >
-                <div className="font-semibold text-gray-900">{l.title}</div>
-                <div className="text-xs text-gray-500 mt-0.5 h-8">{l.desc}</div>
-                <div className="font-bold text-orange-500 mt-1">${l.price}</div>
-              </LoadCard>
-            ))}
-          </div>
-        </details>
+        <div className="mt-1">
+          {flatRateCheaper ? (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-semibold text-green-800">Flat rate could save you ${savingsAmount}</span>
+                  <p className="text-xs text-green-600 mt-0.5">
+                    {LOAD_LABELS[state.analysis?.load_size || state.load_size]} at ${flatRateTotal} vs itemized at ${itemizedTotal}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    update({ load_size: state.analysis?.load_size || state.load_size, itemized: null });
+                  }}
+                  className="text-xs px-3 py-2 rounded-lg bg-green-600 text-white font-medium whitespace-nowrap"
+                >
+                  Apply flat rate
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <details>
+            <summary className="cursor-pointer text-sm text-gray-400 hover:text-gray-600 font-medium select-none">
+              {flatRateCheaper ? 'Compare flat-rate pricing' : 'Prefer flat-rate pricing instead?'}
+            </summary>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              {LOADS.map((l) => (
+                <LoadCard
+                  key={l.key}
+                  selected={state.load_size === l.key}
+                  onClick={() => {
+                    // Switching to flat-rate: clear itemized pricing
+                    update({ load_size: l.key, itemized: null });
+                  }}
+                >
+                  <div className="font-semibold text-gray-900">{l.title}</div>
+                  <div className="text-xs text-gray-500 mt-0.5 h-8">{l.desc}</div>
+                  <div className="font-bold text-orange-500 mt-1">${l.price}</div>
+                </LoadCard>
+              ))}
+            </div>
+          </details>
+        </div>
       ) : (
         <>
           <div className="flex items-center gap-2 mt-1">
@@ -1164,16 +1204,24 @@ function ReviewStep({ state, update, price, onNext }) {
         </>
       )}
 
-      {/* ===== TRUCK SIZE UPSELL ===== */}
-      {showTruckUpsell && (
+      {/* ===== TRUCK SIZE — always accessible via toggle ===== */}
+      {(showTruckUpsell || state.show_truck_size) ? (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
-          <div>
-            <span className="text-sm font-medium text-gray-900">Truck size</span>
-            {suggestedTruckSize > 15 && (
-              <span className="text-xs text-orange-600 ml-2">
-                We recommend {TRUCK_SIZES[suggestedTruckSize].label} based on your load
-              </span>
-            )}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-gray-900">Truck size</span>
+              {suggestedTruckSize > 15 && (
+                <span className="text-xs text-orange-600 ml-2">
+                  We recommend {TRUCK_SIZES[suggestedTruckSize].label} based on your load
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => update({ show_truck_size: false })}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Hide
+            </button>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {[15, 20, 26].map((size) => (
@@ -1200,6 +1248,13 @@ function ReviewStep({ state, update, price, onNext }) {
             </p>
           )}
         </div>
+      ) : (
+        <button
+          onClick={() => update({ show_truck_size: true })}
+          className="text-sm text-gray-400 hover:text-gray-600 font-medium text-left"
+        >
+          See truck size options →
+        </button>
       )}
 
       {/* ===== DONATE SECTION (from LoadStep) — only when no itemized items ===== */}
@@ -1261,7 +1316,10 @@ function ReviewStep({ state, update, price, onNext }) {
         <div className="flex-1 h-px bg-gray-200" />
       </div>
       <div className="space-y-3">
-        {/* Freon: per-item count */}
+        {/* Freon: per-item count — only for flat-rate pricing.
+            When using itemized pricing, freon disposal is already
+            included in the item's line price (e.g. fridge $65). */}
+        {!hasItems && (
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium text-gray-900">Freon appliances</div>
@@ -1291,6 +1349,12 @@ function ReviewStep({ state, update, price, onNext }) {
             </button>
           </div>
         </div>
+        )}
+        {hasItems && items.some((i) => i.is_freon) && (
+          <div className="text-xs text-gray-400 bg-gray-50 rounded-lg p-2">
+            Freon disposal is included in your appliance item prices — no extra charge.
+          </div>
+        )}
 
         {/* Stairs: with confirmation */}
         <div className="flex items-center justify-between">
@@ -1356,13 +1420,18 @@ function ReviewStep({ state, update, price, onNext }) {
             <>
               <div className="flex justify-between"><span>Itemized quote ({items.length} item{items.length > 1 ? 's' : ''})</span><span>${itemized.subtotal || itemized.total}</span></div>
               {itemized.is_minimum && <div className="flex justify-between"><span>Minimum charge adjustment</span><span>+$99</span></div>}
+              {itemized.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span><span>${itemized.stairs_fee}</span></div>}
+              {itemized.same_day_fee > 0 && <div className="flex justify-between"><span>Same-day</span><span>${itemized.same_day_fee}</span></div>}
             </>
           ) : (
             <div className="flex justify-between"><span>Base ({LOAD_LABELS[state.load_size]})</span><span>${price.base_price}</span></div>
           )}
-          {price.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span><span>${price.freon_fee}</span></div>}
-          {price.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span><span>${price.stairs_fee}</span></div>}
-          {price.same_day_fee > 0 && <div className="flex justify-between"><span>Same-day</span><span>${price.same_day_fee}</span></div>}
+          {/* Freon fee only shows for flat-rate pricing — for itemized, it's in the item prices */}
+          {!hasItems && price.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span><span>${price.freon_fee}</span></div>}
+          {/* Stairs fee for flat-rate */}
+          {!hasItems && price.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span><span>${price.stairs_fee}</span></div>}
+          {/* Same-day for flat-rate */}
+          {!hasItems && price.same_day_fee > 0 && <div className="flex justify-between"><span>Same-day</span><span>${price.same_day_fee}</span></div>}
           {price.truck_fee > 0 && <div className="flex justify-between"><span>Larger truck ({TRUCK_SIZES[state.truck_size || 15]?.label})</span><span>+${price.truck_fee}</span></div>}
           <div className="flex justify-between font-medium text-gray-600 pt-1 border-t border-gray-200"><span>Balance on pickup</span><span>${hasItems ? itemized.balance_due : price.balance_due}</span></div>
         </div>
