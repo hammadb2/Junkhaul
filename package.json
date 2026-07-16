@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node supabase/migrations/payroll.test.js",
+    "test": "node supabase/migrations/payroll.test.js && node supabase/migrations/payment-validation.test.js",
     "test:payroll": "node supabase/migrations/payroll.test.js"
   },
   "dependencies": {
