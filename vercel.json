@@ -12,6 +12,14 @@
     {
       "path": "/api/cron/seed-daily-assignments",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/seed-reviewer-jobs",
+      "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron/seed-donation-drops",
+      "schedule": "0 6 * * 1"
     }
   ]
 }
