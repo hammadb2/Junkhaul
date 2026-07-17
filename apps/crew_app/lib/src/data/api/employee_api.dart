@@ -401,6 +401,26 @@ class EmployeeApi {
     }
     return [];
   }
+
+  // ---- Route Plan ----
+
+  /// Fetch the current canonical route plan.
+  Future<Map<String, dynamic>> getRoutePlan() async {
+    return _dio.getJson('/api/employee/route-plan');
+  }
+
+  /// Acknowledge receipt of a route plan version.
+  Future<Map<String, dynamic>> acknowledgeRoute({
+    required String routeId,
+    required int routeVersion,
+    String? deviceId,
+  }) async {
+    return _dio.postJson('/api/employee/route-plan', body: {
+      'route_id': routeId,
+      'route_version': routeVersion,
+      if (deviceId != null) 'device_id': deviceId,
+    });
+  }
 }
 
 /// Provider for [EmployeeApi]. Depends on [dioClientProvider].

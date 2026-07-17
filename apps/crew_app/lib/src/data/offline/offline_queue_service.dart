@@ -107,6 +107,8 @@ class OfflineQueueService {
         return '/api/crew/resend-payment-link';
       case 'collect_payment':
         return '/api/crew/collect-payment';
+      case 'route_acknowledgment':
+        return '/api/employee/route-plan';
       default:
         return null;
     }
