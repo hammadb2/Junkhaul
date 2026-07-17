@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
-import { getAuthedEmployee } from '@/lib/employeeAuth';
+import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +35,13 @@ export async function POST(req) {
 
   if (!booking_id || !type || !photo) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  }
+
+  // If authenticated via employee session, verify the employee is assigned
+  // to this booking's crew. Legacy PIN auth bypasses this check (backward
+  // compat for the customer portal).
+  if (employee && !await isEmployeeAssignedToBooking(employee.id, booking_id)) {
+    return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
   }
 
   if (!VALID_TYPES.includes(type)) {

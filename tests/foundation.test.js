@@ -184,4 +184,23 @@ assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*active/, 'active must
 assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*onboarded/, 'onboarded must not be blocked');
 assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*pending_verification/, 'pending_verification must not be blocked');
 
+// Booking assignment check: crew endpoints must verify the employee is
+// assigned to the booking before allowing photo upload, payment collection,
+// or payment link resend.
+assert.match(employeeAuthSource, /isEmployeeAssignedToBooking/, 'must export isEmployeeAssignedToBooking');
+assert.match(employeeAuthSource, /driver_employee_id\.eq.*secondary_employee_id\.eq/, 'must check driver or secondary assignment');
+
+// Verify all three crew endpoints import and use the assignment check.
+const uploadPhotoSource = readFileSync(new URL('../app/api/crew/upload-photo/route.js', import.meta.url), 'utf8');
+assert.match(uploadPhotoSource, /isEmployeeAssignedToBooking/, 'upload-photo must check booking assignment');
+assert.match(uploadPhotoSource, /Not assigned to this booking/, 'upload-photo must reject unassigned employees');
+
+const collectPaymentSource = readFileSync(new URL('../app/api/crew/collect-payment/route.js', import.meta.url), 'utf8');
+assert.match(collectPaymentSource, /isEmployeeAssignedToBooking/, 'collect-payment must check booking assignment');
+assert.match(collectPaymentSource, /Not assigned to this booking/, 'collect-payment must reject unassigned employees');
+
+const resendLinkSource = readFileSync(new URL('../app/api/crew/resend-payment-link/route.js', import.meta.url), 'utf8');
+assert.match(resendLinkSource, /isEmployeeAssignedToBooking/, 'resend-payment-link must check booking assignment');
+assert.match(resendLinkSource, /Not assigned to this booking/, 'resend-payment-link must reject unassigned employees');
+
 console.log('foundation tests passed');
