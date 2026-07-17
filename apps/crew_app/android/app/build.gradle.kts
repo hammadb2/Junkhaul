@@ -52,6 +52,11 @@ android {
             if (hasKeystore) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            // ProGuard rules for release minification (R8).
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
