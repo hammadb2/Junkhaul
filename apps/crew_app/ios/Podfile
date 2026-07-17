@@ -50,20 +50,21 @@ post_install do |installer|
   end
 
   # google_maps_flutter_ios and google_navigation_flutter both link the
-  # GoogleMaps SDK, causing duplicate symbol linker errors on iOS (2886
-  # duplicate symbols). This is a documented incompatibility
+  # GoogleMaps SDK, causing 2886 duplicate symbol linker errors on iOS.
+  # This is a documented incompatibility
   # (googlemaps/flutter-navigation-sdk#498).
   #
-  # Workaround: strip the GoogleMaps framework link from
-  # google_maps_flutter_ios so only google_navigation_flutter provides it.
-  # The GoogleMap widget from google_maps_flutter will not render on iOS
-  # until the app migrates to GoogleMapsMapView from google_navigation_flutter.
+  # Workaround: remove GoogleMaps.framework from the google_maps_flutter_ios
+  # target's "Link Binary With Libraries" build phase so only
+  # google_navigation_flutter provides it. The GoogleMap widget from
+  # google_maps_flutter will not render on iOS until the app migrates to
+  # GoogleMapsMapView from google_navigation_flutter.
   installer.pods_project.targets.each do |target|
     next unless target.name == 'google_maps_flutter_ios'
-    target.build_configurations.each do |config|
-      ldflags = config.build_settings['OTHER_LDFLAGS']
-      next unless ldflags
-      config.build_settings['OTHER_LDFLAGS'] = ldflags.gsub(/-framework\s+"GoogleMaps"/, '')
+    target.frameworks_build_phase.files.each do |file|
+      if file.display_name =~ /GoogleMaps/
+        target.frameworks_build_phase.remove_build_file(file)
+      end
     end
   end
 end
