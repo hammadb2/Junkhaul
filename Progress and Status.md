@@ -7,6 +7,156 @@
 
 ---
 
+## 2026-07-16 Repository-grounded implementation update
+
+This section supersedes broad claims below such as “everything built.” Status values used here are only `COMPLETE_AND_VERIFIED`, `BUILT_NOT_VERIFIED`, `PARTIAL`, `NOT_BUILT`.
+
+### Customer website / paid booking flow
+
+- Status: `BUILT_NOT_VERIFIED`
+- Repository path: `app/book/page.js`, `app/api/capture-lead/route.js`, `app/api/create-booking/route.js`
+- API: `/api/capture-lead`, `/api/create-booking`, `/api/photo-quote`, `/api/slots`
+- Database table: `leads`, `bookings`, `lead_quotes`, `quote_price_ledger`, `timeline_events`, `attribution_records`
+- Admin visibility: `PARTIAL` via Leads, Booking Detail, timeline and price ledger APIs.
+- Manager visibility: `PARTIAL`; role foundation exists, full manager UI is not built.
+- Quo integration: `PARTIAL`; central sender now supports suppression and entity links.
+- Vapi integration: `PARTIAL`; existing tools still need full shared-data refactor.
+- App impact: `APP_READS_THIS` for price ledger/timeline later; documented in `docs/CREW_APP_BACKLOG.md`.
+- Tests: `BUILT_NOT_VERIFIED`; foundation unit tests added, route integration tests still needed.
+- Manual verification: `BUILT_NOT_VERIFIED`; build/lint/tests pass locally.
+- Production status: `PARTIAL`; migration must be applied and seeded.
+- Known gaps: customer change history is still not fully captured per field; photo metadata is not fully stored for website upload; admin action endpoints are not complete.
+
+### Door-hanger and flyer attribution
+
+- Status: `PARTIAL`
+- Repository path: `app/book/hanger/route.js`, `lib/attribution.js`
+- API: `/book/hanger`
+- Database table: `marketing_campaigns`, `campaign_batches`, `campaign_tracking_codes`, `attribution_records`, `funnel_events`
+- Admin visibility: `PARTIAL` via Marketing admin panel.
+- Manager visibility: `NOT_BUILT`
+- Quo integration: `PARTIAL`; messages can link to campaign IDs.
+- Vapi integration: `PARTIAL`; tables exist for later call attribution.
+- App impact: `APP_READS_THIS` optional source badge only.
+- Tests: `PARTIAL`; pure tests added, route tests still needed.
+- Manual verification: `BUILT_NOT_VERIFIED`
+- Production status: `PARTIAL`; campaign/batch/code seed data required.
+- Known gaps: first-touch correction UI is not built; campaign creation UI is not built.
+
+### Marketing campaign reporting
+
+- Status: `PARTIAL`
+- Repository path: `app/api/admin/marketing/route.js`, `components/admin/MarketingPanel.js`
+- API: `/api/admin/marketing`
+- Database table: campaign and attribution tables above.
+- Admin visibility: `PARTIAL`; report metrics are visible but creation/editing and full breakdown filters are not finished.
+- Manager visibility: `NOT_BUILT`
+- Quo integration: `PARTIAL`
+- Vapi integration: `PARTIAL`
+- App impact: `NO_APP_IMPACT`
+- Tests: `NOT_BUILT` for admin route aggregation.
+- Manual verification: `BUILT_NOT_VERIFIED`
+- Production status: `PARTIAL`
+- Known gaps: profit per hanger uses collected revenue minus campaign cost only; full job-cost profit is not wired.
+
+### Free donation-only pickup
+
+- Status: `PARTIAL`
+- Repository path: `app/book/donation/page.js`, `app/api/donation-request/route.js`, `lib/donation.js`, `components/admin/DonationsView.js`, `app/api/admin/donations/route.js`
+- API: `/api/donation-request`, `/api/admin/donations`
+- Database table: `donation_requests`, `donation_request_items`, `donation_request_photos`, `donation_policy_versions`, `donation_ai_analyses`, `donation_route_matches`
+- Admin visibility: `PARTIAL`; queue and actions exist, full detail workspace is not complete.
+- Manager visibility: `PARTIAL`; permission tables exist, manager UI not built.
+- Quo integration: `PARTIAL`; templates are represented by message types, versioned template admin is not built.
+- Vapi integration: `NOT_BUILT` for donation-specific tools.
+- App impact: `APP_REQUIRES_NEW_WORKFLOW`, `APP_WRITES_THIS`, `APP_RECEIVES_REALTIME_UPDATE`; backlog documented.
+- Tests: `PARTIAL`; validation/state-machine pure tests added.
+- Manual verification: `BUILT_NOT_VERIFIED`
+- Production status: `PARTIAL`; photo upload currently accepts URL payloads, not complete storage upload UX.
+- Known gaps: route-fit algorithm foundation exists as table only; actual route matching is not implemented.
+
+### Quo SMS infrastructure
+
+- Status: `PARTIAL`
+- Repository path: `lib/sms.js`, `lib/quoInbound.js`, `lib/quoRules.js`, `app/api/quo/inbound/route.js`, `app/api/sms-webhook/route.js`
+- API: `/api/quo/inbound`, legacy `/api/sms-webhook`, `/api/sms/inbound`
+- Database table: `messages`, `message_entity_links`, `sms_consent`, `sms_suppression`, `expected_replies`
+- Admin visibility: `PARTIAL`; messages visible through Booking Detail, but full retry/failure dashboard is not built.
+- Manager visibility: `NOT_BUILT`
+- Quo integration: `PARTIAL`; central outbound suppression and canonical inbound helper exist.
+- Vapi integration: `PARTIAL`; Vapi-triggered SMS uses central sender where existing callers use `sendSMS`.
+- App impact: `APP_RECEIVES_REALTIME_UPDATE` later for message-triggered assignments.
+- Tests: `PARTIAL`; pure expected reply/STOP/START classification tests added.
+- Manual verification: `BUILT_NOT_VERIFIED`
+- Production status: `PARTIAL`; Quo webhook should be pointed to canonical route after payload verification.
+- Known gaps: existing conversational SMS route still contains legacy booking logic; full migration to canonical router remains.
+
+### Booking Detail workspace
+
+- Status: `PARTIAL`
+- Repository path: `components/admin/BookingDetailView.js`, `app/api/admin/bookings/[id]/detail/route.js`
+- API: `/api/admin/bookings/[id]/detail`
+- Database table: `bookings`, `leads`, `quote_price_ledger`, `timeline_events`, `audit_events`, `messages`, `attribution_records`, `phone_calls`, `service_requests`, `refund_requests`
+- Admin visibility: `PARTIAL`; read workspace exists by booking UUID.
+- Manager visibility: `NOT_BUILT`
+- Quo integration: `PARTIAL`; communications section reads linked messages.
+- Vapi integration: `PARTIAL`; calls are included where linked.
+- App impact: `APP_READS_THIS` for future crew context.
+- Tests: `NOT_BUILT` for route response shape.
+- Manual verification: `BUILT_NOT_VERIFIED`
+- Production status: `PARTIAL`
+- Known gaps: admin action buttons/endpoints for assign/reschedule/correct/review/send/cancel/escalate are not fully implemented.
+
+### Manager-role foundation
+
+- Status: `PARTIAL`
+- Repository path: `lib/permissions.js`, `lib/permissionRules.js`
+- API: not fully exposed yet.
+- Database table: `staff_roles`, `permissions`, `staff_role_permissions`, `staff_role_assignments`, `manager_scopes`
+- Admin visibility: `NOT_BUILT`
+- Manager visibility: `NOT_BUILT`
+- Quo integration: `NOT_BUILT`
+- Vapi integration: `NOT_BUILT`
+- App impact: `APP_REQUIRES_NEW_WORKFLOW`
+- Tests: `PARTIAL`; manager denial rules tested.
+- Manual verification: `BUILT_NOT_VERIFIED`
+- Production status: `PARTIAL`; owner/admin role assignment seed required.
+- Known gaps: existing admin APIs still use admin cookie only; permission enforcement must be rolled through action routes.
+
+### Timeline and audit architecture
+
+- Status: `PARTIAL`
+- Repository path: `lib/timeline.js`, `lib/auditEvents.js`
+- API: used by new/modified routes.
+- Database table: `timeline_events`, `audit_events`
+- Admin visibility: `PARTIAL`; Booking Detail reads timeline/audit records.
+- Manager visibility: `NOT_BUILT`
+- Quo integration: `PARTIAL`
+- Vapi integration: `NOT_BUILT`
+- App impact: `APP_WRITES_THIS` for future crew workflow events.
+- Tests: `NOT_BUILT` for DB insert behavior.
+- Manual verification: `BUILT_NOT_VERIFIED`
+- Production status: `PARTIAL`
+- Known gaps: many existing routes still write only legacy state and need timeline/audit wrappers.
+
+### Crew app backlog
+
+- Status: `COMPLETE_AND_VERIFIED`
+- Repository path: `docs/CREW_APP_BACKLOG.md`
+- API: documented per backlog item.
+- Database table: documented per backlog item.
+- Admin visibility: documented per backlog item.
+- Manager visibility: documented per backlog item.
+- Quo integration: documented per backlog item.
+- Vapi integration: documented per backlog item.
+- App impact: every item labeled.
+- Tests: documentation only.
+- Manual verification: file created and reviewed.
+- Production status: documentation only.
+- Known gaps: Flutter UI intentionally not built today.
+
+---
+
 ## 1. PLATFORM OVERVIEW
 
 Junkhaul is a Calgary-based junk removal business platform with three connected surfaces:
