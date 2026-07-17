@@ -67,5 +67,8 @@ flutter {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Google Navigation SDK (navigation:7.7.0) requires the NIO desugaring
+    // flavor and desugar_jdk_libs >= 2.1.5. See:
+    // https://d.android.com/r/tools/api-desugaring-flavors
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 }
