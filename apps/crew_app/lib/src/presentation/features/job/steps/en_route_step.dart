@@ -6,8 +6,8 @@ import '../../../shared/jh_primary_button.dart';
 /// Step 1/9 — driving to the job; crew can jot arrival notes and launch
 /// in-app navigation.
 ///
-/// TODO(dev): source ETA/distance from your routing/dispatch service
-/// (e.g. the same Mapbox Directions result powering [ScheduleMap]).
+/// ETA and distance are nullable — when null, the UI shows "—" until
+/// a real routing service provides the values.
 class EnRouteStep extends StatefulWidget {
   const EnRouteStep({
     super.key,
@@ -19,8 +19,8 @@ class EnRouteStep extends StatefulWidget {
   });
 
   final Job job;
-  final int etaMinutes;
-  final double distanceKm;
+  final int? etaMinutes;
+  final double? distanceKm;
   final VoidCallback onStartNavigation;
   final ValueChanged<String>? onNotesChanged;
 
@@ -48,8 +48,8 @@ class _EnRouteStepState extends State<EnRouteStep> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _stat('ETA', '${widget.etaMinutes} min'),
-                    _stat('Distance', '${widget.distanceKm.toStringAsFixed(1)} km'),
+                    _stat('ETA', widget.etaMinutes != null ? '${widget.etaMinutes} min' : '—'),
+                    _stat('Distance', widget.distanceKm != null ? '${widget.distanceKm!.toStringAsFixed(1)} km' : '—'),
                   ],
                 ),
               ),

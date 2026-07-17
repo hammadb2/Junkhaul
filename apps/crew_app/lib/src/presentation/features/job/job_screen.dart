@@ -21,15 +21,14 @@ import 'steps/route_decision_step.dart';
 import 'steps/drop_flow_step.dart';
 import 'steps/signature_step.dart';
 
+/// Dispatch phone number for crew to call during a job.
+const _dispatchPhone = '+15873250751';
+
 enum _JobStep { enRoute, arrived, before, payment, load, fullness, route, drop, signature, complete }
 
 /// The container that hosts all 9 job steps, in-app navigation, and the
 /// final "Job Complete!" celebration. Forward-only — no back navigation
 /// between steps, matching the existing app's flow.
-///
-/// This shell owns only transient UI/session state for the visit in
-/// progress (which photo was captured, which checkboxes are ticked, the
-/// route choice). All of it is discarded once [onJobComplete] fires.
 class JobScreen extends ConsumerStatefulWidget {
   const JobScreen({
     super.key,
@@ -67,11 +66,25 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   RouteChoice _routeChoice = RouteChoice.landfillRun;
   PaymentResult? _payment;
 
+  /// Error message shown in a snackbar when an API call fails.
+  String? _lastError;
+
   static const _stepLabels = ['En Route', 'Item Conditions', 'Before Photo', 'Payment', 'Load Truck', 'Truck Fullness', 'Route Decision', 'Drop-off', 'Signature'];
 
   int get _stepIndex => _JobStep.values.indexOf(_step);
 
   void _goTo(_JobStep step) => setState(() => _step = step);
+
+  void _showError(String message) {
+    setState(() => _lastError = message);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.statusRed,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,10 +92,7 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       return JobNavigationScreen(
         mode: _navMode,
         onModeChanged: (m) => setState(() => _navMode = m),
-        nextManeuver: 'Turn right onto ${widget.job.customer.address.split(',').first}',
-        maneuverDistance: '300 m',
-        etaMinutes: 6,
-        remainingKm: 3.1,
+        job: widget.job,
         onArrive: () => setState(() {
           _showingNavigation = false;
           _step = _JobStep.arrived;
@@ -117,8 +127,8 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       case _JobStep.enRoute:
         return EnRouteStep(
           job: widget.job,
-          etaMinutes: 14,
-          distanceKm: 8.2,
+          etaMinutes: null,
+          distanceKm: null,
           onStartNavigation: () => setState(() => _showingNavigation = true),
         );
       case _JobStep.arrived:
@@ -140,14 +150,14 @@ class _JobScreenState extends ConsumerState<JobScreen> {
             final file = await ref.read(cameraServiceProvider).capturePhoto();
             if (file != null) setState(() => _beforePhoto = file);
           },
-          onCallDispatch: () => _callCustomer('5873254317'),
+          onCallDispatch: () => _callCustomer(_dispatchPhone),
           onDismissHazmatFlag: () => setState(() => _hazmatFlag = false),
           onNext: () => _goTo(_JobStep.payment),
         );
       case _JobStep.payment:
         return PaymentStep(
           job: widget.job.copyWithAmount(_adjustedAmount),
-          cardLast4: '4471',
+          cardLast4: null,
           onConfirm: (result) {
             setState(() => _payment = result);
             _goTo(_JobStep.load);
@@ -167,8 +177,8 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       case _JobStep.fullness:
         return TruckFullnessStep(
           photoFile: _truckBedPhoto,
-          capacityUsedPercent: _truckBedPhoto != null ? 65 : null,
-          nextJobSummary: 'Looks like about a third left — should fit the next job.',
+          capacityUsedPercent: null,
+          nextJobSummary: null,
           onCapture: () async {
             final file = await ref.read(cameraServiceProvider).capturePhoto();
             if (file != null) setState(() => _truckBedPhoto = file);
@@ -185,9 +195,9 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       case _JobStep.drop:
         return DropFlowStep(
           choice: _routeChoice,
-          facilityName: _routeChoice == RouteChoice.landfillRun ? 'Nearest municipal landfill' : 'Storage facility',
+          facilityName: null,
           photoFile: _dropPhoto,
-          capacityAfterPercent: _dropPhoto != null ? 5 : null,
+          capacityAfterPercent: null,
           onCapture: () async {
             final file = await ref.read(cameraServiceProvider).capturePhoto();
             if (file != null) setState(() => _dropPhoto = file);
@@ -243,7 +253,9 @@ class _JobScreenState extends ConsumerState<JobScreen> {
           conditions: conditions,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      _showError('Failed to save item conditions: $e');
+    }
   }
 
   Future<void> _resendPaymentLink() async {
@@ -251,7 +263,14 @@ class _JobScreenState extends ConsumerState<JobScreen> {
     try {
       final api = await ref.read(employeeApiProvider.future);
       await api.resendPaymentLink(bookingId: widget.bookingId!);
-    } catch (_) {}
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment link sent to customer'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      _showError('Failed to send payment link: $e');
+    }
   }
 
   Future<void> _submitSignature({
@@ -269,7 +288,9 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         amountConfirmed: amount,
         paymentMethod: paymentMethod,
       );
-    } catch (_) {}
+    } catch (e) {
+      _showError('Failed to submit signature: $e');
+    }
   }
 }
 

@@ -7,9 +7,6 @@ import 'route_decision_step.dart';
 
 /// Step 8/9 — storage unit / facility / landfill drop-off with capacity
 /// tracking, shown after [RouteChoice.landfillRun].
-///
-/// TODO(dev): source [facilityName] and [capacityAfterPercent] from the
-/// drop-off facility record and post-drop weight/volume estimate.
 class DropFlowStep extends StatelessWidget {
   const DropFlowStep({
     super.key,
@@ -22,7 +19,7 @@ class DropFlowStep extends StatelessWidget {
   });
 
   final RouteChoice choice;
-  final String facilityName;
+  final String? facilityName;
   final VoidCallback onCapture;
   final VoidCallback onConfirm;
   final File? photoFile;
@@ -40,7 +37,8 @@ class DropFlowStep extends StatelessWidget {
               Text(isLandfill ? 'Confirm the landfill drop' : 'Confirm the storage drop',
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 4),
-              Text(facilityName, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              if (facilityName != null)
+                Text(facilityName!, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
               const SizedBox(height: 16),
               JhPhotoThumbnail(onCapture: onCapture, imageFile: photoFile, label: 'Tap to capture drop-off photo', height: 170),
               if (capacityAfterPercent != null) ...[

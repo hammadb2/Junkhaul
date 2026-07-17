@@ -8,14 +8,11 @@ import '../../../shared/jh_text_field.dart';
 
 /// Step 4/9 — "How will the customer pay?" Card-on-file, cash, or an SMS
 /// payment link.
-///
-/// TODO(dev): wire [onConfirm] to your payments integration (Stripe charge
-/// for card-on-file, cash reconciliation entry, or SMS link dispatch).
 class PaymentStep extends StatefulWidget {
   const PaymentStep({super.key, required this.job, required this.cardLast4, required this.onConfirm});
 
   final Job job;
-  final String cardLast4;
+  final String? cardLast4;
   final void Function(PaymentResult result) onConfirm;
 
   @override
@@ -50,7 +47,7 @@ class _PaymentStepState extends State<PaymentStep> {
               JhCard(
                 selected: _method == PaymentMethod.cardOnFile,
                 onTap: () => setState(() => _method = PaymentMethod.cardOnFile),
-                child: _row(Icons.credit_card_outlined, 'Card on file', 'Visa •••• ${widget.cardLast4} — charge on confirm', _method == PaymentMethod.cardOnFile),
+                child: _row(Icons.credit_card_outlined, 'Card on file', widget.cardLast4 != null ? '•••• ${widget.cardLast4} — charge on confirm' : 'Charge on confirm', _method == PaymentMethod.cardOnFile),
               ),
               const SizedBox(height: 10),
               JhCard(
