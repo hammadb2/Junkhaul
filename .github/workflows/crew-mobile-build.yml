@@ -1,0 +1,246 @@
+name: Crew Mobile Build
+
+# Remote build verification for the Junkhaul Crew Flutter app.
+# Builds run on GitHub-hosted runners so the local Mac does not have to.
+#
+# Mandatory pass criteria:
+#   - Flutter static checks (analyze + tests)
+#   - Android debug APK
+#   - iOS simulator app
+# Android release may remain blocked only by missing signing credentials,
+# but source compilation is distinguished from signing failure.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/crew_app/**'
+      - '.github/workflows/crew-mobile-build.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/crew_app/**'
+      - '.github/workflows/crew-mobile-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crew-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.44.4'
+  DART_VERSION: '3.12.2'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1 — Static Flutter verification
+  # ---------------------------------------------------------------------------
+  static-checks:
+    name: Flutter static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          dart-version: ${{ env.DART_VERSION }}
+          cache: true
+
+      - name: Generate secrets.dart from example
+        working-directory: apps/crew_app
+        run: |
+          if [ ! -f lib/src/core/secrets.dart ]; then
+            cp lib/src/core/secrets.dart.example lib/src/core/secrets.dart
+          fi
+
+      - name: Pub get
+        working-directory: apps/crew_app
+        run: flutter pub get
+
+      - name: Build runner
+        working-directory: apps/crew_app
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Dart format check
+        working-directory: apps/crew_app
+        run: dart format --set-exit-if-changed .
+
+      - name: Flutter analyze
+        working-directory: apps/crew_app
+        run: flutter analyze
+
+      - name: Flutter test
+        working-directory: apps/crew_app
+        run: flutter test
+
+  # ---------------------------------------------------------------------------
+  # Job 2 — Android debug APK
+  # ---------------------------------------------------------------------------
+  android-debug:
+    name: Android debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          dart-version: ${{ env.DART_VERSION }}
+          cache: true
+
+      - name: Generate secrets.dart from example
+        working-directory: apps/crew_app
+        run: |
+          if [ ! -f lib/src/core/secrets.dart ]; then
+            cp lib/src/core/secrets.dart.example lib/src/core/secrets.dart
+          fi
+
+      - name: Pub get
+        working-directory: apps/crew_app
+        run: flutter pub get
+
+      - name: Build runner
+        working-directory: apps/crew_app
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build debug APK
+        working-directory: apps/crew_app
+        run: flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: junkhaul-crew-android-debug
+          path: apps/crew_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Job 3 — Android release compilation
+  #
+  # The project reads release signing values from a gitignored key.properties.
+  # We do NOT invent signing values. We attempt a release appbundle build and
+  # distinguish source/Gradle compilation failure from signing-credential
+  # unavailability. Without key.properties the release build produces an
+  # UNSIGNED appbundle, which still proves source compilation succeeds.
+  # ---------------------------------------------------------------------------
+  android-release:
+    name: Android release compilation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          dart-version: ${{ env.DART_VERSION }}
+          cache: true
+
+      - name: Generate secrets.dart from example
+        working-directory: apps/crew_app
+        run: |
+          if [ ! -f lib/src/core/secrets.dart ]; then
+            cp lib/src/core/secrets.dart.example lib/src/core/secrets.dart
+          fi
+
+      - name: Pub get
+        working-directory: apps/crew_app
+        run: flutter pub get
+
+      - name: Build runner
+        working-directory: apps/crew_app
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build release appbundle (unsigned is acceptable)
+        working-directory: apps/crew_app
+        run: flutter build appbundle --release
+
+      - name: Report signing status
+        working-directory: apps/crew_app
+        run: |
+          if [ -f android/key.properties ]; then
+            echo "::notice::Release build used key.properties signing"
+          else
+            echo "::notice::Release build compiled successfully WITHOUT signing credentials (key.properties absent). Output is unsigned — production signing requires approved keystore credentials."
+          fi
+
+      - name: Upload release AAB (unsigned)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junkhaul-crew-android-release-unsigned
+          path: apps/crew_app/build/app/outputs/flutter-bundle/app-release.aab
+          retention-days: 7
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Job 4 — iOS simulator build
+  # ---------------------------------------------------------------------------
+  ios-simulator:
+    name: iOS simulator build
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          dart-version: ${{ env.DART_VERSION }}
+          cache: true
+
+      - name: Generate secrets.dart from example
+        working-directory: apps/crew_app
+        run: |
+          if [ ! -f lib/src/core/secrets.dart ]; then
+            cp lib/src/core/secrets.dart.example lib/src/core/secrets.dart
+          fi
+
+      - name: Pub get
+        working-directory: apps/crew_app
+        run: flutter pub get
+
+      - name: Build runner
+        working-directory: apps/crew_app
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Verify iOS deployment target consistency
+        working-directory: apps/crew_app/ios
+        run: |
+          set -e
+          echo "Podfile platform:"
+          grep "platform :ios" Podfile || true
+          echo "Xcode project targets:"
+          grep "IPHONEOS_DEPLOYMENT_TARGET" Runner.xcodeproj/project.pbxproj || true
+
+      - name: CocoaPods install
+        working-directory: apps/crew_app/ios
+        run: pod install --repo-update
+
+      - name: Build iOS simulator app
+        working-directory: apps/crew_app
+        run: flutter build ios --simulator --no-codesign
+
+      - name: Upload iOS simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: junkhaul-crew-ios-simulator
+          path: |
+            apps/crew_app/build/ios/iphonesimulator/Runner.app
+          retention-days: 7
+          if-no-files-found: warn
