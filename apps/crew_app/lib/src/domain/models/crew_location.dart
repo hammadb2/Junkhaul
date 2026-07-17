@@ -17,5 +17,6 @@ abstract class CrewLocation with _$CrewLocation {
     @Default(false) bool enRoute,
   }) = _CrewLocation;
 
-  factory CrewLocation.fromJson(Map<String, dynamic> json) => _$CrewLocationFromJson(json);
+  factory CrewLocation.fromJson(Map<String, dynamic> json) =>
+      _$CrewLocationFromJson(json);
 }

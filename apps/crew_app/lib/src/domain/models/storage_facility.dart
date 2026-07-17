@@ -17,7 +17,8 @@ abstract class StorageFacility with _$StorageFacility {
     @JsonKey(name: 'current_usage_pct') double? currentUsagePct,
   }) = _StorageFacility;
 
-  factory StorageFacility.fromJson(Map<String, dynamic> json) => _$StorageFacilityFromJson(json);
+  factory StorageFacility.fromJson(Map<String, dynamic> json) =>
+      _$StorageFacilityFromJson(json);
 }
 
 /// GET /api/employee/storage-drop response.
@@ -27,5 +28,6 @@ abstract class StorageFacilitiesResponse with _$StorageFacilitiesResponse {
     @Default(<StorageFacility>[]) List<StorageFacility> facilities,
   }) = _StorageFacilitiesResponse;
 
-  factory StorageFacilitiesResponse.fromJson(Map<String, dynamic> json) => _$StorageFacilitiesResponseFromJson(json);
+  factory StorageFacilitiesResponse.fromJson(Map<String, dynamic> json) =>
+      _$StorageFacilitiesResponseFromJson(json);
 }

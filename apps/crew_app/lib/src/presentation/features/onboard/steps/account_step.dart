@@ -76,20 +76,49 @@ class _AccountStepState extends ConsumerState<AccountStep> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             children: [
-              const Text('Your account', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+              const Text(
+                'Your account',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
-              const Text('Legal name — it has to match your ID.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              const Text(
+                'Legal name — it has to match your ID.',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 20),
-              JhTextField(label: 'Legal first name', hint: 'First name', controller: _firstNameController),
+              JhTextField(
+                label: 'Legal first name',
+                hint: 'First name',
+                controller: _firstNameController,
+              ),
               const SizedBox(height: 14),
-              JhTextField(label: 'Legal last name', hint: 'Last name', controller: _lastNameController),
+              JhTextField(
+                label: 'Legal last name',
+                hint: 'Last name',
+                controller: _lastNameController,
+              ),
               const SizedBox(height: 14),
-              JhTextField(label: 'Mobile number', hint: '(403) 555-0134', controller: _phoneController, keyboardType: TextInputType.phone),
+              JhTextField(
+                label: 'Mobile number',
+                hint: '(403) 555-0134',
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+              ),
               const SizedBox(height: 14),
-              JhTextField(label: 'Emergency contact', hint: 'Name and phone number', controller: _emergencyContactController),
+              JhTextField(
+                label: 'Emergency contact',
+                hint: 'Name and phone number',
+                controller: _emergencyContactController,
+              ),
               if (_error != null) ...[
                 const SizedBox(height: 14),
-                Text(_error!, style: const TextStyle(fontSize: 13, color: AppColors.statusRed)),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.statusRed,
+                  ),
+                ),
               ],
             ],
           ),

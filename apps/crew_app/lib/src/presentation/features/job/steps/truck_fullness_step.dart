@@ -33,18 +33,47 @@ class TruckFullnessStep extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             children: [
-              const Text('How full is the truck?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const Text(
+                'How full is the truck?',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 4),
-              const Text('Snap the bed so we can plan the next stop.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              const Text(
+                'Snap the bed so we can plan the next stop.',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 16),
-              JhPhotoThumbnail(onCapture: onCapture, imageFile: photoFile, label: 'Tap to capture truck bed', height: 190),
+              JhPhotoThumbnail(
+                onCapture: onCapture,
+                imageFile: photoFile,
+                label: 'Tap to capture truck bed',
+                height: 190,
+              ),
               if (capacityUsedPercent != null) ...[
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Estimated capacity used', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    Text('$capacityUsedPercent%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                    const Text(
+                      'Estimated capacity used',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      '$capacityUsedPercent%',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -61,8 +90,19 @@ class TruckFullnessStep extends StatelessWidget {
                   const SizedBox(height: 14),
                   Container(
                     padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: AppColors.bgCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.borderSubtle)),
-                    child: Text(nextJobSummary!, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4)),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: Text(
+                      nextJobSummary!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
                   ),
                 ],
               ],
@@ -71,7 +111,10 @@ class TruckFullnessStep extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-          child: JhPrimaryButton(label: 'Continue', onPressed: photoFile != null ? onNext : null),
+          child: JhPrimaryButton(
+            label: 'Continue',
+            onPressed: photoFile != null ? onNext : null,
+          ),
         ),
       ],
     );

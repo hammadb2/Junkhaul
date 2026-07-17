@@ -84,7 +84,11 @@ class PhotoUploadService {
 
       return PhotoUploadResult(success: true, url: url, localPath: file.path);
     } catch (e) {
-      return PhotoUploadResult(success: false, error: e.toString(), localPath: file.path);
+      return PhotoUploadResult(
+        success: false,
+        error: e.toString(),
+        localPath: file.path,
+      );
     }
   }
 
@@ -110,7 +114,9 @@ class PhotoUploadService {
 
       final compressedBytes = img.encodeJpg(resized, quality: 85);
       final tempDir = Directory.systemTemp;
-      final tempFile = File('${tempDir.path}/jh_photo_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final tempFile = File(
+        '${tempDir.path}/jh_photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
       await tempFile.writeAsBytes(compressedBytes);
       return tempFile;
     } catch (_) {

@@ -7,11 +7,7 @@ import 'package:geolocator/geolocator.dart';
 enum GpsState { initial, loading, ready, denied, disabled, unavailable }
 
 class GpsStatus {
-  const GpsStatus({
-    this.state = GpsState.initial,
-    this.position,
-    this.error,
-  });
+  const GpsStatus({this.state = GpsState.initial, this.position, this.error});
 
   final GpsState state;
   final Position? position;
@@ -48,13 +44,17 @@ class LocationNotifier extends Notifier<GpsStatus> {
 
   /// Start listening to GPS updates. Call when the schedule screen mounts.
   Future<void> start() async {
-    if (state.state == GpsState.loading || state.state == GpsState.ready) return;
+    if (state.state == GpsState.loading || state.state == GpsState.ready)
+      return;
 
     state = const GpsStatus(state: GpsState.loading);
 
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      state = const GpsStatus(state: GpsState.disabled, error: 'Location services disabled');
+      state = const GpsStatus(
+        state: GpsState.disabled,
+        error: 'Location services disabled',
+      );
       return;
     }
 
@@ -64,11 +64,17 @@ class LocationNotifier extends Notifier<GpsStatus> {
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.unableToDetermine) {
-      state = const GpsStatus(state: GpsState.denied, error: 'Location permission denied');
+      state = const GpsStatus(
+        state: GpsState.denied,
+        error: 'Location permission denied',
+      );
       return;
     }
     if (permission == LocationPermission.deniedForever) {
-      state = const GpsStatus(state: GpsState.denied, error: 'Location permission permanently denied');
+      state = const GpsStatus(
+        state: GpsState.denied,
+        error: 'Location permission permanently denied',
+      );
       return;
     }
 
@@ -85,15 +91,19 @@ class LocationNotifier extends Notifier<GpsStatus> {
       // Continue to stream even if the one-shot fails.
     }
 
-    _sub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.medium,
-        distanceFilter: 10,
-      ),
-    ).listen(
-      (pos) => state = GpsStatus(state: GpsState.ready, position: pos),
-      onError: (e) => state = GpsStatus(state: GpsState.unavailable, error: e.toString()),
-    );
+    _sub =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            distanceFilter: 10,
+          ),
+        ).listen(
+          (pos) => state = GpsStatus(state: GpsState.ready, position: pos),
+          onError: (e) => state = GpsStatus(
+            state: GpsState.unavailable,
+            error: e.toString(),
+          ),
+        );
   }
 
   /// Stop the GPS stream. Call when the schedule screen is disposed.
@@ -104,5 +114,6 @@ class LocationNotifier extends Notifier<GpsStatus> {
   }
 }
 
-final locationProvider =
-    NotifierProvider<LocationNotifier, GpsStatus>(LocationNotifier.new);
+final locationProvider = NotifierProvider<LocationNotifier, GpsStatus>(
+  LocationNotifier.new,
+);

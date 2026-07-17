@@ -27,7 +27,18 @@ import 'steps/signature_step.dart';
 /// Dispatch phone number for crew to call during a job.
 const _dispatchPhone = '+15873250751';
 
-enum _JobStep { enRoute, arrived, before, payment, load, fullness, route, drop, signature, complete }
+enum _JobStep {
+  enRoute,
+  arrived,
+  before,
+  payment,
+  load,
+  fullness,
+  route,
+  drop,
+  signature,
+  complete,
+}
 
 /// The container that hosts all 9 job steps, in-app navigation, and the
 /// final "Job Complete!" celebration. Forward-only — no back navigation
@@ -59,7 +70,8 @@ class _JobScreenState extends ConsumerState<JobScreen> {
 
   late List<JobItem> _items = List.of(widget.job.items);
   bool _loadBigger = false;
-  double? get _adjustedAmount => _loadBigger ? widget.job.totalAmount + 80 : null;
+  double? get _adjustedAmount =>
+      _loadBigger ? widget.job.totalAmount + 80 : null;
 
   File? _beforePhoto;
   File? _truckBedPhoto;
@@ -72,7 +84,17 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   /// Error message shown in a snackbar when an API call fails.
   String? _lastError;
 
-  static const _stepLabels = ['En Route', 'Item Conditions', 'Before Photo', 'Payment', 'Load Truck', 'Truck Fullness', 'Route Decision', 'Drop-off', 'Signature'];
+  static const _stepLabels = [
+    'En Route',
+    'Item Conditions',
+    'Before Photo',
+    'Payment',
+    'Load Truck',
+    'Truck Fullness',
+    'Route Decision',
+    'Drop-off',
+    'Signature',
+  ];
 
   int get _stepIndex => _JobStep.values.indexOf(_step);
 
@@ -104,7 +126,11 @@ class _JobScreenState extends ConsumerState<JobScreen> {
     }
 
     if (_step == _JobStep.complete) {
-      return _CompleteScreen(job: widget.job, finalAmount: _payment?.amount ?? widget.job.totalAmount, onDone: widget.onJobComplete);
+      return _CompleteScreen(
+        job: widget.job,
+        finalAmount: _payment?.amount ?? widget.job.totalAmount,
+        onDone: widget.onJobComplete,
+      );
     }
 
     return Scaffold(
@@ -112,11 +138,18 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            JhSyncBanner(state: widget.syncState, queuedActionCount: widget.queuedActionCount),
+            JhSyncBanner(
+              state: widget.syncState,
+              queuedActionCount: widget.queuedActionCount,
+            ),
             if (_stepIndex < _stepLabels.length)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: JhStepProgress(currentStep: _stepIndex + 1, totalSteps: _stepLabels.length, stepLabel: _stepLabels[_stepIndex]),
+                child: JhStepProgress(
+                  currentStep: _stepIndex + 1,
+                  totalSteps: _stepLabels.length,
+                  stepLabel: _stepLabels[_stepIndex],
+                ),
               ),
             Expanded(child: _buildStep()),
           ],
@@ -175,7 +208,14 @@ class _JobScreenState extends ConsumerState<JobScreen> {
           items: _items,
           adjustedTotal: _adjustedAmount,
           onAddFoundItem: () => setState(() {
-            _items = [..._items, JobItem(id: 'found-${_items.length}', name: 'Item found onsite', quantity: 1)];
+            _items = [
+              ..._items,
+              JobItem(
+                id: 'found-${_items.length}',
+                name: 'Item found onsite',
+                quantity: 1,
+              ),
+            ];
             _loadBigger = true;
           }),
           onSendPriceUpdate: () => _resendPaymentLink(),
@@ -212,9 +252,12 @@ class _JobScreenState extends ConsumerState<JobScreen> {
             final file = await ref.read(cameraServiceProvider).capturePhoto();
             if (file != null) {
               setState(() => _dropPhoto = file);
-              _uploadPhoto(file, _routeChoice == RouteChoice.landfillRun
-                  ? PhotoCategory.disposalEvidence
-                  : PhotoCategory.donationEvidence);
+              _uploadPhoto(
+                file,
+                _routeChoice == RouteChoice.landfillRun
+                    ? PhotoCategory.disposalEvidence
+                    : PhotoCategory.donationEvidence,
+              );
             }
           },
           onConfirm: () => _goTo(_JobStep.signature),
@@ -252,12 +295,17 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   /// Check if the device is currently online.
   bool get _isOnline {
     final connectivityAsync = ref.read(isOnlineProvider);
-    return connectivityAsync.maybeWhen(data: (online) => online, orElse: () => true);
+    return connectivityAsync.maybeWhen(
+      data: (online) => online,
+      orElse: () => true,
+    );
   }
 
   /// Get the offline queue service, or null if not ready.
   OfflineQueueService? get _queue {
-    return ref.read(offlineQueueProvider).maybeWhen(data: (q) => q, orElse: () => null);
+    return ref
+        .read(offlineQueueProvider)
+        .maybeWhen(data: (q) => q, orElse: () => null);
   }
 
   /// Process the payment result based on the selected method.
@@ -279,7 +327,12 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cash payment saved offline — will sync when online'), duration: Duration(seconds: 3)),
+            const SnackBar(
+              content: Text(
+                'Cash payment saved offline — will sync when online',
+              ),
+              duration: Duration(seconds: 3),
+            ),
           );
         }
         return;
@@ -304,7 +357,10 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         await api.resendPaymentLink(bookingId: widget.bookingId!);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Payment link sent to customer'), duration: Duration(seconds: 2)),
+            const SnackBar(
+              content: Text('Payment link sent to customer'),
+              duration: Duration(seconds: 2),
+            ),
           );
         }
       } catch (e) {
@@ -349,14 +405,14 @@ class _JobScreenState extends ConsumerState<JobScreen> {
     if (!_isOnline) {
       _queue?.enqueue(
         type: 'item_conditions',
-        payload: {
-          'booking_id': widget.bookingId!,
-          'conditions': conditions,
-        },
+        payload: {'booking_id': widget.bookingId!, 'conditions': conditions},
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saved offline — will sync when online'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Saved offline — will sync when online'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
       return;
@@ -386,7 +442,10 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       await api.resendPaymentLink(bookingId: widget.bookingId!);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment link sent to customer'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Payment link sent to customer'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -414,7 +473,10 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       _queue?.enqueue(type: 'signature', payload: payload);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Signature saved offline — will sync when online'), duration: Duration(seconds: 3)),
+          const SnackBar(
+            content: Text('Signature saved offline — will sync when online'),
+            duration: Duration(seconds: 3),
+          ),
         );
       }
       return;
@@ -437,7 +499,11 @@ class _JobScreenState extends ConsumerState<JobScreen> {
 }
 
 class _CompleteScreen extends StatelessWidget {
-  const _CompleteScreen({required this.job, required this.finalAmount, required this.onDone});
+  const _CompleteScreen({
+    required this.job,
+    required this.finalAmount,
+    required this.onDone,
+  });
   final Job job;
   final double finalAmount;
   final VoidCallback onDone;
@@ -459,22 +525,49 @@ class _CompleteScreen extends StatelessWidget {
                       Container(
                         width: 84,
                         height: 84,
-                        decoration: const BoxDecoration(color: AppColors.statusGreen, shape: BoxShape.circle),
-                        child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
+                        decoration: const BoxDecoration(
+                          color: AppColors.statusGreen,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 40,
+                        ),
                       ),
                       const SizedBox(height: 20),
-                      const Text('Job Complete!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                      const Text(
+                        'Job Complete!',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      Text('${job.customer.name} · ${job.customer.address}', style: const TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+                      Text(
+                        '${job.customer.name} · ${job.customer.address}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                       const SizedBox(height: 24),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(color: AppColors.bgCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.borderSubtle)),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgCard,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.borderSubtle),
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _stat('Charged', '\$${finalAmount.toStringAsFixed(0)}'),
+                            _stat(
+                              'Charged',
+                              '\$${finalAmount.toStringAsFixed(0)}',
+                            ),
                             _stat('Duration', '—'),
                           ],
                         ),
@@ -485,7 +578,10 @@ class _CompleteScreen extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 26),
-                child: JhPrimaryButton(label: 'Back to Schedule', onPressed: onDone),
+                child: JhPrimaryButton(
+                  label: 'Back to Schedule',
+                  onPressed: onDone,
+                ),
               ),
             ],
           ),
@@ -497,9 +593,19 @@ class _CompleteScreen extends StatelessWidget {
   Widget _stat(String label, String value) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
         const SizedBox(height: 2),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
       ],
     );
   }

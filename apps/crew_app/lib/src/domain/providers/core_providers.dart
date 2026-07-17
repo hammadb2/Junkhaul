@@ -6,7 +6,10 @@ import '../../data/api/dio_client.dart';
 /// Base URL of the Next.js backend. Override with --dart-define=BASE_URL=...
 /// for staging. Defaults to the production origin.
 final baseUrlProvider = Provider<String>((ref) {
-  const defined = String.fromEnvironment('BASE_URL', defaultValue: 'https://www.junkhaul.ca');
+  const defined = String.fromEnvironment(
+    'BASE_URL',
+    defaultValue: 'https://www.junkhaul.ca',
+  );
   return defined;
 });
 

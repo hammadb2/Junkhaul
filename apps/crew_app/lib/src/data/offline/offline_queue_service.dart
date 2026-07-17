@@ -48,7 +48,9 @@ class OfflineQueueService {
     for (final key in keys) {
       final raw = _box.get(key);
       if (raw == null) continue;
-      final action = OfflineAction.fromJson(Map<String, dynamic>.from(raw as Map));
+      final action = OfflineAction.fromJson(
+        Map<String, dynamic>.from(raw as Map),
+      );
       action.attempts += 1;
       _box.put(key, action.toJson());
       try {

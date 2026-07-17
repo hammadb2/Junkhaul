@@ -76,31 +76,66 @@ class _ArrivedStepState extends State<ArrivedStep> {
               ),
               const SizedBox(height: 16),
               if (_customerHome) ...[
-                const Text('Log what\'s here', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const Text(
+                  'Log what\'s here',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                const Text('Note condition before you touch anything.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                const Text(
+                  'Note condition before you touch anything.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 const SizedBox(height: 18),
                 for (final item in widget.job.items) ...[
                   _ItemRow(item: item, label: _conditionLabel(item.condition)),
                   const SizedBox(height: 10),
                 ],
                 const SizedBox(height: 8),
-                const Text('Notes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                const Text(
+                  'Notes',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                const TextField(maxLines: 3, decoration: InputDecoration(hintText: 'Anything worth flagging?')),
+                const TextField(
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Anything worth flagging?',
+                  ),
+                ),
               ] else
                 JhErrorBanner(
                   tone: JhBannerTone.warning,
                   title: 'No answer at the door',
-                  message: "${widget.job.customer.name} isn't answering. Try one of these before you leave.",
+                  message:
+                      "${widget.job.customer.name} isn't answering. Try one of these before you leave.",
                 ),
               if (!_customerHome) ...[
                 const SizedBox(height: 16),
-                JhSecondaryButton(label: 'Call ${widget.job.customer.name}', onPressed: widget.onCallCustomer),
+                JhSecondaryButton(
+                  label: 'Call ${widget.job.customer.name}',
+                  onPressed: widget.onCallCustomer,
+                ),
                 const SizedBox(height: 10),
-                JhSecondaryButton(label: 'Leave Notice & Photo', onPressed: widget.onLeaveNotice),
+                JhSecondaryButton(
+                  label: 'Leave Notice & Photo',
+                  onPressed: widget.onLeaveNotice,
+                ),
                 const SizedBox(height: 10),
-                JhSecondaryButton(label: 'Wait 5 More Minutes', onPressed: widget.onWait),
+                JhSecondaryButton(
+                  label: 'Wait 5 More Minutes',
+                  onPressed: widget.onWait,
+                ),
               ],
             ],
           ),
@@ -108,7 +143,10 @@ class _ArrivedStepState extends State<ArrivedStep> {
         if (_customerHome)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-            child: JhPrimaryButton(label: 'Confirm', onPressed: widget.onConfirm),
+            child: JhPrimaryButton(
+              label: 'Confirm',
+              onPressed: widget.onConfirm,
+            ),
           ),
       ],
     );
@@ -124,11 +162,22 @@ class _ItemRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.bgCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.borderSubtle)),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(item.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text(
+            item.name,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
           JhStatusPill(label: label.$1, tone: label.$2),
         ],
       ),

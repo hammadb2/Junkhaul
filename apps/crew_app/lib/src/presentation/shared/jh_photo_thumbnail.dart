@@ -33,7 +33,9 @@ class JhPhotoThumbnail extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.bgInput,
           borderRadius: BorderRadius.circular(16),
-          border: imageFile == null ? Border.all(color: AppColors.borderSubtle, width: 1.5) : null,
+          border: imageFile == null
+              ? Border.all(color: AppColors.borderSubtle, width: 1.5)
+              : null,
         ),
         child: imageFile != null
             ? Stack(
@@ -44,9 +46,22 @@ class JhPhotoThumbnail extends StatelessWidget {
                     right: 8,
                     bottom: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(999)),
-                      child: const Text('Retake', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Retake',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -54,9 +69,19 @@ class JhPhotoThumbnail extends StatelessWidget {
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.camera_alt_outlined, size: 28, color: AppColors.textSecondary),
+                  const Icon(
+                    Icons.camera_alt_outlined,
+                    size: 28,
+                    color: AppColors.textSecondary,
+                  ),
                   const SizedBox(height: 8),
-                  Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
       ),

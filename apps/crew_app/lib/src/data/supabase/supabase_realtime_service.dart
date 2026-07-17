@@ -52,12 +52,17 @@ class SupabaseRealtimeService {
   }
 
   /// Subscribe to broadcast notifications on a crew channel.
-  Stream<Map<String, dynamic>> watchCrewNotifications({required String employeeId}) {
+  Stream<Map<String, dynamic>> watchCrewNotifications({
+    required String employeeId,
+  }) {
     final controller = StreamController<Map<String, dynamic>>.broadcast();
     final channel = _client.channel('crew-notifications:$employeeId');
-    channel.onBroadcast(event: 'notification', callback: (payload) {
-      controller.add(payload);
-    });
+    channel.onBroadcast(
+      event: 'notification',
+      callback: (payload) {
+        controller.add(payload);
+      },
+    );
     channel.subscribe();
     _channels['crew-notifications:$employeeId'] = channel;
 
@@ -98,7 +103,9 @@ final supabaseClientProvider = Provider<SupabaseClient>((ref) {
   const url = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
   const anonKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
   if (url.isEmpty || anonKey.isEmpty) {
-    throw StateError('SUPABASE_URL and SUPABASE_ANON_KEY must be provided via --dart-define');
+    throw StateError(
+      'SUPABASE_URL and SUPABASE_ANON_KEY must be provided via --dart-define',
+    );
   }
   return SupabaseClient(url, anonKey);
 });
@@ -111,4 +118,6 @@ final supabaseRealtimeProvider = Provider<SupabaseRealtimeService>((ref) {
 });
 
 /// Convenience: read the base URL so callers can build absolute photo URLs.
-final baseUrlStringProvider = Provider<String>((ref) => ref.watch(baseUrlProvider));
+final baseUrlStringProvider = Provider<String>(
+  (ref) => ref.watch(baseUrlProvider),
+);

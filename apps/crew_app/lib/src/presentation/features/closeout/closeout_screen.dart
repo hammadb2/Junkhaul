@@ -37,8 +37,14 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
     final connectivityAsync = ref.watch(isOnlineProvider);
     final queueAsync = ref.watch(offlineQueueProvider);
 
-    final isOnline = connectivityAsync.maybeWhen(data: (o) => o, orElse: () => true);
-    final queuedCount = queueAsync.maybeWhen(data: (q) => q.pending, orElse: () => 0);
+    final isOnline = connectivityAsync.maybeWhen(
+      data: (o) => o,
+      orElse: () => true,
+    );
+    final queuedCount = queueAsync.maybeWhen(
+      data: (q) => q.pending,
+      orElse: () => 0,
+    );
     final syncState = isOnline ? SyncState.online : SyncState.offline;
 
     return Scaffold(
@@ -49,9 +55,12 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
             JhSyncBanner(state: syncState, queuedActionCount: queuedCount),
             Expanded(
               child: scheduleAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.accent)),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppColors.accent),
+                ),
                 error: (_, __) => _buildError(context),
-                data: (schedule) => _buildContent(context, schedule, queuedCount),
+                data: (schedule) =>
+                    _buildContent(context, schedule, queuedCount),
               ),
             ),
           ],
@@ -76,12 +85,26 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
     );
   }
 
-  Widget _buildContent(BuildContext context, DailyScheduleResponse schedule, int queuedCount) {
-    final completedJobs = schedule.bookings.where((b) => b.status == 'completed').toList();
-    final inProgressJobs = schedule.bookings.where((b) => b.status == 'in_progress').toList();
-    final totalRevenue = completedJobs.fold<double>(0, (sum, b) => sum + (b.totalPrice ?? 0));
+  Widget _buildContent(
+    BuildContext context,
+    DailyScheduleResponse schedule,
+    int queuedCount,
+  ) {
+    final completedJobs = schedule.bookings
+        .where((b) => b.status == 'completed')
+        .toList();
+    final inProgressJobs = schedule.bookings
+        .where((b) => b.status == 'in_progress')
+        .toList();
+    final totalRevenue = completedJobs.fold<double>(
+      0,
+      (sum, b) => sum + (b.totalPrice ?? 0),
+    );
     final completedSessions = schedule.completedSessions;
-    final totalJobMinutes = completedSessions.fold<int>(0, (sum, s) => sum + (s.durationMinutes ?? 0));
+    final totalJobMinutes = completedSessions.fold<int>(
+      0,
+      (sum, s) => sum + (s.durationMinutes ?? 0),
+    );
     final openShift = schedule.openShift;
 
     // Calculate shift hours from clock-in time (if still open).
@@ -99,7 +122,11 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
         // Header.
         const Text(
           'Daily Closeout',
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
@@ -113,7 +140,9 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
           icon: Icons.check_circle_outline,
           label: 'Jobs Completed',
           value: '${completedJobs.length}',
-          subtitle: inProgressJobs.isNotEmpty ? '${inProgressJobs.length} in progress' : null,
+          subtitle: inProgressJobs.isNotEmpty
+              ? '${inProgressJobs.length} in progress'
+              : null,
           color: AppColors.statusGreen,
         ),
         const SizedBox(height: 12),
@@ -121,7 +150,8 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
           icon: Icons.payments_outlined,
           label: 'Total Revenue',
           value: '\$${totalRevenue.toStringAsFixed(2)}',
-          subtitle: 'From ${completedJobs.length} completed job${completedJobs.length == 1 ? '' : 's'}',
+          subtitle:
+              'From ${completedJobs.length} completed job${completedJobs.length == 1 ? '' : 's'}',
           color: AppColors.accent,
         ),
         const SizedBox(height: 12),
@@ -137,7 +167,8 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
           icon: Icons.work_history_outlined,
           label: 'Job Time Logged',
           value: '${(totalJobMinutes / 60).toStringAsFixed(1)}h',
-          subtitle: '${completedSessions.length} session${completedSessions.length == 1 ? '' : 's'}',
+          subtitle:
+              '${completedSessions.length} session${completedSessions.length == 1 ? '' : 's'}',
           color: AppColors.textPrimary,
         ),
 
@@ -153,12 +184,20 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.cloud_off_rounded, color: AppColors.statusAmber, size: 20),
+                const Icon(
+                  Icons.cloud_off_rounded,
+                  color: AppColors.statusAmber,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     '$queuedCount action${queuedCount == 1 ? '' : 's'} pending sync',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.statusAmber),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.statusAmber,
+                    ),
                   ),
                 ),
               ],
@@ -171,7 +210,11 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
           const SizedBox(height: 24),
           const Text(
             'Completed Jobs',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 12),
           ...completedJobs.map((b) => _JobRow(booking: b)),
@@ -203,7 +246,10 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
       await api.clockOut();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Clocked out. Have a great evening!'), duration: Duration(seconds: 3)),
+          const SnackBar(
+            content: Text('Clocked out. Have a great evening!'),
+            duration: Duration(seconds: 3),
+          ),
         );
         context.go('/schedule');
       }
@@ -221,8 +267,29 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
   }
 
   String _formatDate(DateTime d) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
     return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
   }
 }
@@ -268,10 +335,29 @@ class _SummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
                 if (subtitle != null)
-                  Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  Text(
+                    subtitle!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -298,7 +384,11 @@ class _JobRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, size: 18, color: AppColors.statusGreen),
+          const Icon(
+            Icons.check_circle,
+            size: 18,
+            color: AppColors.statusGreen,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -306,12 +396,19 @@ class _JobRow extends StatelessWidget {
               children: [
                 Text(
                   booking.name ?? 'Customer',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 if (booking.address != null)
                   Text(
                     booking.address!,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -321,7 +418,11 @@ class _JobRow extends StatelessWidget {
           if (booking.totalPrice != null)
             Text(
               '\$${booking.totalPrice!.toStringAsFixed(0)}',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
         ],
       ),

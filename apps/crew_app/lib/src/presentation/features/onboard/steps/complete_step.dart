@@ -4,7 +4,11 @@ import '../../../shared/jh_primary_button.dart';
 
 /// Step 8 — celebratory completion; hands off to verification-pending.
 class CompleteStep extends StatelessWidget {
-  const CompleteStep({super.key, required this.firstName, required this.onNext});
+  const CompleteStep({
+    super.key,
+    required this.firstName,
+    required this.onNext,
+  });
 
   final String firstName;
   final VoidCallback onNext;
@@ -23,16 +27,34 @@ class CompleteStep extends StatelessWidget {
                   Container(
                     width: 76,
                     height: 76,
-                    decoration: const BoxDecoration(color: AppColors.statusGreen, shape: BoxShape.circle),
-                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 36),
+                    decoration: const BoxDecoration(
+                      color: AppColors.statusGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
                   ),
                   const SizedBox(height: 20),
-                  Text("You're all set, $firstName", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  Text(
+                    "You're all set, $firstName",
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   const Text(
                     "Your application is complete and headed to review. We'll text you the moment you're approved.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 15, color: AppColors.textSecondary, height: 1.5),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
                   ),
                 ],
               ),

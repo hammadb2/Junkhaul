@@ -26,11 +26,18 @@ class JhCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: selected ? AppColors.accent : AppColors.borderSubtle, width: selected ? 1.5 : 1),
+        border: Border.all(
+          color: selected ? AppColors.accent : AppColors.borderSubtle,
+          width: selected ? 1.5 : 1,
+        ),
       ),
       child: child,
     );
     if (onTap == null) return card;
-    return InkWell(borderRadius: BorderRadius.circular(16), onTap: onTap, child: card);
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: card,
+    );
   }
 }

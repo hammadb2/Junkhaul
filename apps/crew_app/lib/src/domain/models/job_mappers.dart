@@ -7,29 +7,33 @@ import 'payment.dart';
 /// used by the redesigned UI widgets.
 extension BookingToJob on Booking {
   Job toJob() => Job(
-        id: id,
-        customer: Customer(
-          id: id,
-          name: name ?? 'Unknown',
-          address: address ?? 'No address',
-          phone: phone,
-        ),
-        scheduledTime: _parseJobDateTime(jobDate, windowStart),
-        status: _mapStatus(status),
-        loadSize: _mapLoadSize(loadSize),
-        quotedAmount: totalPrice ?? 0,
-        items: itemizedItems
-            .map((e) => JobItem(
-                  id: e.name ?? e.description ?? '',
-                  name: e.name ?? e.description ?? 'Item',
-                  quantity: e.quantity ?? 1,
-                ))
-            .toList(),
-        notes: notes,
-        adjustedAmount: balanceDue != null && balanceDue! < (totalPrice ?? 0)
-            ? balanceDue
-            : null,
-      );
+    id: id,
+    customer: Customer(
+      id: id,
+      name: name ?? 'Unknown',
+      address: address ?? 'No address',
+      phone: phone,
+      lat: addressData?.lat,
+      lng: addressData?.lng,
+    ),
+    scheduledTime: _parseJobDateTime(jobDate, windowStart),
+    status: _mapStatus(status),
+    loadSize: _mapLoadSize(loadSize),
+    quotedAmount: totalPrice ?? 0,
+    items: itemizedItems
+        .map(
+          (e) => JobItem(
+            id: e.name ?? e.description ?? '',
+            name: e.name ?? e.description ?? 'Item',
+            quantity: e.quantity ?? 1,
+          ),
+        )
+        .toList(),
+    notes: notes,
+    adjustedAmount: balanceDue != null && balanceDue! < (totalPrice ?? 0)
+        ? balanceDue
+        : null,
+  );
 
   static DateTime _parseJobDateTime(String? jobDate, String? windowStart) {
     if (jobDate == null) return DateTime.now();
@@ -71,7 +75,10 @@ extension BookingToJob on Booking {
 }
 
 /// Maps a [PaymentResult] to the API payload for the payment endpoint.
-Map<String, dynamic> paymentResultToApiPayload(PaymentResult result, String bookingId) {
+Map<String, dynamic> paymentResultToApiPayload(
+  PaymentResult result,
+  String bookingId,
+) {
   return {
     'booking_id': bookingId,
     'method': result.method.name,

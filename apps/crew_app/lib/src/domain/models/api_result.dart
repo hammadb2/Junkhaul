@@ -15,11 +15,4 @@ abstract class ApiResult<T> with _$ApiResult<T> {
 }
 
 /// Coarse-grained error categorization used by the UI to decide what to show.
-enum ApiError {
-  network,
-  auth,
-  notFound,
-  server,
-  validation,
-  unknown,
-}
+enum ApiError { network, auth, notFound, server, validation, unknown }

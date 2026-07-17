@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_navigation_flutter/google_navigation_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/app_theme.dart';
@@ -9,28 +11,27 @@ import '../../../../domain/models/job.dart';
 
 enum CrewNavMode { turnByTurn, freeDrive }
 
-/// Real turn-by-turn navigation using Google Navigation SDK.
+/// Embedded Google turn-by-turn navigation using google_navigation_flutter.
 ///
-/// Google Navigation SDK owns:
-/// - Road-snapped location
-/// - Vehicle puck
-/// - Camera following, bearing, tilt, zoom
-/// - Traffic-aware route
-/// - Maneuver guidance, lane guidance, voice guidance
-/// - Rerouting, arrival detection, speed limit
+/// The [GoogleMapsNavigationView] is a platform view that renders the native
+/// Navigation SDK. It is created once in initState and kept mounted for the
+/// entire navigation session — it is NOT recreated on setState or Riverpod
+/// rebuilds. Only Flutter overlays (exit button, mode chips, arrival button)
+/// update on rebuild.
 ///
-/// Flutter owns:
-/// - Current job card (customer name, job type, arrival window)
-/// - Mode toggle (turn-by-turn vs free drive)
-/// - Exit navigation
-/// - "Open in Google Maps" fallback
-/// - Arrival button (manual fallback if SDK arrival detection is delayed)
+/// Lifecycle:
+/// 1. View created → onViewCreated fires → controller stored
+/// 2. initializeNavigationSession() called once
+/// 3. setDestinations() called with booking coordinates
+/// 4. startGuidance() called
+/// 5. setAudioGuidance() enables voice
+/// 6. setOnArrivalListener() fires on arrival → onArrive callback
+/// 7. setOnReroutingListener() fires on off-route → SDK handles rerouting
+/// 8. stopGuidance() + cleanup() on dispose
 ///
-/// Lifecycle: one persistent navigation controller per active session.
-/// The view is created once, destination set once, guidance started once.
-/// The view stays mounted across Riverpod rebuilds — only Flutter overlays
-/// update.
-class JobNavigationScreen extends StatefulWidget {
+/// Duplicate destination requests are prevented by _guidanceStarted flag.
+/// "Open in Google Maps" fallback works when no API key is configured.
+class JobNavigationScreen extends ConsumerStatefulWidget {
   const JobNavigationScreen({
     super.key,
     required this.mode,
@@ -45,20 +46,122 @@ class JobNavigationScreen extends StatefulWidget {
   final VoidCallback onArrive;
 
   @override
-  State<JobNavigationScreen> createState() => _JobNavigationScreenState();
+  ConsumerState<JobNavigationScreen> createState() => _JobNavigationScreenState();
 }
 
-class _JobNavigationScreenState extends State<JobNavigationScreen> {
-  // The Google Navigation view is created once and kept mounted.
-  // When google_navigation_flutter is available with a valid API key,
-  // the native view renders road-snapped navigation with voice guidance.
-  // When the API key is missing, we show a fallback with "Open in Google Maps".
-  bool _navigationAvailable = false;
+class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
+  GoogleNavigationViewController? _viewController;
+  bool _navigationInitialized = false;
+  bool _guidanceStarted = false;
+  bool _arrived = false;
+  StreamSubscription<OnArrivalEvent>? _arrivalSub;
+  StreamSubscription<void>? _reroutingSub;
+  StreamSubscription<void>? _newSessionSub;
+  String? _initError;
+
+  /// Destination coordinates from the booking's AddressData.
+  double? get _destLat => widget.job.customer.lat;
+  double? get _destLng => widget.job.customer.lng;
 
   @override
   void initState() {
     super.initState();
-    _navigationAvailable = AppSecrets.googleNavigationApiKey.isNotEmpty;
+  }
+
+  @override
+  void dispose() {
+    _arrivalSub?.cancel();
+    _reroutingSub?.cancel();
+    _newSessionSub?.cancel();
+    if (_guidanceStarted) {
+      GoogleMapsNavigator.stopGuidance().catchError((_) {});
+    }
+    if (_navigationInitialized) {
+      GoogleMapsNavigator.cleanup().catchError((_) {});
+    }
+    super.dispose();
+  }
+
+  /// Called when the native view is created. Initializes the navigation
+  /// session, sets destinations, starts guidance, and wires event listeners.
+  Future<void> _onViewCreated(GoogleNavigationViewController controller) async {
+    _viewController = controller;
+
+    if (AppSecrets.googleNavigationApiKey.isEmpty) {
+      // No API key — can't initialize. Fallback UI will show.
+      return;
+    }
+
+    if (_destLat == null || _destLng == null) {
+      setState(() => _initError = 'No destination coordinates for this job');
+      return;
+    }
+
+    try {
+      // 1. Initialize the navigation session (one per active session).
+      await GoogleMapsNavigator.initializeNavigationSession();
+      _navigationInitialized = true;
+
+      // 2. Set up event listeners before starting guidance.
+      _arrivalSub = GoogleMapsNavigator.setOnArrivalListener((event) {
+        if (!_arrived) {
+          _arrived = true;
+          if (mounted) widget.onArrive();
+        }
+      });
+
+      _reroutingSub = GoogleMapsNavigator.setOnReroutingListener(() {
+        // SDK handles rerouting automatically. No Flutter action needed.
+      });
+
+      _newSessionSub = GoogleMapsNavigator.setOnNewNavigationSessionListener(() {
+        // Session refreshed after rerouting or resume.
+      });
+
+      // 3. Enable voice guidance.
+      await GoogleMapsNavigator.setAudioGuidance(
+        NavigationAudioGuidanceSettings(
+          guidanceType: NavigationAudioGuidanceType.alertsAndGuidance,
+          isBluetoothAudioEnabled: true,
+          isVibrationEnabled: true,
+        ),
+      );
+
+      // 4. Set destinations (prevents duplicates via _guidanceStarted flag).
+      if (!_guidanceStarted) {
+        _guidanceStarted = true;
+        final destinations = Destinations(
+          waypoints: [
+            NavigationWaypoint(
+              title: widget.job.customer.name,
+              target: LatLng(latitude: _destLat!, longitude: _destLng!),
+            ),
+          ],
+          displayOptions: NavigationDisplayOptions(
+            showDestinationMarkers: true,
+          ),
+          routingOptions: RoutingOptions(
+            travelMode: NavigationTravelMode.driving,
+            avoidTolls: false,
+            avoidHighways: false,
+          ),
+        );
+
+        final status = await GoogleMapsNavigator.setDestinations(destinations);
+        if (status != NavigationRouteStatus.statusOk) {
+          setState(() => _initError = 'Route calculation failed: $status');
+          _guidanceStarted = false;
+          return;
+        }
+
+        // 5. Start guidance.
+        await GoogleMapsNavigator.startGuidance();
+      }
+    } on SessionInitializationException catch (e) {
+      setState(() => _initError = 'Navigation init failed: $e');
+    } catch (e) {
+      setState(() => _initError = 'Navigation error: $e');
+    }
   }
 
   Future<void> _openInGoogleMaps() async {
@@ -69,7 +172,6 @@ class _JobNavigationScreenState extends State<JobNavigationScreen> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       return;
     }
-    // Fallback to universal URL.
     final fallback = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$encoded&travelmode=driving');
     if (await canLaunchUrl(fallback)) {
       await launchUrl(fallback, mode: LaunchMode.externalApplication);
@@ -78,19 +180,56 @@ class _JobNavigationScreenState extends State<JobNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasApiKey = AppSecrets.googleNavigationApiKey.isNotEmpty;
+    final hasCoords = _destLat != null && _destLng != null;
+    final canUseNativeNav = hasApiKey && hasCoords;
+
     return Scaffold(
       backgroundColor: const Color(0xFFDCE4E0),
       body: Stack(
         children: [
-          // Native navigation view (or placeholder if no API key).
-          Positioned.fill(
-            child: _buildNavigationView(),
-          ),
-          // Flutter overlays — these update without recreating the nav view.
+          // Native navigation view — created once, stays mounted.
+          if (canUseNativeNav)
+            GoogleMapsNavigationView(
+              onViewCreated: _onViewCreated,
+              onRecenterButtonClicked: (_) {},
+            ),
+
+          // Placeholder when no API key or no coordinates.
+          if (!canUseNativeNav)
+            Positioned.fill(
+              child: _NavigationPlaceholder(
+                destination: widget.job.customer.address,
+                reason: !hasApiKey
+                    ? 'Navigation SDK not configured'
+                    : 'No destination coordinates for this job',
+                onOpenGoogleMaps: _openInGoogleMaps,
+              ),
+            ),
+
+          // Error overlay.
+          if (_initError != null)
+            Positioned(
+              top: 80,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.statusRed,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _initError!,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
+            ),
+
+          // Flutter overlays — update without recreating the nav view.
           SafeArea(
             child: Column(
               children: [
-                // Top bar with exit and mode toggle.
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   child: Row(
@@ -118,6 +257,7 @@ class _JobNavigationScreenState extends State<JobNavigationScreen> {
               ],
             ),
           ),
+
           // Bottom card with job info and arrival button.
           Align(
             alignment: Alignment.bottomCenter,
@@ -134,7 +274,6 @@ class _JobNavigationScreenState extends State<JobNavigationScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Job info row.
                     Row(
                       children: [
                         Expanded(
@@ -162,7 +301,7 @@ class _JobNavigationScreenState extends State<JobNavigationScreen> {
                             ],
                           ),
                         ),
-                        if (!_navigationAvailable)
+                        if (!canUseNativeNav)
                           TextButton.icon(
                             onPressed: _openInGoogleMaps,
                             icon: const Icon(Icons.open_in_new, size: 16),
@@ -171,12 +310,11 @@ class _JobNavigationScreenState extends State<JobNavigationScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    // Arrival button.
                     SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: widget.onArrive,
+                        onPressed: _arrived ? null : widget.onArrive,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
                           foregroundColor: Colors.white,
@@ -184,9 +322,9 @@ class _JobNavigationScreenState extends State<JobNavigationScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        child: const Text(
-                          "I've Arrived",
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                        child: Text(
+                          _arrived ? 'Arrived' : "I've Arrived",
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -199,47 +337,19 @@ class _JobNavigationScreenState extends State<JobNavigationScreen> {
       ),
     );
   }
-
-  /// Builds the native navigation view or a fallback placeholder.
-  ///
-  /// When google_navigation_flutter is wired with a valid API key, this
-  /// will host the NavigationView widget. The view is created once and
-  /// stays mounted — it is NOT recreated on Riverpod updates.
-  Widget _buildNavigationView() {
-    if (!_navigationAvailable) {
-      return _NavigationPlaceholder(
-        destination: widget.job.customer.address,
-        onOpenGoogleMaps: _openInGoogleMaps,
-      );
-    }
-
-    // TODO(phase5): When a Google Maps API key with Navigation SDK enabled
-    // is configured, replace this placeholder with:
-    //
-    //   NavigationView(
-    //     apiKey: AppSecrets.googleNavigationApiKey,
-    //     destination: LatLng(lat, lng),
-    //     onArrival: widget.onArrive,
-    //   )
-    //
-    // The view must be created once and kept mounted. Do NOT recreate it
-    // on setState or Riverpod rebuilds. Only Flutter overlays update.
-    return _NavigationPlaceholder(
-      destination: widget.job.customer.address,
-      onOpenGoogleMaps: _openInGoogleMaps,
-    );
-  }
 }
 
-/// Placeholder shown when the Google Navigation SDK is not yet configured.
-/// Shows the destination and an "Open in Google Maps" fallback.
+/// Placeholder shown when the Google Navigation SDK is not configured or
+/// the booking has no coordinates.
 class _NavigationPlaceholder extends StatelessWidget {
   const _NavigationPlaceholder({
     required this.destination,
+    required this.reason,
     required this.onOpenGoogleMaps,
   });
 
   final String destination;
+  final String reason;
   final VoidCallback onOpenGoogleMaps;
 
   @override
@@ -254,9 +364,9 @@ class _NavigationPlaceholder extends StatelessWidget {
             children: [
               const Icon(Icons.navigation_rounded, size: 48, color: Color(0xFFB7C2BC)),
               const SizedBox(height: 12),
-              const Text(
-                'Navigation SDK not configured',
-                style: TextStyle(
+              Text(
+                reason,
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF6B7B73),

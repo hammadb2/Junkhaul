@@ -37,26 +37,57 @@ class BeforeAfterStep extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             children: [
-              const Text('Snap a before photo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const Text(
+                'Snap a before photo',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 4),
-              const Text('Get everything in frame before you load.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              const Text(
+                'Get everything in frame before you load.',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 16),
-              JhPhotoThumbnail(onCapture: onCapture, imageFile: photoFile, label: 'Tap to capture before photo', height: 220),
+              JhPhotoThumbnail(
+                onCapture: onCapture,
+                imageFile: photoFile,
+                label: 'Tap to capture before photo',
+                height: 220,
+              ),
               if (hazmatFlag) ...[
                 const SizedBox(height: 14),
                 JhErrorBanner(
                   tone: JhBannerTone.error,
                   title: 'Possible hazardous item',
-                  message: 'Our scan flagged what looks like a propane tank in this photo. Confirm with dispatch before loading it.',
+                  message:
+                      'Our scan flagged what looks like a propane tank in this photo. Confirm with dispatch before loading it.',
                   actions: [
                     ElevatedButton(
                       onPressed: onCallDispatch,
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.textPrimary, foregroundColor: Colors.white),
-                      child: const Text('Call Dispatch', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.textPrimary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        'Call Dispatch',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                     OutlinedButton(
                       onPressed: onDismissHazmatFlag,
-                      child: const Text('Not Hazardous', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                      child: const Text(
+                        'Not Hazardous',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -66,7 +97,10 @@ class BeforeAfterStep extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-          child: JhPrimaryButton(label: 'Looks Good', onPressed: photoFile != null ? onNext : null),
+          child: JhPrimaryButton(
+            label: 'Looks Good',
+            onPressed: photoFile != null ? onNext : null,
+          ),
         ),
       ],
     );

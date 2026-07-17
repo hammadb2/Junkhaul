@@ -47,10 +47,22 @@ void main() {
 
   group('DispatchTrackingState', () {
     test('has all expected states', () {
-      expect(DispatchTrackingState.values, contains(DispatchTrackingState.idle));
-      expect(DispatchTrackingState.values, contains(DispatchTrackingState.tracking));
-      expect(DispatchTrackingState.values, contains(DispatchTrackingState.paused));
-      expect(DispatchTrackingState.values, contains(DispatchTrackingState.error));
+      expect(
+        DispatchTrackingState.values,
+        contains(DispatchTrackingState.idle),
+      );
+      expect(
+        DispatchTrackingState.values,
+        contains(DispatchTrackingState.tracking),
+      );
+      expect(
+        DispatchTrackingState.values,
+        contains(DispatchTrackingState.paused),
+      );
+      expect(
+        DispatchTrackingState.values,
+        contains(DispatchTrackingState.error),
+      );
     });
   });
 }

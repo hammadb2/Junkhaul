@@ -12,7 +12,11 @@ class SignatureStroke {
 /// TODO(dev): decide how you persist this — e.g. render to PNG via
 /// [JhSignaturePad.exportPng] and upload, or store the stroke data directly.
 class SignatureResult {
-  const SignatureResult({required this.strokes, required this.signedAt, this.signedByDelegate = false});
+  const SignatureResult({
+    required this.strokes,
+    required this.signedAt,
+    this.signedByDelegate = false,
+  });
   final List<SignatureStroke> strokes;
   final DateTime signedAt;
   final bool signedByDelegate;

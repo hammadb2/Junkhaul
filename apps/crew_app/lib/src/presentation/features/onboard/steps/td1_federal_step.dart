@@ -9,7 +9,11 @@ import '../../../shared/jh_primary_button.dart';
 /// TODO(dev): source [basicPersonalAmount] from your CRA tax-year config
 /// and persist selected credits + the certification checkbox.
 class Td1FederalStep extends StatefulWidget {
-  const Td1FederalStep({super.key, required this.onNext, this.basicPersonalAmount = 16129});
+  const Td1FederalStep({
+    super.key,
+    required this.onNext,
+    this.basicPersonalAmount = 16129,
+  });
 
   final VoidCallback onNext;
   final double basicPersonalAmount;
@@ -31,10 +35,19 @@ class _Td1FederalStepState extends State<Td1FederalStep> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             children: [
-              const Text('TD1 — Federal', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const Text(
+                'TD1 — Federal',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 6),
-              const Text('Your federal personal tax credits. Most crew just take the basic amount.',
-                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              const Text(
+                'Your federal personal tax credits. Most crew just take the basic amount.',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 20),
               JhCard(
                 child: Row(
@@ -43,12 +56,31 @@ class _Td1FederalStepState extends State<Td1FederalStep> {
                     const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Basic personal amount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                        Text('Set by CRA for 2026', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        Text(
+                          'Basic personal amount',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Set by CRA for 2026',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                       ],
                     ),
-                    Text('\$${widget.basicPersonalAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    Text(
+                      '\$${widget.basicPersonalAmount.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -73,15 +105,24 @@ class _Td1FederalStepState extends State<Td1FederalStep> {
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
                 activeColor: AppColors.accent,
-                title: const Text('I certify the information on this TD1 is correct and complete.',
-                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4)),
+                title: const Text(
+                  'I certify the information on this TD1 is correct and complete.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
               ),
             ],
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-          child: JhPrimaryButton(label: 'Continue', onPressed: _certify ? widget.onNext : null),
+          child: JhPrimaryButton(
+            label: 'Continue',
+            onPressed: _certify ? widget.onNext : null,
+          ),
         ),
       ],
     );
@@ -89,7 +130,12 @@ class _Td1FederalStepState extends State<Td1FederalStep> {
 }
 
 class _CheckRow extends StatelessWidget {
-  const _CheckRow({required this.title, required this.subtitle, required this.value, required this.onChanged});
+  const _CheckRow({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
   final String title;
   final String subtitle;
   final bool value;
@@ -102,14 +148,31 @@ class _CheckRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Checkbox(value: value, onChanged: (v) => onChanged(v ?? false), activeColor: AppColors.accent),
+          Checkbox(
+            value: value,
+            onChanged: (v) => onChanged(v ?? false),
+            activeColor: AppColors.accent,
+          ),
           const SizedBox(width: 4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),

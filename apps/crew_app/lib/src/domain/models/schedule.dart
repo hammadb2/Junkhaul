@@ -16,7 +16,8 @@ abstract class CrewAssignment with _$CrewAssignment {
     CrewMember? secondary,
   }) = _CrewAssignment;
 
-  factory CrewAssignment.fromJson(Map<String, dynamic> json) => _$CrewAssignmentFromJson(json);
+  factory CrewAssignment.fromJson(Map<String, dynamic> json) =>
+      _$CrewAssignmentFromJson(json);
 }
 
 /// Lightweight crew member reference (driver or secondary).
@@ -30,7 +31,8 @@ abstract class CrewMember with _$CrewMember {
     String? phone,
   }) = _CrewMember;
 
-  factory CrewMember.fromJson(Map<String, dynamic> json) => _$CrewMemberFromJson(json);
+  factory CrewMember.fromJson(Map<String, dynamic> json) =>
+      _$CrewMemberFromJson(json);
 }
 
 /// Open job-clock session for the current employee.
@@ -44,7 +46,8 @@ abstract class JobClockSession with _$JobClockSession {
     @JsonKey(name: 'duration_minutes') int? durationMinutes,
   }) = _JobClockSession;
 
-  factory JobClockSession.fromJson(Map<String, dynamic> json) => _$JobClockSessionFromJson(json);
+  factory JobClockSession.fromJson(Map<String, dynamic> json) =>
+      _$JobClockSessionFromJson(json);
 }
 
 /// Open timesheet shift.
@@ -55,7 +58,8 @@ abstract class OpenShift with _$OpenShift {
     @JsonKey(name: 'clock_in_at') String? clockInAt,
   }) = _OpenShift;
 
-  factory OpenShift.fromJson(Map<String, dynamic> json) => _$OpenShiftFromJson(json);
+  factory OpenShift.fromJson(Map<String, dynamic> json) =>
+      _$OpenShiftFromJson(json);
 }
 
 /// GET /api/employee/schedule (daily) response.
@@ -65,12 +69,17 @@ abstract class DailyScheduleResponse with _$DailyScheduleResponse {
     CrewAssignment? assignment,
     CrewMember? partner,
     @Default(<Booking>[]) List<Booking> bookings,
-    @JsonKey(name: 'open_sessions') @Default(<JobClockSession>[]) List<JobClockSession> openSessions,
-    @JsonKey(name: 'completed_sessions') @Default(<JobClockSession>[]) List<JobClockSession> completedSessions,
+    @JsonKey(name: 'open_sessions')
+    @Default(<JobClockSession>[])
+    List<JobClockSession> openSessions,
+    @JsonKey(name: 'completed_sessions')
+    @Default(<JobClockSession>[])
+    List<JobClockSession> completedSessions,
     @JsonKey(name: 'open_shift') OpenShift? openShift,
   }) = _DailyScheduleResponse;
 
-  factory DailyScheduleResponse.fromJson(Map<String, dynamic> json) => _$DailyScheduleResponseFromJson(json);
+  factory DailyScheduleResponse.fromJson(Map<String, dynamic> json) =>
+      _$DailyScheduleResponseFromJson(json);
 }
 
 /// Single day in the weekly schedule view.
@@ -85,7 +94,8 @@ abstract class WeekDay with _$WeekDay {
     @Default(<Booking>[]) List<Booking> bookings,
   }) = _WeekDay;
 
-  factory WeekDay.fromJson(Map<String, dynamic> json) => _$WeekDayFromJson(json);
+  factory WeekDay.fromJson(Map<String, dynamic> json) =>
+      _$WeekDayFromJson(json);
 }
 
 /// GET /api/employee/schedule?weekly=true response.
@@ -97,5 +107,6 @@ abstract class WeeklyScheduleResponse with _$WeeklyScheduleResponse {
     @JsonKey(name: 'endDate') String? endDate,
   }) = _WeeklyScheduleResponse;
 
-  factory WeeklyScheduleResponse.fromJson(Map<String, dynamic> json) => _$WeeklyScheduleResponseFromJson(json);
+  factory WeeklyScheduleResponse.fromJson(Map<String, dynamic> json) =>
+      _$WeeklyScheduleResponseFromJson(json);
 }

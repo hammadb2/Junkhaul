@@ -32,7 +32,8 @@ abstract class ShiftPeriod with _$ShiftPeriod {
     double? gross,
   }) = _ShiftPeriod;
 
-  factory ShiftPeriod.fromJson(Map<String, dynamic> json) => _$ShiftPeriodFromJson(json);
+  factory ShiftPeriod.fromJson(Map<String, dynamic> json) =>
+      _$ShiftPeriodFromJson(json);
 }
 
 /// GET /api/employee/shifts response.
@@ -44,5 +45,6 @@ abstract class ShiftsResponse with _$ShiftsResponse {
     ShiftPeriod? period,
   }) = _ShiftsResponse;
 
-  factory ShiftsResponse.fromJson(Map<String, dynamic> json) => _$ShiftsResponseFromJson(json);
+  factory ShiftsResponse.fromJson(Map<String, dynamic> json) =>
+      _$ShiftsResponseFromJson(json);
 }

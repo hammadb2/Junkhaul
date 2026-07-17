@@ -17,7 +17,8 @@ abstract class Receipt with _$Receipt {
     @JsonKey(name: 'created_at') String? createdAt,
   }) = _Receipt;
 
-  factory Receipt.fromJson(Map<String, dynamic> json) => _$ReceiptFromJson(json);
+  factory Receipt.fromJson(Map<String, dynamic> json) =>
+      _$ReceiptFromJson(json);
 }
 
 /// GET /api/employee/receipts response.
@@ -27,5 +28,6 @@ abstract class ReceiptsResponse with _$ReceiptsResponse {
     @Default(<Receipt>[]) List<Receipt> receipts,
   }) = _ReceiptsResponse;
 
-  factory ReceiptsResponse.fromJson(Map<String, dynamic> json) => _$ReceiptsResponseFromJson(json);
+  factory ReceiptsResponse.fromJson(Map<String, dynamic> json) =>
+      _$ReceiptsResponseFromJson(json);
 }

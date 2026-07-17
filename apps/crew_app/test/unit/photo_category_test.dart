@@ -20,7 +20,11 @@ void main() {
       ];
 
       final set = categories.toSet();
-      expect(set.length, categories.length, reason: 'All categories should be unique');
+      expect(
+        set.length,
+        categories.length,
+        reason: 'All categories should be unique',
+      );
     });
 
     test('categories match backend VALID_TYPES', () {

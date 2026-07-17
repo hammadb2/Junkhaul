@@ -31,17 +31,17 @@ Future<void> main() async {
   const sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
 
   if (sentryDsn.isNotEmpty) {
-    await SentryFlutter.init(
-      (options) {
-        options
-          ..dsn = sentryDsn
-          ..environment = const String.fromEnvironment('FLAVOR', defaultValue: 'production')
-          ..tracesSampleRate = 0.2
-          ..reportSilentFlutterErrors = true
-          ..captureFailedRequests = true;
-      },
-      appRunner: () => runApp(const ProviderScope(child: CrewApp())),
-    );
+    await SentryFlutter.init((options) {
+      options
+        ..dsn = sentryDsn
+        ..environment = const String.fromEnvironment(
+          'FLAVOR',
+          defaultValue: 'production',
+        )
+        ..tracesSampleRate = 0.2
+        ..reportSilentFlutterErrors = true
+        ..captureFailedRequests = true;
+    }, appRunner: () => runApp(const ProviderScope(child: CrewApp())));
   } else {
     runApp(const ProviderScope(child: CrewApp()));
   }

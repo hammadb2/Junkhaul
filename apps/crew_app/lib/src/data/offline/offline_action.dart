@@ -26,20 +26,20 @@ class OfflineAction {
   int attempts;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-        'payload': payload,
-        'file_paths': filePaths,
-        'created_at': createdAt.toIso8601String(),
-        'attempts': attempts,
-      };
+    'id': id,
+    'type': type,
+    'payload': payload,
+    'file_paths': filePaths,
+    'created_at': createdAt.toIso8601String(),
+    'attempts': attempts,
+  };
 
   factory OfflineAction.fromJson(Map<String, dynamic> json) => OfflineAction(
-        id: json['id'] as String,
-        type: json['type'] as String,
-        payload: Map<String, dynamic>.from(json['payload'] as Map),
-        filePaths: (json['file_paths'] as List?)?.cast<String>(),
-        createdAt: DateTime.parse(json['created_at'] as String),
-        attempts: (json['attempts'] as num?)?.toInt() ?? 0,
-      );
+    id: json['id'] as String,
+    type: json['type'] as String,
+    payload: Map<String, dynamic>.from(json['payload'] as Map),
+    filePaths: (json['file_paths'] as List?)?.cast<String>(),
+    createdAt: DateTime.parse(json['created_at'] as String),
+    attempts: (json['attempts'] as num?)?.toInt() ?? 0,
+  );
 }

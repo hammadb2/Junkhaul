@@ -46,8 +46,8 @@ class ScheduleScreen extends ConsumerWidget {
     final syncState = isLoading
         ? SyncState.syncing
         : isOnline
-            ? SyncState.online
-            : SyncState.offline;
+        ? SyncState.online
+        : SyncState.offline;
 
     return _ScheduleBody(
       crewFirstName: crewFirstName,
@@ -135,7 +135,10 @@ class _ScheduleBodyState extends ConsumerState<_ScheduleBody> {
         bottom: false,
         child: Column(
           children: [
-            JhSyncBanner(state: widget.syncState, queuedActionCount: widget.queuedActionCount),
+            JhSyncBanner(
+              state: widget.syncState,
+              queuedActionCount: widget.queuedActionCount,
+            ),
             Expanded(
               child: Stack(
                 children: [
@@ -158,9 +161,14 @@ class _ScheduleBodyState extends ConsumerState<_ScheduleBody> {
                         _RoundIconButton(
                           icon: Icons.privacy_tip_outlined,
                           onTap: () async {
-                            final uri = Uri.parse('https://www.junkhaul.ca/crew-privacy');
+                            final uri = Uri.parse(
+                              'https://www.junkhaul.ca/crew-privacy',
+                            );
                             if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
                             }
                           },
                         ),
@@ -170,7 +178,10 @@ class _ScheduleBodyState extends ConsumerState<_ScheduleBody> {
                           onTap: () => context.push('/closeout'),
                         ),
                         const SizedBox(width: 8),
-                        _RoundIconButton(icon: Icons.logout_rounded, onTap: widget.onSignOut),
+                        _RoundIconButton(
+                          icon: Icons.logout_rounded,
+                          onTap: widget.onSignOut,
+                        ),
                       ],
                     ),
                   ),

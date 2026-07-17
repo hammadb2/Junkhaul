@@ -54,7 +54,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (status == AuthStatus.unknown) return '/splash';
 
       // Authenticated routes require auth.
-      final isAuthedRoute = location.startsWith('/schedule') ||
+      final isAuthedRoute =
+          location.startsWith('/schedule') ||
           location.startsWith('/job') ||
           location.startsWith('/clock') ||
           location.startsWith('/closeout') ||
@@ -68,7 +69,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // Login/onboard/verification should redirect away if already authed.
-      if ((location == '/login' || location.startsWith('/onboard') || location == '/verification') &&
+      if ((location == '/login' ||
+              location.startsWith('/onboard') ||
+              location == '/verification') &&
           status == AuthStatus.authenticated) {
         return '/schedule';
       }
@@ -78,23 +81,31 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/splash',
-        pageBuilder: (context, state) => pageFadeTransition(context, state, const SplashScreen()),
+        pageBuilder: (context, state) =>
+            pageFadeTransition(context, state, const SplashScreen()),
       ),
       GoRoute(
         path: '/login',
-        pageBuilder: (context, state) => pageSharedAxisTransition(context, state, const LoginScreen()),
+        pageBuilder: (context, state) =>
+            pageSharedAxisTransition(context, state, const LoginScreen()),
       ),
       GoRoute(
         path: '/onboard',
-        pageBuilder: (context, state) => pageSharedAxisTransition(context, state, const OnboardScreen()),
+        pageBuilder: (context, state) =>
+            pageSharedAxisTransition(context, state, const OnboardScreen()),
       ),
       GoRoute(
         path: '/verification',
-        pageBuilder: (context, state) => pageFadeTransition(context, state, const VerificationPendingScreen()),
+        pageBuilder: (context, state) => pageFadeTransition(
+          context,
+          state,
+          const VerificationPendingScreen(),
+        ),
       ),
       GoRoute(
         path: '/schedule',
-        pageBuilder: (context, state) => pageFadeTransition(context, state, const ScheduleScreen()),
+        pageBuilder: (context, state) =>
+            pageFadeTransition(context, state, const ScheduleScreen()),
       ),
       GoRoute(
         path: '/job/:bookingId',
@@ -106,19 +117,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/permissions-gate',
-        pageBuilder: (context, state) => pageFadeTransition(
-          context,
-          state,
-          const PermissionGateScreen(),
-        ),
+        pageBuilder: (context, state) =>
+            pageFadeTransition(context, state, const PermissionGateScreen()),
       ),
       GoRoute(
         path: '/closeout',
-        pageBuilder: (context, state) => pageSharedAxisTransition(
-          context,
-          state,
-          const CloseoutScreen(),
-        ),
+        pageBuilder: (context, state) =>
+            pageSharedAxisTransition(context, state, const CloseoutScreen()),
       ),
     ],
   );
@@ -150,7 +155,8 @@ Widget _jobScreenBuilder(String bookingId) {
     builder: (context, ref, _) {
       final scheduleAsync = ref.watch(todayScheduleProvider);
       return scheduleAsync.when(
-        loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
         error: (_, __) => Scaffold(
           body: Center(
             child: Column(
@@ -168,7 +174,9 @@ Widget _jobScreenBuilder(String bookingId) {
         ),
         data: (schedule) {
           try {
-            final booking = schedule.bookings.firstWhere((b) => b.id == bookingId);
+            final booking = schedule.bookings.firstWhere(
+              (b) => b.id == bookingId,
+            );
             final job = booking.toJob();
             return JobScreen(
               job: job,

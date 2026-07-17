@@ -44,17 +44,18 @@ class DispatchLocationService extends Notifier<DispatchTrackingState> {
     // Listen to the GPS stream at a 3-second interval for dispatch.
     // The service itself decides whether to actually send based on
     // movement and stationary detection.
-    _sub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.medium,
-        distanceFilter: 5,
-      ),
-    ).listen(
-      _onPositionUpdate,
-      onError: (e) {
-        state = DispatchTrackingState.error;
-      },
-    );
+    _sub =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            distanceFilter: 5,
+          ),
+        ).listen(
+          _onPositionUpdate,
+          onError: (e) {
+            state = DispatchTrackingState.error;
+          },
+        );
 
     // Stationary check: if we haven't moved >10m in 15s, switch to
     // the slower stationary interval.
@@ -124,15 +125,17 @@ class DispatchLocationService extends Notifier<DispatchTrackingState> {
         state == DispatchTrackingState.tracking) {
       // Force a position request and send.
       Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 5),
-        ),
-      ).then((pos) {
-        _sendLocation(pos);
-        _lastSentPosition = pos;
-        _lastSentAt = DateTime.now();
-      }).catchError((_) {});
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 5),
+            ),
+          )
+          .then((pos) {
+            _sendLocation(pos);
+            _lastSentPosition = pos;
+            _lastSentAt = DateTime.now();
+          })
+          .catchError((_) {});
     }
   }
 
@@ -146,10 +149,9 @@ class DispatchLocationService extends Notifier<DispatchTrackingState> {
     if (!isOnline) return;
 
     try {
-      final api = ref.read(employeeApiProvider).maybeWhen(
-        data: (api) => api,
-        orElse: () => null,
-      );
+      final api = ref
+          .read(employeeApiProvider)
+          .maybeWhen(data: (api) => api, orElse: () => null);
       if (api == null) return;
 
       await api.updateLocation(
@@ -167,5 +169,5 @@ class DispatchLocationService extends Notifier<DispatchTrackingState> {
 
 final dispatchLocationProvider =
     NotifierProvider<DispatchLocationService, DispatchTrackingState>(
-  DispatchLocationService.new,
-);
+      DispatchLocationService.new,
+    );

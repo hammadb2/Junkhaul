@@ -20,13 +20,17 @@ enum AuthStatus {
 class AuthState {
   const AuthState._({required this.status, this.employee});
   const AuthState.unknown() : status = AuthStatus.unknown, employee = null;
-  const AuthState.unauthenticated() : status = AuthStatus.unauthenticated, employee = null;
+  const AuthState.unauthenticated()
+    : status = AuthStatus.unauthenticated,
+      employee = null;
 
   final AuthStatus status;
   final Employee? employee;
 
-  AuthState copyWith({AuthStatus? status, Employee? employee}) =>
-      AuthState._(status: status ?? this.status, employee: employee ?? this.employee);
+  AuthState copyWith({AuthStatus? status, Employee? employee}) => AuthState._(
+    status: status ?? this.status,
+    employee: employee ?? this.employee,
+  );
 
   @override
   String toString() => 'AuthState(status=$status, employee=${employee?.email})';
@@ -79,10 +83,10 @@ class AuthRepository extends Notifier<AuthState> {
   /// to secure storage so it survives app restarts.
   Future<void> login({required String email, required String password}) async {
     final d = dio;
-    final body = await d.postJson('/api/employee/login', body: {
-      'email': email,
-      'password': password,
-    });
+    final body = await d.postJson(
+      '/api/employee/login',
+      body: {'email': email, 'password': password},
+    );
     final res = LoginResponse.fromJson(body);
     await d.persistSessionCookie(_storage!);
     try {
@@ -121,8 +125,8 @@ class AuthRepository extends Notifier<AuthState> {
             status: emp.pendingVerification
                 ? AuthStatus.needsVerification
                 : !emp.onboardingComplete && !emp.onboarded
-                    ? AuthStatus.needsOnboarding
-                    : AuthStatus.authenticated,
+                ? AuthStatus.needsOnboarding
+                : AuthStatus.authenticated,
             employee: emp,
           );
     state = next;
@@ -131,4 +135,6 @@ class AuthRepository extends Notifier<AuthState> {
 }
 
 /// Provider for [AuthRepository]. Watch this to get the current [AuthState].
-final authRepositoryProvider = NotifierProvider<AuthRepository, AuthState>(AuthRepository.new);
+final authRepositoryProvider = NotifierProvider<AuthRepository, AuthState>(
+  AuthRepository.new,
+);

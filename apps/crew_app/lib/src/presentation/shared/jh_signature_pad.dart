@@ -44,7 +44,10 @@ class JhSignaturePadState extends State<JhSignaturePad> {
     final canvas = Canvas(recorder);
     _SignaturePainter(_strokes).paint(canvas, size);
     final picture = recorder.endRecording();
-    final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+    final image = await picture.toImage(
+      size.width.toInt(),
+      size.height.toInt(),
+    );
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     return bytes!.buffer.asUint8List();
   }
@@ -60,9 +63,16 @@ class JhSignaturePadState extends State<JhSignaturePad> {
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.borderSubtle, width: 1.5, style: BorderStyle.solid),
+          border: Border.all(
+            color: AppColors.borderSubtle,
+            width: 1.5,
+            style: BorderStyle.solid,
+          ),
         ),
-        child: CustomPaint(painter: _SignaturePainter(_strokes), size: Size.infinite),
+        child: CustomPaint(
+          painter: _SignaturePainter(_strokes),
+          size: Size.infinite,
+        ),
       ),
     );
   }
@@ -87,5 +97,6 @@ class _SignaturePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SignaturePainter oldDelegate) => oldDelegate.strokes != strokes;
+  bool shouldRepaint(covariant _SignaturePainter oldDelegate) =>
+      oldDelegate.strokes != strokes;
 }

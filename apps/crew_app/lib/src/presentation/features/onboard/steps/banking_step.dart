@@ -43,7 +43,10 @@ class _BankingStepState extends ConsumerState<BankingStep> {
 
   Future<void> _saveAndContinue() async {
     if (!_isValid) {
-      setState(() => _error = 'Institution (3 digits), transit (5 digits), and account (7+ digits) required.');
+      setState(
+        () => _error =
+            'Institution (3 digits), transit (5 digits), and account (7+ digits) required.',
+      );
       return;
     }
     setState(() {
@@ -79,13 +82,29 @@ class _BankingStepState extends ConsumerState<BankingStep> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             children: [
-              const Text('Direct deposit', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+              const Text(
+                'Direct deposit',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
-              const Text('Where we send your pay. From a void cheque or your banking app.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              const Text(
+                'Where we send your pay. From a void cheque or your banking app.',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 20),
-              JhTextField(label: 'Institution number', hint: '003', controller: _institutionController, keyboardType: TextInputType.number),
+              JhTextField(
+                label: 'Institution number',
+                hint: '003',
+                controller: _institutionController,
+                keyboardType: TextInputType.number,
+              ),
               const SizedBox(height: 14),
-              JhTextField(label: 'Transit number', hint: '12345', controller: _transitController, keyboardType: TextInputType.number),
+              JhTextField(
+                label: 'Transit number',
+                hint: '12345',
+                controller: _transitController,
+                keyboardType: TextInputType.number,
+              ),
               const SizedBox(height: 14),
               JhTextField(
                 label: 'Account number',
@@ -101,7 +120,13 @@ class _BankingStepState extends ConsumerState<BankingStep> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 14),
-                Text(_error!, style: const TextStyle(fontSize: 13, color: AppColors.statusRed)),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.statusRed,
+                  ),
+                ),
               ],
             ],
           ),

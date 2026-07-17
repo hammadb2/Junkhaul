@@ -34,20 +34,53 @@ class DropFlowStep extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             children: [
-              Text(isLandfill ? 'Confirm the landfill drop' : 'Confirm the storage drop',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              Text(
+                isLandfill
+                    ? 'Confirm the landfill drop'
+                    : 'Confirm the storage drop',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 4),
               if (facilityName != null)
-                Text(facilityName!, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                Text(
+                  facilityName!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               const SizedBox(height: 16),
-              JhPhotoThumbnail(onCapture: onCapture, imageFile: photoFile, label: 'Tap to capture drop-off photo', height: 170),
+              JhPhotoThumbnail(
+                onCapture: onCapture,
+                imageFile: photoFile,
+                label: 'Tap to capture drop-off photo',
+                height: 170,
+              ),
               if (capacityAfterPercent != null) ...[
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Truck capacity after drop', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    Text('$capacityAfterPercent%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.statusGreen)),
+                    const Text(
+                      'Truck capacity after drop',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      '$capacityAfterPercent%',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.statusGreen,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -57,7 +90,9 @@ class DropFlowStep extends StatelessWidget {
                     value: capacityAfterPercent! / 100,
                     minHeight: 10,
                     backgroundColor: AppColors.bgInput,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.statusGreen),
+                    valueColor: const AlwaysStoppedAnimation(
+                      AppColors.statusGreen,
+                    ),
                   ),
                 ),
               ],
@@ -66,7 +101,10 @@ class DropFlowStep extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-          child: JhPrimaryButton(label: 'Confirm Drop-off', onPressed: photoFile != null ? onConfirm : null),
+          child: JhPrimaryButton(
+            label: 'Confirm Drop-off',
+            onPressed: photoFile != null ? onConfirm : null,
+          ),
         ),
       ],
     );

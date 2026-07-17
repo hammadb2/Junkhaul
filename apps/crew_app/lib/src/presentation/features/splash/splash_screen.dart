@@ -35,13 +35,36 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             Container(
               width: 72,
               height: 72,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-              child: const Icon(Icons.local_shipping_outlined, color: AppColors.accent, size: 34),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.local_shipping_outlined,
+                color: AppColors.accent,
+                size: 34,
+              ),
             ),
             const SizedBox(height: 18),
-            const Text('JUNKHAUL', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+            const Text(
+              'JUNKHAUL',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text('CREW', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 2)),
+            Text(
+              'CREW',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.85),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 2,
+              ),
+            ),
             const SizedBox(height: 28),
             SizedBox(
               width: 120,

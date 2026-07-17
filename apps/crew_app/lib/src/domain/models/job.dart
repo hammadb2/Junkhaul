@@ -20,7 +20,11 @@ class JobItem {
   final ItemCondition? condition;
   final String? photoUrl;
 
-  JobItem copyWith({int? quantity, ItemCondition? condition, String? photoUrl}) {
+  JobItem copyWith({
+    int? quantity,
+    ItemCondition? condition,
+    String? photoUrl,
+  }) {
     return JobItem(
       id: id,
       name: name,
@@ -64,12 +68,26 @@ class Job {
   double get totalAmount => adjustedAmount ?? quotedAmount;
 
   Job copyWithItems(List<JobItem> items) => Job(
-        id: id, customer: customer, scheduledTime: scheduledTime, status: status,
-        loadSize: loadSize, quotedAmount: quotedAmount, items: items, notes: notes, adjustedAmount: adjustedAmount,
-      );
+    id: id,
+    customer: customer,
+    scheduledTime: scheduledTime,
+    status: status,
+    loadSize: loadSize,
+    quotedAmount: quotedAmount,
+    items: items,
+    notes: notes,
+    adjustedAmount: adjustedAmount,
+  );
 
   Job copyWithAmount(double? adjusted) => Job(
-        id: id, customer: customer, scheduledTime: scheduledTime, status: status,
-        loadSize: loadSize, quotedAmount: quotedAmount, items: items, notes: notes, adjustedAmount: adjusted,
-      );
+    id: id,
+    customer: customer,
+    scheduledTime: scheduledTime,
+    status: status,
+    loadSize: loadSize,
+    quotedAmount: quotedAmount,
+    items: items,
+    notes: notes,
+    adjustedAmount: adjusted,
+  );
 }

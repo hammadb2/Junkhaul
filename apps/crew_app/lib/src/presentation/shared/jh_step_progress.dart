@@ -38,7 +38,11 @@ class JhStepProgress extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'STEP $currentStep OF $totalSteps · ${stepLabel.toUpperCase()}',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.accent,
+          ),
         ),
       ],
     );

@@ -32,7 +32,8 @@ abstract class PayStub with _$PayStub {
     @JsonKey(name: 'direct_deposit_sent_at') String? directDepositSentAt,
   }) = _PayStub;
 
-  factory PayStub.fromJson(Map<String, dynamic> json) => _$PayStubFromJson(json);
+  factory PayStub.fromJson(Map<String, dynamic> json) =>
+      _$PayStubFromJson(json);
 }
 
 /// GET /api/employee/pay-stubs response.
@@ -42,5 +43,6 @@ abstract class PayStubsResponse with _$PayStubsResponse {
     @JsonKey(name: 'pay_stubs') @Default(<PayStub>[]) List<PayStub> payStubs,
   }) = _PayStubsResponse;
 
-  factory PayStubsResponse.fromJson(Map<String, dynamic> json) => _$PayStubsResponseFromJson(json);
+  factory PayStubsResponse.fromJson(Map<String, dynamic> json) =>
+      _$PayStubsResponseFromJson(json);
 }

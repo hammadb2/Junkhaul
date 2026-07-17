@@ -33,7 +33,13 @@ class ScheduleBottomSheet extends StatelessWidget {
       decoration: const BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, -4))],
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 16,
+            offset: Offset(0, -4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -59,10 +65,21 @@ class ScheduleBottomSheet extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Welcome, $crewFirstName',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                            Text('${jobs.length} job${jobs.length == 1 ? '' : 's'} today',
-                                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                            Text(
+                              'Welcome, $crewFirstName',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              '${jobs.length} job${jobs.length == 1 ? '' : 's'} today',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -95,16 +112,34 @@ class _EmptyState extends StatelessWidget {
           Container(
             width: 64,
             height: 64,
-            decoration: const BoxDecoration(color: AppColors.bgInput, shape: BoxShape.circle),
-            child: const Icon(Icons.checklist_rtl_rounded, color: AppColors.statusGray, size: 28),
+            decoration: const BoxDecoration(
+              color: AppColors.bgInput,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.checklist_rtl_rounded,
+              color: AppColors.statusGray,
+              size: 28,
+            ),
           ),
           const SizedBox(height: 16),
-          const Text('No jobs scheduled today', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          const Text(
+            'No jobs scheduled today',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
           const SizedBox(height: 6),
           const Text(
             'Enjoy the day off — dispatch will text you if anything opens up. Check back tomorrow morning.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.4),
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -156,7 +191,12 @@ class _JobCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: job.status == JobStatus.confirmed ? AppColors.accent : AppColors.borderSubtle, width: job.status == JobStatus.confirmed ? 1.5 : 1),
+          border: Border.all(
+            color: job.status == JobStatus.confirmed
+                ? AppColors.accent
+                : AppColors.borderSubtle,
+            width: job.status == JobStatus.confirmed ? 1.5 : 1,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,16 +205,34 @@ class _JobCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text('$time · ${job.customer.name}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  child: Text(
+                    '$time · ${job.customer.name}',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ),
                 JhStatusPill(label: label, tone: tone),
               ],
             ),
             const SizedBox(height: 8),
-            Text(job.customer.address, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text(
+              job.customer.address,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text('$_loadLabel · \$${job.quotedAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text(
+              '$_loadLabel · \$${job.quotedAmount.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
       ),

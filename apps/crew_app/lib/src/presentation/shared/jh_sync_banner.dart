@@ -11,7 +11,11 @@ enum SyncState { online, offline, syncing }
 /// TODO(dev): drive [state] and [queuedActionCount] from your existing
 /// offline-queue/connectivity service.
 class JhSyncBanner extends StatelessWidget {
-  const JhSyncBanner({super.key, required this.state, this.queuedActionCount = 0});
+  const JhSyncBanner({
+    super.key,
+    required this.state,
+    this.queuedActionCount = 0,
+  });
 
   final SyncState state;
   final int queuedActionCount;
@@ -27,16 +31,24 @@ class JhSyncBanner extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(isSyncing ? Icons.sync_rounded : Icons.wifi_off_rounded, size: 14, color: Colors.white),
+          Icon(
+            isSyncing ? Icons.sync_rounded : Icons.wifi_off_rounded,
+            size: 14,
+            color: Colors.white,
+          ),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
               isSyncing
                   ? 'Syncing…'
                   : queuedActionCount > 0
-                      ? 'Offline — $queuedActionCount action${queuedActionCount == 1 ? '' : 's'} queued, will sync automatically'
-                      : 'Offline — changes will sync automatically',
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                  ? 'Offline — $queuedActionCount action${queuedActionCount == 1 ? '' : 's'} queued, will sync automatically'
+                  : 'Offline — changes will sync automatically',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -60,7 +72,10 @@ class JhSavedChip extends StatelessWidget {
     final bg = synced ? const Color(0xFFE8FBF0) : const Color(0xFFFEF6E7);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -68,7 +83,11 @@ class JhSavedChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             synced ? 'Saved & Synced' : 'Saved locally — will sync',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
         ],
       ),

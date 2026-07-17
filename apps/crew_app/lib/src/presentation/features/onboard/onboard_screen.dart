@@ -26,7 +26,14 @@ class _OnboardScreenState extends ConsumerState<OnboardScreen> {
   int _step = 0;
   static const _totalSteps = 8;
   static const _labels = [
-    'Account', 'Documents', 'TD1 Federal', 'TD1AB', 'Contract', 'Banking', 'Acknowledgments', 'Complete',
+    'Account',
+    'Documents',
+    'TD1 Federal',
+    'TD1AB',
+    'Contract',
+    'Banking',
+    'Acknowledgments',
+    'Complete',
   ];
 
   String get _firstName {
@@ -59,7 +66,11 @@ class _OnboardScreenState extends ConsumerState<OnboardScreen> {
             if (_step < _totalSteps - 1)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: JhStepProgress(currentStep: _step + 1, totalSteps: _totalSteps, stepLabel: _labels[_step]),
+                child: JhStepProgress(
+                  currentStep: _step + 1,
+                  totalSteps: _totalSteps,
+                  stepLabel: _labels[_step],
+                ),
               ),
             Expanded(child: _buildStep()),
           ],

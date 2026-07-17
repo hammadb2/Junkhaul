@@ -30,22 +30,53 @@ class VerificationPendingScreen extends ConsumerWidget {
                       Container(
                         width: 76,
                         height: 76,
-                        decoration: const BoxDecoration(color: Color(0xFFFFF1E8), shape: BoxShape.circle),
-                        child: const Icon(Icons.schedule_rounded, color: AppColors.statusAmber, size: 32),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFF1E8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.schedule_rounded,
+                          color: AppColors.statusAmber,
+                          size: 32,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: const Color(0xFFFEF6E7), borderRadius: BorderRadius.circular(999)),
-                        child: const Text('PENDING REVIEW', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.statusAmber)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF6E7),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'PENDING REVIEW',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.statusAmber,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      Text('Almost there, $firstName', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                      Text(
+                        'Almost there, $firstName',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       const Text(
                         "Our office is checking your documents. Most crew get approved within one business day — we'll text you the second you're in.",
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 15, color: AppColors.textSecondary, height: 1.5),
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
                       ),
                     ],
                   ),

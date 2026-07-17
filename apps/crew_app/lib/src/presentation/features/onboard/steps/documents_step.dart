@@ -50,21 +50,46 @@ class _DocumentsStepState extends ConsumerState<DocumentsStep> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             children: [
-              const Text('Documents', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const Text(
+                'Documents',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 6),
-              const Text("Snap a clear photo of each. We'll confirm within 24 hours.", style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              const Text(
+                "Snap a clear photo of each. We'll confirm within 24 hours.",
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 20),
               _label("Driver's license (front)", required: true),
               const SizedBox(height: 8),
-              JhPhotoThumbnail(onCapture: () => _capture('license'), imageFile: _licensePhoto, label: 'Tap to capture license', height: 110),
+              JhPhotoThumbnail(
+                onCapture: () => _capture('license'),
+                imageFile: _licensePhoto,
+                label: 'Tap to capture license',
+                height: 110,
+              ),
               const SizedBox(height: 16),
               _label('SIN document', required: true),
               const SizedBox(height: 8),
-              JhPhotoThumbnail(onCapture: () => _capture('sin'), imageFile: _sinPhoto, label: 'Tap to capture SIN letter or card', height: 110),
+              JhPhotoThumbnail(
+                onCapture: () => _capture('sin'),
+                imageFile: _sinPhoto,
+                label: 'Tap to capture SIN letter or card',
+                height: 110,
+              ),
               const SizedBox(height: 16),
               _label('Void cheque or direct deposit form', required: false),
               const SizedBox(height: 8),
-              JhPhotoThumbnail(onCapture: () => _capture('cheque'), imageFile: _chequePhoto, label: 'Tap to capture void cheque', height: 110),
+              JhPhotoThumbnail(
+                onCapture: () => _capture('cheque'),
+                imageFile: _chequePhoto,
+                label: 'Tap to capture void cheque',
+                height: 110,
+              ),
             ],
           ),
         ),
@@ -72,7 +97,9 @@ class _DocumentsStepState extends ConsumerState<DocumentsStep> {
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
           child: JhPrimaryButton(
             label: 'Continue',
-            onPressed: (_licensePhoto != null && _sinPhoto != null) ? widget.onNext : null,
+            onPressed: (_licensePhoto != null && _sinPhoto != null)
+                ? widget.onNext
+                : null,
           ),
         ),
       ],
@@ -82,10 +109,21 @@ class _DocumentsStepState extends ConsumerState<DocumentsStep> {
   Widget _label(String text, {required bool required}) {
     return RichText(
       text: TextSpan(
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
         children: [
           TextSpan(text: text),
-          if (required) const TextSpan(text: '  ·  required', style: TextStyle(color: AppColors.statusRed, fontWeight: FontWeight.w500)),
+          if (required)
+            const TextSpan(
+              text: '  ·  required',
+              style: TextStyle(
+                color: AppColors.statusRed,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
         ],
       ),
     );

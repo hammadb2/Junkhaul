@@ -13,7 +13,10 @@ class JhBottomSheetHandle extends StatelessWidget {
         margin: const EdgeInsets.only(top: 10, bottom: 4),
         width: 40,
         height: 5,
-        decoration: BoxDecoration(color: AppColors.borderSubtle, borderRadius: BorderRadius.circular(99)),
+        decoration: BoxDecoration(
+          color: AppColors.borderSubtle,
+          borderRadius: BorderRadius.circular(99),
+        ),
       ),
     );
   }

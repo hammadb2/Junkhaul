@@ -5,7 +5,12 @@ import '../../core/app_theme.dart';
 /// loads (schedule list, job details, etc). Per design direction: skeletons,
 /// not spinners.
 class JhSkeleton extends StatefulWidget {
-  const JhSkeleton({super.key, this.width = double.infinity, this.height = 16, this.radius = 8});
+  const JhSkeleton({
+    super.key,
+    this.width = double.infinity,
+    this.height = 16,
+    this.radius = 8,
+  });
 
   final double width;
   final double height;
@@ -15,9 +20,12 @@ class JhSkeleton extends StatefulWidget {
   State<JhSkeleton> createState() => _JhSkeletonState();
 }
 
-class _JhSkeletonState extends State<JhSkeleton> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat();
+class _JhSkeletonState extends State<JhSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
 
   @override
   void dispose() {
@@ -39,7 +47,11 @@ class _JhSkeletonState extends State<JhSkeleton> with SingleTickerProviderStateM
             gradient: LinearGradient(
               begin: Alignment(-1 + 2 * t, 0),
               end: Alignment(1 + 2 * t, 0),
-              colors: const [AppColors.bgInput, Color(0xFFE8E8E8), AppColors.bgInput],
+              colors: const [
+                AppColors.bgInput,
+                Color(0xFFE8E8E8),
+                AppColors.bgInput,
+              ],
               stops: const [0.3, 0.5, 0.7],
             ),
           ),

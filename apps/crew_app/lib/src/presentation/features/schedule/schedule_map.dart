@@ -102,9 +102,7 @@ class _ScheduleMapState extends ConsumerState<ScheduleMap> {
           markerId: MarkerId('job_${b.id}'),
           position: LatLng(coords!.lat!, coords.lng!),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            isSelected
-                ? BitmapDescriptor.hueGreen
-                : BitmapDescriptor.hueOrange,
+            isSelected ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueOrange,
           ),
           infoWindow: InfoWindow(
             title: '${i + 1}. ${b.name ?? 'Job'}',
@@ -134,7 +132,9 @@ class _ScheduleMapState extends ConsumerState<ScheduleMap> {
     }
     if (positions.isEmpty) return;
     if (positions.length == 1) {
-      _mapController!.animateCamera(CameraUpdate.newLatLngZoom(positions.first, 14));
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(positions.first, 14),
+      );
       return;
     }
     final bounds = _boundsFromPositions(positions);
@@ -225,7 +225,11 @@ class _ScheduleMapState extends ConsumerState<ScheduleMap> {
               onTap: _recenter,
               child: const Padding(
                 padding: EdgeInsets.all(12),
-                child: Icon(Icons.my_location, size: 22, color: AppColors.accent),
+                child: Icon(
+                  Icons.my_location,
+                  size: 22,
+                  color: AppColors.accent,
+                ),
               ),
             ),
           ),
@@ -282,7 +286,10 @@ class _MapStateView extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   subtext!,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF9AA8A1)),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF9AA8A1),
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],

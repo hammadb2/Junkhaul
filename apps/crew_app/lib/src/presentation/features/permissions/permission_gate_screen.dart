@@ -14,7 +14,8 @@ class PermissionGateScreen extends ConsumerStatefulWidget {
   const PermissionGateScreen({super.key});
 
   @override
-  ConsumerState<PermissionGateScreen> createState() => _PermissionGateScreenState();
+  ConsumerState<PermissionGateScreen> createState() =>
+      _PermissionGateScreenState();
 }
 
 class _PermissionGateScreenState extends ConsumerState<PermissionGateScreen> {
@@ -91,9 +92,22 @@ class _PermissionGateScreenState extends ConsumerState<PermissionGateScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
                 children: [
-                  const Text('Before we start', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const Text(
+                    'Before we start',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 6),
-                  const Text('Three things the job needs from your phone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                  const Text(
+                    'Three things the job needs from your phone.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 22),
                   for (final permission in AppPermission.values) ...[
                     _PermissionRow(
@@ -108,7 +122,9 @@ class _PermissionGateScreenState extends ConsumerState<PermissionGateScreen> {
             ),
             Container(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-              decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.borderSubtle))),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.borderSubtle)),
+              ),
               child: JhPrimaryButton(
                 label: 'Continue',
                 onPressed: () => context.go('/schedule'),
@@ -122,7 +138,11 @@ class _PermissionGateScreenState extends ConsumerState<PermissionGateScreen> {
 }
 
 class _PermissionRow extends StatelessWidget {
-  const _PermissionRow({required this.permission, required this.isGranted, required this.onRequest});
+  const _PermissionRow({
+    required this.permission,
+    required this.isGranted,
+    required this.onRequest,
+  });
 
   final AppPermission permission;
   final bool isGranted;
@@ -133,14 +153,21 @@ class _PermissionRow extends StatelessWidget {
     final (title, reason, icon) = _PermissionGateScreenState._copy[permission]!;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.bgCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.borderSubtle)),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 40,
             height: 40,
-            decoration: BoxDecoration(color: const Color(0xFFFFF1E8), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF1E8),
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(icon, color: AppColors.accent, size: 20),
           ),
           const SizedBox(width: 12),
@@ -148,9 +175,23 @@ class _PermissionRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(reason, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4)),
+                Text(
+                  reason,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),
@@ -158,12 +199,21 @@ class _PermissionRow extends StatelessWidget {
           TextButton(
             onPressed: isGranted ? null : onRequest,
             style: TextButton.styleFrom(
-              backgroundColor: isGranted ? const Color(0xFFE8FBF0) : AppColors.bgInput,
-              foregroundColor: isGranted ? AppColors.statusGreen : AppColors.textSecondary,
+              backgroundColor: isGranted
+                  ? const Color(0xFFE8FBF0)
+                  : AppColors.bgInput,
+              foregroundColor: isGranted
+                  ? AppColors.statusGreen
+                  : AppColors.textSecondary,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
-            child: Text(isGranted ? 'Enabled' : 'Allow', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            child: Text(
+              isGranted ? 'Enabled' : 'Allow',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

@@ -14,7 +14,9 @@ abstract class TruckCheck with _$TruckCheck {
     @JsonKey(name: 'odometer_km') double? odometerKm,
     @JsonKey(name: 'fuel_level') String? fuelLevel,
     @JsonKey(name: 'fuel_percent') double? fuelPercent,
-    @JsonKey(name: 'truck_photos') @Default(<String>[]) List<String> truckPhotos,
+    @JsonKey(name: 'truck_photos')
+    @Default(<String>[])
+    List<String> truckPhotos,
     @JsonKey(name: 'damage_notes') String? damageNotes,
     @JsonKey(name: 'gas_receipt_url') String? gasReceiptUrl,
     @JsonKey(name: 'gas_amount_cad') double? gasAmountCad,
@@ -22,7 +24,8 @@ abstract class TruckCheck with _$TruckCheck {
     @JsonKey(name: 'created_at') String? createdAt,
   }) = _TruckCheck;
 
-  factory TruckCheck.fromJson(Map<String, dynamic> json) => _$TruckCheckFromJson(json);
+  factory TruckCheck.fromJson(Map<String, dynamic> json) =>
+      _$TruckCheckFromJson(json);
 }
 
 /// GET /api/employee/truck-check response.
@@ -32,5 +35,6 @@ abstract class TruckChecksResponse with _$TruckChecksResponse {
     @Default(<TruckCheck>[]) List<TruckCheck> checks,
   }) = _TruckChecksResponse;
 
-  factory TruckChecksResponse.fromJson(Map<String, dynamic> json) => _$TruckChecksResponseFromJson(json);
+  factory TruckChecksResponse.fromJson(Map<String, dynamic> json) =>
+      _$TruckChecksResponseFromJson(json);
 }
