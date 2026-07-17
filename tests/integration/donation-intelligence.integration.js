@@ -89,6 +89,9 @@ let seeded = {};
 async function cleanup() {
   try {
     if (seeded.donationRequestId) {
+      if (seeded.routeProposalIds?.length) {
+        await supabase.from('audit_events').delete().eq('entity_type', 'donation_route_proposal').in('entity_id', seeded.routeProposalIds);
+      }
       await supabase.from('donation_route_proposals').delete().eq('donation_request_id', seeded.donationRequestId);
       await supabase.from('donation_route_matches').delete().eq('donation_request_id', seeded.donationRequestId);
       await supabase.from('donation_destination_scores').delete().eq('donation_request_id', seeded.donationRequestId);
@@ -97,7 +100,6 @@ async function cleanup() {
       await supabase.from('donation_request_items').delete().eq('donation_request_id', seeded.donationRequestId);
       await supabase.from('timeline_events').delete().eq('entity_type', 'donation_request').eq('entity_id', seeded.donationRequestId);
       await supabase.from('audit_events').delete().eq('entity_type', 'donation_request').eq('entity_id', seeded.donationRequestId);
-      await supabase.from('audit_events').delete().eq('entity_type', 'donation_route_proposal');
       await supabase.from('donation_requests').delete().eq('id', seeded.donationRequestId);
     }
     if (seeded.routePlanIds?.length) await supabase.from('route_plans').delete().in('id', seeded.routePlanIds);
@@ -159,6 +161,7 @@ try {
   }).select().single();
   seeded.crewAssignmentId = crewAssignment.id;
   seeded.routePlanIds = [];
+  seeded.routeProposalIds = [];
 
   const { data: routePlanV1 } = await supabase.from('route_plans').insert({
     crew_assignment_id: crewAssignment.id, route_version: 1, stops: [],
@@ -214,6 +217,7 @@ try {
   });
   assert.equal(proposalCreate.res.status, 200, `Proposal creation failed: ${proposalCreate.text}`);
   const proposalId = proposalCreate.json.proposal.id;
+  seeded.routeProposalIds.push(proposalId);
   assert.equal(proposalCreate.json.proposal.source_route_version, 1);
 
   const approve = await appFetch(`/api/admin/donations/route-proposals/${proposalId}`, {
@@ -237,6 +241,7 @@ try {
     method: 'POST', headers: { ...headers, ...cookieFor(ownerSession) },
     body: JSON.stringify({ donation_request_id: donation.id, donation_route_match_id: routeMatchId }),
   });
+  if (staleProposal.json?.proposal?.id) seeded.routeProposalIds.push(staleProposal.json.proposal.id);
   // route-fit already re-evaluated against v2 above via ownerOk's route_match if re-run were needed;
   // here we directly manufacture a stale proposal row pointing at v1 to prove approval rejects it.
   const { data: staleRow } = await supabase.from('donation_route_proposals').insert({
@@ -244,6 +249,7 @@ try {
     source_route_version: 1, proposed_stop: {}, proposed_insertion_index: 0, before_route: [], proposed_route: [],
     status: 'pending', expires_at: new Date(Date.now() + 3600_000).toISOString(),
   }).select().single();
+  seeded.routeProposalIds.push(staleRow.id);
   const staleApprove = await appFetch(`/api/admin/donations/route-proposals/${staleRow.id}`, {
     method: 'POST', headers: { ...headers, ...cookieFor(ownerSession) }, body: JSON.stringify({ action: 'approve' }),
   });
