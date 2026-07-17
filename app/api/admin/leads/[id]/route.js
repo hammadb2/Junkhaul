@@ -195,8 +195,9 @@ export async function POST(req, { params }) {
     const message = action === 'request_photos'
       ? `Hi ${lead.name || 'there'}, could you upload a few photos so we can finish your Junk Haul quote?`
       : `Hi ${lead.name || 'there'}, this is Junkhaul following up on your junk removal quote. Ready to book? Call us or reply to this message. - Junkhaul Calgary`;
-    result.message = await sendSMS(lead.phone, message, null, action === 'request_photos' ? 'lead_photo_request' : 'lead_follow_up', {
+    result.message = await sendSMS(lead.phone, message, {
       lead_id: id,
+      message_type: action === 'request_photos' ? 'lead_photo_request' : 'lead_follow_up',
       workflow_action: action,
     });
   } else if (action === 'escalate') {

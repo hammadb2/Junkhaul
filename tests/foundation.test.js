@@ -159,4 +159,14 @@ const attributionSource = readFileSync(new URL('../lib/attribution.js', import.m
 assert.match(attributionSource, /const normalizedCode = String\(code\)\.trim\(\)\.toUpperCase\(\)/);
 assert.match(attributionSource, /\.eq\('code', normalizedCode\)/);
 
+for (const route of [
+  '../app/api/admin/bookings/[id]/actions/route.js',
+  '../app/api/admin/donations/route.js',
+  '../app/api/admin/leads/[id]/route.js',
+  '../app/api/admin/leads/send-sms/route.js',
+]) {
+  const source = readFileSync(new URL(route, import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /sendSMS\([^;]+?,\s*null,\s*[^,]+,\s*\{/s);
+}
+
 console.log('foundation tests passed');
