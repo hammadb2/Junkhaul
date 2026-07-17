@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS referrals (
 );
 
 ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access" ON referrals;
 CREATE POLICY "Service role full access" ON referrals
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -110,6 +111,7 @@ CREATE INDEX IF NOT EXISTS referrals_referee_idx ON referrals (referee_phone);
 -- ============================================================
 -- 5. QUADRANT PROFIT VIEW (Step 6)
 -- ============================================================
+DROP VIEW IF EXISTS quadrant_profit_v;
 CREATE OR REPLACE VIEW quadrant_profit_v AS
 SELECT
   quadrant,
@@ -128,6 +130,7 @@ ORDER BY quadrant, job_date DESC;
 -- ============================================================
 -- 6. LEAD SCORING VIEW (Step 2 — pre-booking lead quality)
 -- ============================================================
+DROP VIEW IF EXISTS lead_quality_v;
 CREATE OR REPLACE VIEW lead_quality_v AS
 SELECT
   l.*,
@@ -146,6 +149,7 @@ FROM leads l;
 -- ============================================================
 -- 7. CUSTOMER LTV VIEW (Step 2 — lifetime value by phone)
 -- ============================================================
+DROP VIEW IF EXISTS customer_ltv_v;
 CREATE OR REPLACE VIEW customer_ltv_v AS
 SELECT
   phone,

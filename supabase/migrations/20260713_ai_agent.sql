@@ -13,6 +13,13 @@ CREATE TABLE IF NOT EXISTS ai_agent_actions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE ai_agent_actions
+  ADD COLUMN IF NOT EXISTS tool_name TEXT,
+  ADD COLUMN IF NOT EXISTS arguments JSONB DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS success BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS error TEXT,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_ai_agent_actions_created_at
   ON ai_agent_actions (created_at DESC);
 

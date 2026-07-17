@@ -35,6 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_crew_photos_booking_type ON crew_photos(booking_i
 
 ALTER TABLE crew_photos ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "service_role_all_crew_photos" ON crew_photos;
 CREATE POLICY "service_role_all_crew_photos" ON crew_photos
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
@@ -44,14 +45,17 @@ VALUES ('crew-photos', 'crew-photos', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies
+DROP POLICY IF EXISTS "crew_photos_public_read" ON storage.objects;
 CREATE POLICY "crew_photos_public_read" ON storage.objects
   FOR SELECT TO public
   USING (bucket_id = 'crew-photos');
 
+DROP POLICY IF EXISTS "crew_photos_auth_write" ON storage.objects;
 CREATE POLICY "crew_photos_auth_write" ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'crew-photos');
 
+DROP POLICY IF EXISTS "crew_photos_service_write" ON storage.objects;
 CREATE POLICY "crew_photos_service_write" ON storage.objects
   FOR INSERT TO service_role
   WITH CHECK (bucket_id = 'crew-photos');

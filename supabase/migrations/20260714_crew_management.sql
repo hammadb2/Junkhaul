@@ -195,9 +195,9 @@ INSERT INTO system_config (key, value, value_type, description, category)
 VALUES
   ('uhaul_tank_capacity_litres', '80', 'number', 'U-Haul 15ft truck fuel tank capacity in litres', 'crew'),
   ('default_pay_rate', '18', 'number', 'Default hourly pay rate for new crew members', 'crew'),
-  ('storage_facility_id', null, 'text', 'Active storage facility ID', 'crew'),
-  ('donation_center_id', null, 'text', 'Active donation center ID', 'crew'),
-  ('oilpriceapi_key', '', 'text', 'API key for OilPriceAPI gas price fetch', 'crew')
+  ('storage_facility_id', null, 'string', 'Active storage facility ID', 'crew'),
+  ('donation_center_id', null, 'string', 'Active donation center ID', 'crew'),
+  ('oilpriceapi_key', '', 'string', 'API key for OilPriceAPI gas price fetch', 'crew')
 ON CONFLICT (key) DO NOTHING;
 
 -- 15. Add document types for onboarding

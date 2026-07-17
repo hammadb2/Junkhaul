@@ -54,9 +54,12 @@ ALTER TABLE route_acknowledgements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE geofence_events ENABLE ROW LEVEL SECURITY;
 
 -- Service role can do everything
+DROP POLICY IF EXISTS "service_role_all_route_plans" ON route_plans;
 CREATE POLICY "service_role_all_route_plans" ON route_plans
   FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "service_role_all_route_acks" ON route_acknowledgements;
 CREATE POLICY "service_role_all_route_acks" ON route_acknowledgements
   FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "service_role_all_geofence" ON geofence_events;
 CREATE POLICY "service_role_all_geofence" ON geofence_events
   FOR ALL TO service_role USING (true) WITH CHECK (true);

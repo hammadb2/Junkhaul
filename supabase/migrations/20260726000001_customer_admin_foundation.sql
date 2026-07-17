@@ -756,7 +756,7 @@ DO $$
 DECLARE
   mismatch text;
 BEGIN
-  SELECT string_agg(table_name || '.' || column_name || ' is ' || data_type || ', expected ' || expected_type, '; ')
+  SELECT string_agg(expected.table_name || '.' || expected.column_name || ' is ' || c.data_type || ', expected ' || expected.expected_type, '; ')
   INTO mismatch
   FROM (
     VALUES

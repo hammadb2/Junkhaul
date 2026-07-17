@@ -30,18 +30,21 @@ CREATE INDEX IF NOT EXISTS idx_safety_incidents_created_at ON safety_incidents(c
 ALTER TABLE safety_incidents ENABLE ROW LEVEL SECURITY;
 
 -- Service role has full access
+DROP POLICY IF EXISTS "Service role full access to safety_incidents" ON safety_incidents;
 CREATE POLICY "Service role full access to safety_incidents"
   ON safety_incidents FOR ALL
   TO service_role
   USING (true) WITH CHECK (true);
 
 -- Employees can insert incidents (crew app reports)
+DROP POLICY IF EXISTS "Employees can create safety incidents" ON safety_incidents;
 CREATE POLICY "Employees can create safety incidents"
   ON safety_incidents FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
 -- Employees can read their own incidents
+DROP POLICY IF EXISTS "Employees can read their own safety incidents" ON safety_incidents;
 CREATE POLICY "Employees can read their own safety incidents"
   ON safety_incidents FOR SELECT
   TO authenticated
@@ -56,10 +59,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS safety_incidents_updated_at ON safety_incidents;
 CREATE TRIGGER safety_incidents_updated_at
   BEFORE UPDATE ON safety_incidents
   FOR EACH ROW
   EXECUTE FUNCTION update_safety_incidents_updated_at();
 
 -- Enable realtime for admin live monitoring
-ALTER PUBLICATION supabase_realtime ADD TABLE safety_incidents;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE safety_incidents;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+  WHEN undefined_object THEN NULL;
+END $$;
