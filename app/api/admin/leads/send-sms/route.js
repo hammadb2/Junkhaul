@@ -1,45 +1,50 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
+import { sendSMS } from '@/lib/sms';
+import { requireStaffPermission } from '@/lib/staffAuth';
+import { recordTimelineEvent } from '@/lib/timeline';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === await adminToken();
-}
-
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { leads } = await req.json();
-  if (!Array.isArray(leads)) return NextResponse.json({ error: 'leads array required' }, { status: 400 });
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
+  const auth = await requireStaffPermission(req, {
+    permission: 'communications.send_approved_sms',
+    action: 'leads.send_follow_up',
+    metadata: { route: '/api/admin/leads/send-sms' },
+  });
+  if (!auth.ok) return auth.response;
+  const { leads, reason = null } = await req.json();
+  if (!Array.isArray(leads)) return NextResponse.json({ error: 'leads array required' }, { status: 422 });
 
   const results = [];
   for (const lead of leads) {
     if (!lead.phone) continue;
     try {
       const message = `Hi ${lead.name || 'there'}, this is Junkhaul following up on your junk removal quote. Ready to book? Call us or reply to this message. - Junkhaul Calgary`;
-      // Log the SMS attempt
-      const { error } = await supabase
-        .from('sms_log')
-        .insert({ to_phone: lead.phone, message, direction: 'outbound', status: 'sent', lead_id: lead.id });
+      const sms = await sendSMS(lead.phone, message, null, 'lead_follow_up', {
+        lead_id: lead.id,
+        workflow_action: 'lead_follow_up',
+      });
 
       // Mark follow-up as sent
-      if (!error) {
-        await supabase
+      if (sms?.ok !== false) {
+        await supabaseAdmin
           .from('leads')
           .update({ follow_up_sent: true, follow_up_sent_at: new Date().toISOString() })
           .eq('id', lead.id);
+        await recordTimelineEvent({
+          entity_type: 'lead',
+          entity_id: lead.id,
+          event_type: 'lead_follow_up_sms',
+          actor_type: 'employee',
+          actor_id: auth.context.employee.id,
+          source: 'admin_leads',
+          reason,
+          metadata: { message_id: sms?.message_id || sms?.id || null, provider_status: sms?.status || sms?.provider_status || null },
+        });
       }
 
-      results.push({ id: lead.id, phone: lead.phone, status: error ? 'failed' : 'sent' });
+      results.push({ id: lead.id, phone: lead.phone, status: sms?.ok === false ? 'blocked_or_failed' : 'sent', message: sms });
     } catch (e) {
       results.push({ id: lead.id, phone: lead.phone, status: 'failed', error: e.message });
     }

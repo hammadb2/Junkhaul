@@ -1,21 +1,18 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { invalidateConfigCache } from '@/lib/config';
+import { auditSensitiveAttempt, requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === await adminToken();
-}
-
 // GET /api/admin/config — returns all runtime config rows
-export async function GET() {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req) {
+  const auth = await requireStaffPermission(req, {
+    permission: 'config.read',
+    action: 'config.read',
+    metadata: { route: '/api/admin/config' },
+  });
+  if (!auth.ok) return auth.response;
   const { data, error } = await supabaseAdmin
     .from('system_config')
     .select('*')
@@ -31,14 +28,22 @@ export async function GET() {
 
 // POST /api/admin/config — updates one or more config values
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await req.json();
-    const { updates, updated_by } = body;
+    const { updates, updated_by, reason = null } = body;
+    const auth = await requireStaffPermission(req, {
+      permission: 'config.manage_sensitive',
+      ownerOnly: true,
+      action: 'config.manage_sensitive',
+      reason,
+      metadata: { update_count: Array.isArray(updates) ? updates.length : 0 },
+    });
+    if (!auth.ok) return auth.response;
 
     if (!Array.isArray(updates) || updates.length === 0) {
-      return NextResponse.json({ error: 'updates array required' }, { status: 400 });
+      return NextResponse.json({ error: 'updates array required' }, { status: 422 });
     }
+    if (!reason) return NextResponse.json({ error: 'reason is required' }, { status: 422 });
 
     const now = new Date().toISOString();
     const rows = updates.map((u) => ({
@@ -47,7 +52,7 @@ export async function POST(req) {
       value_type: u.value_type || 'string',
       description: u.description || null,
       category: u.category || 'general',
-      updated_by: updated_by || 'admin',
+      updated_by: updated_by || auth.context.employee.id,
       updated_at: now,
     }));
 
@@ -61,6 +66,17 @@ export async function POST(req) {
     }
 
     invalidateConfigCache();
+
+    await auditSensitiveAttempt({
+      context: auth.context,
+      allowed: true,
+      permission: 'config.manage_sensitive',
+      entityType: 'system_config',
+      action: 'config.manage_sensitive',
+      reason,
+      after: rows,
+      metadata: { keys: rows.map((row) => row.key) },
+    });
 
     return NextResponse.json({ updated: data.length, config: data });
   } catch (err) {

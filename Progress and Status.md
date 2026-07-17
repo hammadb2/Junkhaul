@@ -1,9 +1,191 @@
 # Junkhaul — Complete Progress & Status
 
-**Last updated:** 2026-07-16
+**Last updated:** 2026-07-17
 **Total commits:** 175+
 **Repo:** `/Users/hammadbhatti/Junkhaul` (Next.js web platform)
 **Crew app:** `/Users/hammadbhatti/Desktop/crew_app` (Flutter iOS/Android)
+
+---
+
+## 2026-07-17 Repository-grounded implementation update
+
+This section supersedes broad claims below such as “everything built.” Status values used here are only `COMPLETE_AND_VERIFIED`, `BUILT_NOT_VERIFIED`, `PARTIAL`, `NOT_BUILT`.
+
+### Operational admin command centre phase
+
+- Status: `COMPLETE_AND_VERIFIED`
+- Repository path: `lib/staffAuth.js`, `lib/permissions.js`, `lib/permissionRules.js`, `app/api/admin/**`, `components/admin/*`, `docs/ADMIN_PERMISSION_MATRIX.md`, `docs/CUSTOMER_ADMIN_FOUNDATION_DEPLOYMENT.md`, `docs/DEPENDENCY_ADVISORIES.md`
+- API: staff-session permission enforcement for every operational `/api/admin/**` route; owner-only staff access API; Booking Detail action API; lead actions; campaign CRUD API; communications dashboard/retry API; donation review API; manager dashboard/closeout API; audit viewer API.
+- Database table: `permissions`, `staff_role_permissions`, `staff_role_assignments`, `staff_user_permissions`, `manager_scopes`, `manager_daily_closeouts`, `audit_events`, `timeline_events`, campaign tables, lead operational columns.
+- Admin visibility: `COMPLETE_AND_VERIFIED`; Booking Detail, Leads, Marketing, Communications, Donations, Manager Ops, Staff Access and Audit are reachable in admin.
+- Manager visibility: `COMPLETE_AND_VERIFIED`; manager dashboard scope filtering, deny/expiry scope behavior and closeout persistence are route-tested.
+- Quo integration: `COMPLETE_AND_VERIFIED` for central sender use in the built admin actions and safe communications retry behavior under integration; live production webhook cutover remains separate.
+- Vapi integration: `PARTIAL`; shared records are visible where linked, but no broad Vapi expansion was built.
+- App impact: `APP_READS_THIS`, `APP_WRITES_THIS`, `APP_REQUIRES_NEW_WORKFLOW`; Flutter work intentionally deferred.
+- Tests: `COMPLETE_AND_VERIFIED`; integration covers staff permission denial/audit, direct permission grant/revoke, disabled runtime migration route, audit viewer, manager scoped/deny/expired scopes, manager closeout, booking action audit/timeline, lead waitlist/merge actions, campaign CRUD duplicate/reassignment rejection, Quo signed STOP/START/expected replies/delivery, donation storage and communications visibility.
+- Manual verification: `COMPLETE_AND_VERIFIED` for Node 22.23.1 / npm 10.9.8 `npm ci`, `npm test`, `npm run test:integration`, `npm run migrations:check`, `npm run lint`, `npm run build`, and `npm audit`.
+- Production status: `BUILT_NOT_VERIFIED`; migrations were applied to the approved Supabase environment for verification and added to the migration manifest. Branch is not merged.
+- Known gaps: Booking Detail action UI is still JSON-based rather than polished per-action forms; route-fit, real donation AI, broad Vapi expansion and Flutter workflows remain intentionally deferred. Remaining npm advisories are documented in `docs/DEPENDENCY_ADVISORIES.md`.
+
+### Customer website / paid booking flow
+
+- Status: `BUILT_NOT_VERIFIED`
+- Repository path: `app/book/page.js`, `app/api/capture-lead/route.js`, `app/api/create-booking/route.js`
+- API: `/api/capture-lead`, `/api/create-booking`, `/api/photo-quote`, `/api/slots`
+- Database table: `leads`, `bookings`, `lead_quotes`, `quote_price_ledger`, `timeline_events`, `attribution_records`
+- Admin visibility: `PARTIAL` via Leads, Booking Detail, timeline and price ledger APIs.
+- Manager visibility: `PARTIAL`; role foundation exists, full manager UI is not built.
+- Quo integration: `PARTIAL`; central sender now supports suppression and entity links.
+- Vapi integration: `PARTIAL`; existing tools still need full shared-data refactor.
+- App impact: `APP_READS_THIS` for price ledger/timeline later; documented in `docs/CREW_APP_BACKLOG.md`.
+- Tests: `BUILT_NOT_VERIFIED`; foundation unit tests added, route integration tests still needed.
+- Manual verification: `BUILT_NOT_VERIFIED`; build/lint/tests pass locally.
+- Production status: `PARTIAL`; migration must be applied and seeded.
+- Known gaps: customer change history is still not fully captured per field; photo metadata is not fully stored for website upload; admin action endpoints are not complete.
+
+### Verification phase status
+
+- Status: `COMPLETE_AND_VERIFIED`
+- Repository path: `tests/integration/foundation.integration.js`, `tests/foundation.test.js`, `.env.integration.example`, `docs/STAGING_VERIFICATION.md`, `docs/MIGRATION_HISTORY.md`, `scripts/check-migration-history.js`, `.nvmrc`, `package.json`, `package-lock.json`
+- API: no production API added by the harness.
+- Database table: validates foundation tables when an isolated test DB is provided.
+- Admin visibility: `NO_APP_IMPACT`
+- Manager visibility: `NO_APP_IMPACT`
+- Quo integration: parser fixtures, signed-webhook unit tests, delivery-event helper coverage and route-level integration cases exist; live Quo payload/auth verification against a real Quo webhook remains `NOT_BUILT`.
+- Vapi integration: `NO_APP_IMPACT`
+- App impact: `NO_APP_IMPACT`
+- Tests: `COMPLETE_AND_VERIFIED` for pure helper/unit tests and guarded route/database/storage integration tests against the approved Supabase environment.
+- Manual verification: `COMPLETE_AND_VERIFIED` under Node 22.23.1 / npm 10.9.8 for `npm ci`, `npm test`, `npm run test:integration`, `npm run lint`, and `npm run build`.
+- Production status: `BUILT_NOT_VERIFIED`; upgrade-path reconciliation has been applied successfully against the approved Supabase environment, but this branch is not merged and production webhook cutover remains held.
+- Known gaps: `npm audit` still reports 4 low and 4 moderate advisories; no high or critical advisories remain. Fresh-from-zero Supabase replay remains blocked in this workspace by Docker access and immutable historical migration replay constraints.
+
+### Door-hanger and flyer attribution
+
+- Status: `PARTIAL`
+- Repository path: `app/book/hanger/route.js`, `lib/attribution.js`
+- API: `/book/hanger`
+- Database table: `marketing_campaigns`, `campaign_batches`, `campaign_tracking_codes`, `attribution_records`, `funnel_events`
+- Admin visibility: `PARTIAL` via Marketing admin panel.
+- Manager visibility: `NOT_BUILT`
+- Quo integration: `PARTIAL`; messages can link to campaign IDs.
+- Vapi integration: `PARTIAL`; tables exist for later call attribution.
+- App impact: `APP_READS_THIS` optional source badge only.
+- Tests: `COMPLETE_AND_VERIFIED`; route/database integration covers `/book/hanger`, tracking-code resolution, first-touch persistence, lead linkage and direct browser-access denial.
+- Manual verification: `COMPLETE_AND_VERIFIED`
+- Production status: `PARTIAL`; campaign/batch/code seed data required.
+- Known gaps: first-touch correction UI is not built; campaign creation UI is not built.
+
+### Marketing campaign reporting
+
+- Status: `PARTIAL`
+- Repository path: `app/api/admin/marketing/route.js`, `components/admin/MarketingPanel.js`
+- API: `/api/admin/marketing`, `/api/admin/campaigns`
+- Database table: campaign and attribution tables above.
+- Admin visibility: `PARTIAL`; report metrics and CRUD for campaigns/batches/tracking codes are visible.
+- Manager visibility: `PARTIAL`; manager-safe reporting visibility exists through admin shell, full scope filtering remains.
+- Quo integration: `PARTIAL`
+- Vapi integration: `PARTIAL`
+- App impact: `NO_APP_IMPACT`
+- Tests: `COMPLETE_AND_VERIFIED` for campaign CRUD duplicate/reassignment route behavior; admin route aggregation remains `PARTIAL`.
+- Manual verification: `COMPLETE_AND_VERIFIED` for CRUD route behavior in integration.
+- Production status: `PARTIAL`
+- Known gaps: profit per hanger uses collected revenue minus campaign cost only; full job-cost profit is not wired. Bulk QR generation and distributor import workflows remain `NOT_BUILT`.
+
+### Free donation-only pickup
+
+- Status: `PARTIAL`
+- Repository path: `app/book/donation/page.js`, `app/api/donation-request/route.js`, `app/api/donation-request/draft/route.js`, `app/api/donation-request/photos/route.js`, `app/api/admin/donations/[id]/photo/[photoId]/route.js`, `lib/donation.js`, `lib/donationPhotos.js`, `components/admin/DonationsView.js`, `app/api/admin/donations/route.js`
+- API: `/api/donation-request`, `/api/donation-request/draft`, `/api/donation-request/photos`, `/api/admin/donations`, `/api/admin/donations/[id]/photo/[photoId]`
+- Database table: `donation_requests`, `donation_request_items`, `donation_request_photos`, `donation_policy_versions`, `donation_ai_analyses`, `donation_route_matches`
+- Admin visibility: `PARTIAL`; queue and actions exist, full detail workspace is not complete.
+- Manager visibility: `PARTIAL`; permission tables exist, manager UI not built.
+- Quo integration: `PARTIAL`; templates are represented by message types, versioned template admin is not built.
+- Vapi integration: `NOT_BUILT` for donation-specific tools.
+- App impact: `APP_REQUIRES_NEW_WORKFLOW`, `APP_WRITES_THIS`, `APP_RECEIVES_REALTIME_UPDATE`; backlog documented.
+- Tests: `COMPLETE_AND_VERIFIED`; route/database/storage integration covers private bucket existence, valid upload, invalid token denial, replacement, removal, required categories and submission.
+- Manual verification: `COMPLETE_AND_VERIFIED`; upload flow exercised against Supabase Storage.
+- Production status: `PARTIAL`; storage and submission foundation works, but real donation AI and route fit remain unbuilt.
+- Known gaps: route-fit algorithm foundation exists as table only; actual route matching is not implemented. Donation “AI” remains rule-based pre-screening and must not be represented as real image AI. Abandoned-draft cleanup is documented but not built.
+
+### Quo SMS infrastructure
+
+- Status: `PARTIAL`
+- Repository path: `lib/sms.js`, `lib/quoInbound.js`, `lib/quoPayload.js`, `lib/quoRules.js`, `app/api/quo/inbound/route.js`, `app/api/sms-webhook/route.js`, `supabase/functions/_shared/clients.ts`
+- API: `/api/quo/inbound`, legacy `/api/sms-webhook`, `/api/sms/inbound`
+- Database table: `messages`, `message_entity_links`, `sms_consent`, `sms_suppression`, `expected_replies`, `quo_webhook_events`
+- Admin visibility: `PARTIAL`; messages visible through Booking Detail, but full retry/failure dashboard is not built.
+- Manager visibility: `NOT_BUILT`
+- Quo integration: `PARTIAL`; central Next.js outbound suppression exists, the edge-function sender now checks suppression, canonical inbound helper exists, signed-webhook verification has unit coverage, and delivery status updates are implemented.
+- Vapi integration: `PARTIAL`; Vapi-triggered SMS uses central sender where existing callers use `sendSMS`.
+- App impact: `APP_RECEIVES_REALTIME_UPDATE` later for message-triggered assignments.
+- Tests: `COMPLETE_AND_VERIFIED` for signed route-level integration covering STOP, START, expected reply consumption and delivery-event persistence against the approved Supabase environment.
+- Manual verification: `COMPLETE_AND_VERIFIED` for persistence behavior; `BUILT_NOT_VERIFIED` for live provider webhook cutover.
+- Production status: `PARTIAL`; keep production webhook traffic on the existing route until a real Quo webhook delivery is verified end-to-end.
+- Known gaps: existing conversational SMS route still contains legacy booking logic; full migration to canonical router remains. The tests use realistic signed fixtures and local Quo test mode, not live production webhook traffic.
+
+### Booking Detail workspace
+
+- Status: `COMPLETE_AND_VERIFIED`
+- Repository path: `components/admin/BookingDetailView.js`, `app/api/admin/bookings/[id]/detail/route.js`, `app/api/admin/bookings/[id]/actions/route.js`
+- API: `/api/admin/bookings/[id]/detail`, `/api/admin/bookings/[id]/actions`
+- Database table: `bookings`, `leads`, `quote_price_ledger`, `timeline_events`, `audit_events`, `messages`, `attribution_records`, `phone_calls`, `service_requests`, `refund_requests`
+- Admin visibility: `PARTIAL`; read workspace and action panel exist by booking UUID.
+- Manager visibility: `PARTIAL`; scoped manager action path is implemented and integration-tested.
+- Quo integration: `PARTIAL`; communications section reads linked messages.
+- Vapi integration: `PARTIAL`; calls are included where linked.
+- App impact: `APP_READS_THIS` for future crew context.
+- Tests: `COMPLETE_AND_VERIFIED` for scoped manager action, deny/expired manager scopes, employee denial, audit/timeline creation, waitlist/reopen support and build coverage. Per-action visual form polish remains deferred.
+- Manual verification: `COMPLETE_AND_VERIFIED` for tested action path.
+- Production status: `PARTIAL`
+- Known gaps: action endpoint supports assignment, truck, schedule, waitlist/reopen history, address/property correction, notes, customer SMS templates, quote review flags, escalation and cancellation-without-refund, but UI is still JSON-based.
+
+### Manager-role foundation
+
+- Status: `COMPLETE_AND_VERIFIED`
+- Repository path: `lib/permissions.js`, `lib/permissionRules.js`, `lib/staffAuth.js`, `app/api/admin/manager-dashboard/route.js`, `components/admin/ManagerDashboard.js`
+- API: `/api/admin/manager-dashboard`, selected sensitive admin routes, Booking Detail action route.
+- Database table: `staff_roles`, `permissions`, `staff_role_permissions`, `staff_role_assignments`, `manager_scopes`
+- Admin visibility: `PARTIAL`
+- Manager visibility: `PARTIAL`
+- Quo integration: `NOT_BUILT`
+- Vapi integration: `NOT_BUILT`
+- App impact: `APP_REQUIRES_NEW_WORKFLOW`
+- Tests: `COMPLETE_AND_VERIFIED` for owner-only/admin/manager/employee denial behavior, direct permission grant/revoke, manager scoped booking action, deny/expiry scope semantics and manager closeout persistence.
+- Manual verification: `COMPLETE_AND_VERIFIED` for tested routes.
+- Production status: `PARTIAL`; owner/admin role assignment seed required.
+- Known gaps: `/api/admin/login` keeps a legacy admin-password compatibility path for shell access, but staff email/password login is now supported and operational APIs require staff sessions. No high-risk operational admin route remains shared-cookie-only.
+
+### Timeline and audit architecture
+
+- Status: `COMPLETE_AND_VERIFIED`
+- Repository path: `lib/timeline.js`, `lib/auditEvents.js`
+- API: used by new/modified routes.
+- Database table: `timeline_events`, `audit_events`
+- Admin visibility: `COMPLETE_AND_VERIFIED`; Booking Detail reads timeline records and the Audit tab reads redacted `audit_events`.
+- Manager visibility: `COMPLETE_AND_VERIFIED`; manager actions write audit/timeline where applicable.
+- Quo integration: `PARTIAL`
+- Vapi integration: `NOT_BUILT`
+- App impact: `APP_WRITES_THIS` for future crew workflow events.
+- Tests: `COMPLETE_AND_VERIFIED` for audit/timeline creation on booking, lead, donation, communications and manager closeout workflows.
+- Manual verification: `COMPLETE_AND_VERIFIED`
+- Production status: `BUILT_NOT_VERIFIED`; branch not merged.
+- Known gaps: older crew-app and cron-only workflows still need incremental audit/timeline wrappers when those areas are revisited.
+
+### Crew app backlog
+
+- Status: `COMPLETE_AND_VERIFIED`
+- Repository path: `docs/CREW_APP_BACKLOG.md`
+- API: documented per backlog item.
+- Database table: documented per backlog item.
+- Admin visibility: documented per backlog item.
+- Manager visibility: documented per backlog item.
+- Quo integration: documented per backlog item.
+- Vapi integration: documented per backlog item.
+- App impact: every item labeled.
+- Tests: documentation only.
+- Manual verification: file created and reviewed.
+- Production status: documentation only.
+- Known gaps: Flutter UI intentionally not built today.
 
 ---
 

@@ -1,18 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { randomBytes } from 'crypto';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  const expected = await adminToken();
-  return token === expected;
-}
 
 function getSiteUrl() {
   const env = process.env.NEXT_PUBLIC_SITE_URL;
@@ -81,9 +72,14 @@ ${bodyHTML}
 // Does NOT delete the employee record — if they already started onboarding
 // (have a password), they can continue where they left off.
 export async function POST(req, { params }) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { id } = params;
+  const auth = await requireStaffPermission(req, {
+    permission: 'employees.create',
+    entityType: 'employee',
+    entityId: id,
+    action: 'employee.resend_invite',
+  });
+  if (!auth.ok) return auth.response;
 
   // Get employee
   const { data: employee, error: empErr } = await supabaseAdmin

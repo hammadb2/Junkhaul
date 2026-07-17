@@ -1,22 +1,14 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { sendPushToEmployee, sendPushToEmployees } from '@/lib/pushNotifications';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  const expected = await adminToken();
-  return token === expected;
-}
-
 // GET /api/admin/crew/push — list active employees with push subscription counts
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'crew.assignments.manage', action: 'crew_push.list' });
+  if (!auth.ok) return auth.response;
 
   const { data: employees } = await supabaseAdmin
     .from('employees')
@@ -49,7 +41,8 @@ export async function GET(req) {
 // POST /api/admin/crew/push — send a push notification to crew
 // Body: { target: 'all' | 'individual', employee_id?, title, body, url? }
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'crew.assignments.manage', action: 'crew_push.send' });
+  if (!auth.ok) return auth.response;
 
   const body = await req.json().catch(() => ({}));
   const { target, employee_id, title, body: messageBody, url } = body;

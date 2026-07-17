@@ -1,21 +1,13 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
 import { edmontonNowParts } from '@/lib/dates';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { isKillSwitchOn } from '@/lib/audit';
 import { getNumberConfig, getBooleanConfig } from '@/lib/config';
 import { callDeepSeek } from '@/lib/deepseek';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === await adminToken();
-}
 
 const SYSTEM_PROMPT = `You are the narrator for a junk removal company's admin dashboard in Calgary, Alberta. Your job is to read the raw operational data and write ONE short paragraph (3-5 sentences, plain English) that a sharp operator would say out loud at the start of a shift.
 
@@ -31,7 +23,8 @@ Rules:
 // GET /api/admin/insights?force=1
 // Returns the latest cached briefing, or generates a new one if stale.
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'reports.read', action: 'insights.read_or_generate' });
+  if (!auth.ok) return auth.response;
 
   try {
     if (!(await isKillSwitchOn('ai_narrator'))) {

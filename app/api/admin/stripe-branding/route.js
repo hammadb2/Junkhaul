@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
+import { auditSensitiveAttempt, requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
 export async function POST(req) {
-  const { password, action } = await req.json();
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { action, reason = null } = await req.json();
+  const auth = await requireStaffPermission(req, {
+    permission: 'billing.manage',
+    ownerOnly: true,
+    entityType: 'billing_config',
+    action: action === 'update' ? 'stripe_branding.update' : 'stripe_branding.read',
+    reason,
+    metadata: { route: '/api/admin/stripe-branding' },
+  });
+  if (!auth.ok) return auth.response;
+  if (action === 'update' && !reason) {
+    return NextResponse.json({ error: 'reason is required' }, { status: 422 });
   }
   try {
     if (action === 'update') {
@@ -69,6 +79,16 @@ export async function POST(req) {
         body: new URLSearchParams(flatten(updateData)),
       });
       const result = await res.json();
+
+      await auditSensitiveAttempt({
+        context: auth.context,
+        allowed: true,
+        permission: 'billing.manage',
+        entityType: 'billing_config',
+        action: 'stripe_branding.update',
+        reason,
+        after: { result: result.error ? 'error' : 'updated', account: 'acct_1TpfJQPM0KC3Ztg7' },
+      });
 
       return NextResponse.json({
         ok: res.ok,

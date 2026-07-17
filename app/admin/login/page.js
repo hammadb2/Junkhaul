@@ -7,11 +7,11 @@ import AdminLoginPage from '@/components/admin/AdminLoginPage';
 export default function AdminLogin() {
   const router = useRouter();
 
-  const handleSubmit = async (password) => {
+  const handleSubmit = async ({ email, password }) => {
     const res = await fetch('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
       const data = await res.json();

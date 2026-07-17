@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
 import { calculatePrice, getPricingConfig, PRICING, checkWeightFlag, LOAD_LABELS } from '@/lib/pricing';
 import { computeSurgeMultiplier } from '@/lib/surge';
@@ -10,6 +11,10 @@ import { sendSMS } from '@/lib/sms';
 import { sendDepositLink } from '@/lib/messages';
 import { resolveDispatch } from '@/lib/dispatch';
 import { randomBytes } from 'crypto';
+import { normalizePhone } from '@/lib/phone';
+import { ATTRIBUTION_COOKIE, captureAttribution } from '@/lib/attribution';
+import { createPriceLedgerEntry } from '@/lib/priceLedger';
+import { recordTimelineEvent } from '@/lib/timeline';
 
 export const runtime = 'nodejs';
 
@@ -54,7 +59,11 @@ export async function POST(req) {
       source = 'web',
       referral_code = null,
       is_custom_slot = false,
+      session_id = null,
+      sms_consent_source = 'booking_details',
     } = body;
+
+    const normalizedPhone = normalizePhone(phone);
 
     // Required-field validation
     if (!name || !phone || !address || !load_size || !job_date || !job_time) {
@@ -204,17 +213,44 @@ export async function POST(req) {
       }).total;
     }
 
+    let linkedLead = null;
+    if (session_id) {
+      const { data } = await supabaseAdmin
+        .from('leads')
+        .select('*')
+        .eq('session_id', session_id)
+        .maybeSingle();
+      linkedLead = data || null;
+    }
+    if (!linkedLead && normalizedPhone) {
+      const { data } = await supabaseAdmin
+        .from('leads')
+        .select('*')
+        .eq('normalized_phone', normalizedPhone)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      linkedLead = data || null;
+    }
+
     const insert = {
+      lead_id: linkedLead?.id || null,
       name,
-      phone,
+      phone: normalizedPhone || phone,
       email,
       address: unit ? `${unit}-${address}` : address,
+      original_customer_address: address,
+      normalized_address: address,
       unit,
       postal_code: geo.postal_code || null,
       quadrant: geo.quadrant,
       lat: geo.lat,
       lng: geo.lng,
       is_apartment,
+      property_type: is_apartment ? 'apartment' : 'unknown',
+      apartment_status: is_apartment ? 'detected' : null,
+      geocoder_result: geo || null,
+      service_area_result: { in_service_area: true, source: 'booking_create' },
       customer_notes,
       load_size,
       base_price: priced.base_price,
@@ -259,6 +295,7 @@ export async function POST(req) {
       source,
       status: 'pending_payment',
       referral_code: referral_code || null,
+      pricing_config_version: 'runtime_system_config',
     };
 
     const { data: booking, error } = await supabaseAdmin
@@ -272,12 +309,84 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Could not create booking.' }, { status: 500 });
     }
 
+    const cookieSession = (await cookies()).get(ATTRIBUTION_COOKIE)?.value;
+    const attributionSession = session_id || linkedLead?.session_id || cookieSession || null;
+    if (attributionSession) {
+      const attr = await captureAttribution({
+        session_id: attributionSession,
+        lead_id: linkedLead?.id || null,
+        booking_id: booking.id,
+        customer_id: normalizedPhone || phone,
+        touch: {
+          source,
+          channel: body.channel || null,
+          landing_path: body.landing_path || '/book',
+          referrer: body.referrer || null,
+          tracking_code: body.tracking_code || body.code || null,
+          code: body.code || body.tracking_code || null,
+          utm_source: body.utm_source || null,
+          utm_medium: body.utm_medium || null,
+          utm_campaign: body.utm_campaign || null,
+          utm_content: body.utm_content || null,
+          utm_term: body.utm_term || null,
+          gclid: body.gclid || null,
+          fbclid: body.fbclid || null,
+        },
+      });
+      if (attr?.first || attr?.last) {
+        try {
+          await supabaseAdmin.from('bookings').update({
+            attribution_record_id: attr.last?.id || attr.first?.id || null,
+            first_touch_attribution_id: attr.first?.id || null,
+            last_touch_attribution_id: attr.last?.id || null,
+          }).eq('id', booking.id);
+        } catch {}
+      }
+    }
+
+    await createPriceLedgerEntry({
+      booking_id: booking.id,
+      lead_id: linkedLead?.id || null,
+      ledger_type: 'initial_quote',
+      pricing: {
+        ...priced,
+        total: priced.total,
+        deposit: PRICING.deposit,
+        balance: priced.balance_due,
+        travel_km: travelKm,
+        truck_size: insert.truck_size,
+        truck_fee: priced.truck_fee,
+        surge_multiplier: surge.multiplier,
+        pricing_config_version: 'runtime_system_config',
+      },
+      actor_type: 'customer',
+      reason: 'Customer accepted website quote before deposit payment',
+      customer_notification_status: 'shown_in_checkout',
+    });
+
+    await recordTimelineEvent({
+      entity_type: 'booking',
+      entity_id: booking.id,
+      event_type: 'booking_created_pending_payment',
+      actor_type: 'customer',
+      source: 'booking_flow',
+      after: insert,
+      metadata: { lead_id: linkedLead?.id || null, sms_consent_source },
+    });
+
     // Create the $50 deposit PaymentIntent (with receipt email if provided).
     const intent = await createDepositPayment(booking.id, name, email);
     await supabaseAdmin
       .from('bookings')
       .update({ stripe_payment_intent_id: intent.id })
       .eq('id', booking.id);
+    await recordTimelineEvent({
+      entity_type: 'booking',
+      entity_id: booking.id,
+      event_type: 'payment_intent_created',
+      source: 'stripe',
+      metadata: { payment_intent_id: intent.id, deposit: PRICING.deposit },
+    });
 
     // ── Tracking token (customer portal link) ─────────────
     // Generate an unguessable token so the customer can track their
@@ -288,6 +397,13 @@ export async function POST(req) {
       .from('bookings')
       .update({ tracking_token: trackingToken })
       .eq('id', booking.id);
+    await recordTimelineEvent({
+      entity_type: 'booking',
+      entity_id: booking.id,
+      event_type: 'tracking_token_created',
+      source: 'booking_flow',
+      metadata: { tracking_url: `https://junkhaul.ca/track/${trackingToken}` },
+    });
 
     // ── Dynamic dispatch (24-hour guarantee) ──────────────
     // Resolve which crew assignment handles this booking — either
@@ -319,7 +435,7 @@ export async function POST(req) {
       try {
         await supabaseAdmin.from('referrals').insert({
           referrer_phone: refPhone || referral_code,
-          referee_phone: phone,
+          referee_phone: normalizedPhone || phone,
           booking_id: booking.id,
           status: 'pending',
         });

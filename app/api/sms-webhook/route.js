@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
-import { sendSMS as _sendSMS } from '@/lib/sms';
+import { sendSMS as _sendSMS, setSmsSuppression, liftSmsSuppression } from '@/lib/sms';
 import { calculatePrice, getPricingConfig, LOAD_LABELS, PRICING } from '@/lib/pricing';
 import { cancelBooking } from '@/lib/cancellations';
 import { analysePhotos, handleSafetyAlert, stripInternalFields } from '@/lib/ai';
@@ -402,7 +402,23 @@ export async function POST(req) {
 
   // ── STOP / HELP (regulatory, must stay as keywords) ──
   if (upper === 'STOP' || upper === 'UNSUBSCRIBE') {
-    await sendSMS(from, 'Youre unsubscribed from Junk Haul Calgary texts. Reply START if you want back in.', recentBooking?.id, 'optout');
+    await setSmsSuppression(from, 'customer_stop', payload);
+    await sendSMS(from, 'Youre unsubscribed from Junk Haul Calgary texts. Reply START if you want back in.', {
+      booking_id: recentBooking?.id || null,
+      message_type: 'optout',
+      workflow_action: 'sms_stop',
+      bypass_suppression: true,
+    });
+    return NextResponse.json({ ok: true });
+  }
+  if (upper === 'START') {
+    await liftSmsSuppression(from, payload);
+    await sendSMS(from, 'You are resubscribed to Junk Haul Calgary texts. Reply STOP to opt out.', {
+      booking_id: recentBooking?.id || null,
+      message_type: 'start',
+      workflow_action: 'sms_start',
+      bypass_suppression: true,
+    });
     return NextResponse.json({ ok: true });
   }
   if (upper === 'HELP') {

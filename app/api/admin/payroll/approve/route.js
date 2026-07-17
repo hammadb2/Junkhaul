@@ -1,23 +1,21 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { sendDirectDeposit, isDirectDepositConfigured } from '@/lib/directDeposit';
 import { sendSMS } from '@/lib/sms';
+import { auditSensitiveAttempt, requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === (await adminToken());
-}
-
 // GET /api/admin/payroll/list — all pay runs (newest first)
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, {
+    permission: 'payroll.preview',
+    ownerOnly: true,
+    action: 'payroll.list',
+    metadata: { route: '/api/admin/payroll/approve', method: 'GET' },
+  });
+  if (!auth.ok) return auth.response;
   const { data: runs } = await supabaseAdmin
     .from('pay_runs')
     .select('*')
@@ -30,24 +28,47 @@ export async function GET(req) {
 // optionally trigger direct deposit for each stub.
 // Body: { pay_run_id, send_direct_deposit?: boolean }
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { pay_run_id, send_direct_deposit } = await req.json();
-  if (!pay_run_id) return NextResponse.json({ error: 'pay_run_id required' }, { status: 400 });
+  const body = await req.json().catch(() => ({}));
+  const { pay_run_id, send_direct_deposit, reason } = body;
+  const permission = send_direct_deposit ? 'payroll.send' : 'payroll.approve';
+  const auth = await requireStaffPermission(req, {
+    permission,
+    ownerOnly: true,
+    entityType: 'pay_run',
+    entityId: pay_run_id || null,
+    action: send_direct_deposit ? 'payroll.send' : 'payroll.approve',
+    reason,
+    metadata: { send_direct_deposit: !!send_direct_deposit },
+  });
+  if (!auth.ok) return auth.response;
+  if (!pay_run_id) return NextResponse.json({ error: 'pay_run_id required' }, { status: 422 });
 
   const { data: run } = await supabaseAdmin
     .from('pay_runs').select('*').eq('id', pay_run_id).maybeSingle();
   if (!run) return NextResponse.json({ error: 'Pay run not found' }, { status: 404 });
   if (run.status !== 'calculated') {
-    return NextResponse.json({ error: `Pay run status is '${run.status}', must be 'calculated' to approve` }, { status: 400 });
+    return NextResponse.json({ error: `Pay run status is '${run.status}', must be 'calculated' to approve` }, { status: 409 });
   }
 
   await supabaseAdmin.from('pay_runs')
-    .update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: 'admin' })
+    .update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: auth.context.employee.id })
     .eq('id', pay_run_id);
 
   let depositResults = [];
   if (send_direct_deposit) {
     if (!isDirectDepositConfigured()) {
+      await auditSensitiveAttempt({
+        context: auth.context,
+        allowed: true,
+        permission,
+        entityType: 'pay_run',
+        entityId: pay_run_id,
+        action: 'payroll.approve_without_direct_deposit',
+        reason,
+        before: run,
+        after: { status: 'approved' },
+        metadata: { send_direct_deposit: true, direct_deposit_configured: false },
+      });
       return NextResponse.json({ ok: true, approved: true, warning: 'Direct deposit not configured — approved but no EFT sent' });
     }
     const { data: stubs } = await supabaseAdmin
@@ -67,6 +88,19 @@ export async function POST(req) {
       .update({ status: allSent ? 'paid' : 'approved', paid_at: allSent ? new Date().toISOString() : null })
       .eq('id', pay_run_id);
   }
+
+  await auditSensitiveAttempt({
+    context: auth.context,
+    allowed: true,
+    permission,
+    entityType: 'pay_run',
+    entityId: pay_run_id,
+    action: send_direct_deposit ? 'payroll.send' : 'payroll.approve',
+    reason,
+    before: run,
+    after: { status: send_direct_deposit && depositResults.every((r) => r.ok) ? 'paid' : 'approved' },
+    metadata: { send_direct_deposit: !!send_direct_deposit, deposit_results_count: depositResults.length },
+  });
 
   // ── Notify each employee that their pay stub is ready ──
   try {

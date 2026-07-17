@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === await adminToken();
-}
-
 // GET /api/admin/growth
 // Returns opportunistic offers, recent surge snapshots, and abandonment funnel
-export async function GET() {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req) {
+  const auth = await requireStaffPermission(req, { permission: 'reports.read', action: 'growth.read' });
+  if (!auth.ok) return auth.response;
   try {
     const { data: offers, error: offersError } = await supabaseAdmin
       .from('nearby_offers')

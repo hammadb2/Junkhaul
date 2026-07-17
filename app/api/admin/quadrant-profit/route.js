@@ -1,17 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
 import { estimateProfit } from '@/lib/pricing';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === await adminToken();
-}
 
 // GET /api/admin/quadrant-profit — per-quadrant profit dashboard.
 // Uses the estimateProfit function from lib/pricing.js to compute
@@ -21,7 +13,8 @@ async function checkAuth() {
 //   ?days=30  — look back N days (default 30)
 //   ?summary=true — return aggregated summary only
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'reports.read', action: 'quadrant_profit.read' });
+  if (!auth.ok) return auth.response;
   const { searchParams } = req.nextUrl;
   const days = parseInt(searchParams.get('days') || '30', 10);
   const summaryOnly = searchParams.get('summary') === 'true';

@@ -1,16 +1,8 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === (await adminToken());
-}
 
 // POST /api/admin/crew/[id]/approve
 // Body: { action: 'approve' | 'reject', notes? }
@@ -18,10 +10,16 @@ async function checkAuth() {
 // approve  → sets employee status to 'active', sends SMS notification
 // reject   → sets employee status to 'rejected', sends SMS with reason
 export async function POST(req, { params }) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { id } = params;
   const { action, notes } = await req.json();
+  const auth = await requireStaffPermission(req, {
+    permission: 'employee_documents.verify',
+    entityType: 'employee',
+    entityId: id,
+    action: `employee_onboarding.${action || 'unknown'}`,
+    reason: notes || null,
+  });
+  if (!auth.ok) return auth.response;
 
   if (!['approve', 'reject'].includes(action)) {
     return NextResponse.json({ error: 'action must be approve or reject' }, { status: 400 });

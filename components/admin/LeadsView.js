@@ -21,6 +21,35 @@ export default function LeadsView({ flash }) {
   const [sort, setSort] = useState('quoted');
   const [dir, setDir] = useState('desc');
   const [selected, setSelected] = useState({});
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const openDetail = async (id) => {
+    setDetailLoading(true);
+    const res = await fetch(`/api/admin/leads/${id}`);
+    const d = await res.json().catch(() => ({}));
+    if (res.ok) setDetail(d);
+    else flash?.(d.error || 'Could not load lead', '#EF4444');
+    setDetailLoading(false);
+  };
+
+  const leadAction = async (action, payload = {}) => {
+    if (!detail?.lead?.id) return;
+    const reason = ['add_note','send_follow_up','request_photos'].includes(action) ? null : window.prompt('Reason required for audit/timeline:');
+    if (reason === '') return;
+    const res = await fetch(`/api/admin/leads/${detail.lead.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, reason, payload }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (res.ok) {
+      flash?.('Lead action saved');
+      await openDetail(detail.lead.id);
+    } else {
+      flash?.(d.error || 'Lead action failed', '#EF4444');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +172,7 @@ export default function LeadsView({ flash }) {
           </thead>
           <tbody>
             {rows.map((l) => (
-              <tr key={l.id} style={{ borderBottom: '1px solid rgba(0,0,0,.045)' }}>
+              <tr key={l.id} onDoubleClick={() => openDetail(l.id)} style={{ borderBottom: '1px solid rgba(0,0,0,.045)', cursor: 'pointer' }}>
                 <td style={{ padding: '10px 0 10px 18px' }}><input type="checkbox" checked={!!selected[l.id]} onChange={() => toggleRow(l.id)} /></td>
                 <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1a1a1a' }}>{l.name}<div style={{ fontSize: 11.5, fontWeight: 400, color: 'rgba(0,0,0,.4)' }}>{l.phone}</div></td>
                 <td style={{ padding: '10px 12px', color: 'rgba(0,0,0,.55)' }}>{l.quoted}</td>
@@ -162,6 +191,67 @@ export default function LeadsView({ flash }) {
           </div>
         )}
       </div>
+      {(detail || detailLoading) && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.18)', zIndex: 30, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ width: 'min(720px,100%)', height: '100%', background: '#fff', boxShadow: '-12px 0 32px rgba(0,0,0,.16)', overflow: 'auto', padding: 22 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>Lead Detail</div>
+              <button onClick={() => setDetail(null)} style={smallBtn}>Close</button>
+            </div>
+            {detailLoading ? <div style={{ padding: 30 }}>Loading…</div> : (
+              <div style={{ display: 'grid', gap: 14, marginTop: 16 }}>
+                <Section title="Identity">
+                  <p>{detail.lead.name || 'Unknown'} · {detail.lead.phone} · {detail.lead.email || 'no email'}</p>
+                  <p>Normalized {detail.lead.normalized_phone || '—'} · session {detail.lead.session_id || detail.lead.booking_session_id || '—'}</p>
+                </Section>
+                <Section title="Attribution">
+                  {(detail.attribution || []).map((a) => <p key={a.id}>{a.touch_type}: {a.channel}/{a.source} · {a.tracking_code || a.utm_campaign || '—'} · {a.campaign?.name || '—'}</p>)}
+                  {(detail.attribution || []).length === 0 && <p>No attribution records.</p>}
+                </Section>
+                <Section title="Funnel and abandonment">
+                  <p>Current step {detail.lead.current_step || detail.lead.last_step_reached || '—'} · abandonment {detail.lead.abandonment_point || '—'}</p>
+                  <p>Quote revealed {detail.lead.quote_revealed_at || '—'} · last activity {detail.lead.last_activity_at || detail.lead.updated_at || '—'}</p>
+                </Section>
+                <Section title="Photos and quote history">
+                  <p>Lead photos {(detail.lead.photos || []).length}</p>
+                  {(detail.lead.quotes || []).map((q) => <p key={q.id}>{q.created_at}: {q.load_size} · {money(q.price)}</p>)}
+                </Section>
+                <Section title="Communications">
+                  {(detail.messages || []).map((m) => <p key={m.id}>{m.direction} {m.message_type}: {m.provider_status} · {m.failure_reason || ''}</p>)}
+                </Section>
+                <Section title="Related records">
+                  <p>Bookings {(detail.bookings || []).map((b) => b.booking_ref).join(', ') || '—'}</p>
+                  <p>Donation requests {(detail.donations || []).length} · waitlist {(detail.waitlist || []).length} · calls {(detail.calls || []).length}</p>
+                </Section>
+                <Section title="Timeline">
+                  {(detail.timeline || []).map((t) => <p key={t.id}>{new Date(t.created_at).toLocaleString()} · {t.event_type}</p>)}
+                </Section>
+                <Section title="Actions">
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button onClick={() => leadAction('add_note', { note: window.prompt('Internal note:') || '' })} style={smallBtn}>Add note</button>
+                    <button onClick={() => leadAction('send_follow_up')} style={smallBtn}>Send follow-up</button>
+                    <button onClick={() => leadAction('request_photos')} style={smallBtn}>Request photos</button>
+                    <button onClick={() => leadAction('correct_attribution', { customer_reported_source: window.prompt('Customer-reported source:') || '' })} style={smallBtn}>Correct attribution</button>
+                    <button onClick={() => leadAction('convert_to_booking', { booking_id: window.prompt('Booking UUID to link:') || '' })} style={smallBtn}>Convert to booking</button>
+                    <button onClick={() => leadAction('convert_to_donation')} style={smallBtn}>Convert to donation</button>
+                    <button onClick={() => leadAction('add_to_waitlist', { preferred_date: window.prompt('Preferred date (optional):') || null })} style={smallBtn}>Add to waitlist</button>
+                    <button onClick={() => leadAction('merge_duplicate', { duplicate_lead_id: window.prompt('Duplicate lead UUID to merge into this lead:') || '' })} style={smallBtn}>Merge duplicate</button>
+                    <button onClick={() => leadAction('mark_invalid')} style={smallBtn}>Mark invalid</button>
+                    <button onClick={() => leadAction('mark_spam')} style={smallBtn}>Mark spam</button>
+                    <button onClick={() => leadAction('escalate')} style={smallBtn}>Escalate</button>
+                  </div>
+                </Section>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+function Section({ title, children }) {
+  return <div style={{ border: '1px solid rgba(0,0,0,.08)', borderRadius: 12, padding: 14 }}><div style={{ fontWeight: 900, marginBottom: 8 }}>{title}</div><div style={{ fontSize: 13, color: 'rgba(0,0,0,.65)' }}>{children}</div></div>;
+}
+
+const smallBtn = { border: '1px solid rgba(0,0,0,.12)', borderRadius: 8, padding: '7px 10px', background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 };

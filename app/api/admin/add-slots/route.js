@@ -1,22 +1,14 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  const expected = await adminToken();
-  return token === expected;
-}
 
 // Admin can add custom slots for any day (e.g. a Thursday or weekday).
 // Body: { date: "2026-07-10", times: ["07:30","09:00","11:00","13:00"], max_jobs: 5, day_type: "custom" }
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'schedule.manage', action: 'schedule.add_slots' });
+  if (!auth.ok) return auth.response;
 
   const { date, times, max_jobs = 5, day_type = 'custom' } = await req.json();
   if (!date || !Array.isArray(times) || times.length === 0) {
@@ -41,7 +33,8 @@ export async function POST(req) {
 
 // Delete slots for a date
 export async function DELETE(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'schedule.manage', action: 'schedule.delete_slots' });
+  if (!auth.ok) return auth.response;
 
   const { date } = await req.json();
   if (!date) return NextResponse.json({ error: 'date required' }, { status: 400 });

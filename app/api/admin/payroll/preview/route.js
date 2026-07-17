@@ -1,18 +1,10 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { calculatePayRun, PAY_PERIODS } from '@/lib/payroll';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === (await adminToken());
-}
 
 // ------------------------------------------------------------
 // Gather un-paid shifts for a period and build payroll entries.
@@ -48,10 +40,16 @@ async function gatherEntries(periodStart, periodEnd) {
 // POST /api/admin/payroll/preview — calculate without saving.
 // Body: { period_start, period_end, P? }
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, {
+    permission: 'payroll.preview',
+    ownerOnly: true,
+    action: 'payroll.preview',
+    metadata: { route: '/api/admin/payroll/preview' },
+  });
+  if (!auth.ok) return auth.response;
   const { period_start, period_end, P = PAY_PERIODS.biweekly } = await req.json();
   if (!period_start || !period_end) {
-    return NextResponse.json({ error: 'period_start and period_end required' }, { status: 400 });
+    return NextResponse.json({ error: 'period_start and period_end required' }, { status: 422 });
   }
 
   const entries = await gatherEntries(period_start, period_end);

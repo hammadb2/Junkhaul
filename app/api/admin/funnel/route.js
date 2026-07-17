@@ -1,17 +1,10 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { supabaseAdmin } from '@/lib/supabase';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === await adminToken();
-}
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'reports.read', action: 'funnel.read' });
+  if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(req.url);
   const days = parseInt(searchParams.get('days') || '30', 10);

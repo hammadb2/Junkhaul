@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { edmontonNowParts } from '@/lib/dates';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === await adminToken();
-}
-
-export async function GET() {
+export async function GET(req) {
+  const auth = await requireStaffPermission(req, { permission: 'admin.read', action: 'schedule.read' });
+  if (!auth.ok) return auth.response;
   // Use Calgary date, not UTC
   const { date: today } = edmontonNowParts();
 
@@ -58,7 +52,8 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'schedule.manage', action: 'schedule.update' });
+  if (!auth.ok) return auth.response;
 
   const body = await req.json();
   const { action, slot_date, slot_time, max_jobs } = body;
