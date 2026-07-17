@@ -154,4 +154,8 @@ const commandCenterSource = readFileSync(new URL('../app/api/admin/command-cente
 assert.match(commandCenterSource, /\.from\('nearby_offers'\)[\s\S]*\.order\('offered_at'/);
 assert.doesNotMatch(commandCenterSource, /\.from\('nearby_offers'\)[\s\S]*\.order\('created_at'/);
 
+const attributionSource = readFileSync(new URL('../lib/attribution.js', import.meta.url), 'utf8');
+assert.match(attributionSource, /const normalizedCode = String\(code\)\.trim\(\)\.toUpperCase\(\)/);
+assert.match(attributionSource, /\.eq\('code', normalizedCode\)/);
+
 console.log('foundation tests passed');
