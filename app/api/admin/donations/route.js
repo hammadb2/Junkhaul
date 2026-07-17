@@ -5,6 +5,8 @@ import { recordTimelineEvent } from '@/lib/timeline';
 import { recordAuditEvent } from '@/lib/auditEvents';
 import { sendSMS } from '@/lib/sms';
 import { requireStaffPermission } from '@/lib/staffAuth';
+import { computeCapacityEstimate } from '@/lib/donationCapacity';
+import { scoreDestinations, selectDestination } from '@/lib/donationDestinations';
 
 export const runtime = 'nodejs';
 
@@ -89,6 +91,17 @@ export async function POST(req) {
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (action === 'approve') {
+    try {
+      const { data: existingCapacity } = await supabaseAdmin.from('donation_capacity_estimates').select('id').eq('donation_request_id', donation_request_id).limit(1).maybeSingle();
+      if (!existingCapacity) await computeCapacityEstimate({ donationRequestId: donation_request_id, actorId: auth.context.employee.id });
+      const scores = await scoreDestinations({ donationRequestId: donation_request_id });
+      await selectDestination({ donationRequestId: donation_request_id, scores });
+    } catch (e) {
+      console.error('post-approval capacity/destination scoring failed:', e.message);
+    }
+  }
 
   let message = null;
   if (['request_photos', 'reject', 'convert_to_paid', 'approve'].includes(action) && current.phone) {

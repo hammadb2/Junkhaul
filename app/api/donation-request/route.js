@@ -3,7 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { normalizePhone } from '@/lib/phone';
 import { upsertSmsConsent, sendSMS } from '@/lib/sms';
 import { captureAttribution } from '@/lib/attribution';
-import { validateDonationPhotos, analyzeDonationSubmission } from '@/lib/donation';
+import { validateDonationPhotos, assertDonationTransition } from '@/lib/donation';
+import { analyzeDonationPhotos } from '@/lib/donationVision';
+import { evaluatePhotoSufficiency, requestAdditionalDonationPhotos, recordPhotoSufficiency } from '@/lib/donationPhotoSufficiency';
+import { computeCapacityEstimate } from '@/lib/donationCapacity';
 import { assertDonationUploadAllowed, REQUIRED_DONATION_PHOTO_TYPES } from '@/lib/donationPhotos';
 import { recordTimelineEvent } from '@/lib/timeline';
 import { assertRateLimit, getClientKey } from '@/lib/rateLimit';
@@ -112,32 +115,58 @@ export async function POST(req) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const analysis = analyzeDonationSubmission({ description, photos: storedPhotos || [], confirmations });
-    const nextStatus = analysis.outcome === 'NEED_MORE_PHOTOS'
-      ? 'needs_more_photos'
-      : analysis.outcome === 'OFFER_PAID_JUNK_REMOVAL'
-        ? 'paid_quote_offered'
-        : 'manual_review';
+    assertDonationTransition('submitted', 'analyzing');
+    await supabaseAdmin.from('donation_requests').update({ status: 'analyzing' }).eq('id', request.id);
 
-    await supabaseAdmin.from('donation_ai_analyses').insert({
-      donation_request_id: request.id,
-      provider: 'internal',
-      model: 'donation-policy-v1',
-      prompt_version: 'donation-v1',
-      donation_policy_version_id: policy?.id || null,
-      raw_output: analysis,
-      structured_output: analysis.structured_output || {},
-      confidence: analysis.confidence,
-      rejection_reasons: analysis.rejection_reasons || [],
-      item_level_decisions: [],
+    const { analysis, ai_recommendation, items, fallback_used } = await analyzeDonationPhotos({
+      donationRequestId: request.id,
+      description,
+      trigger: 'submission',
     });
+
+    const sufficiency = evaluatePhotoSufficiency({ photos: storedPhotos || [], analysis: ai_recommendation, items, policy });
+
+    let nextStatus;
+    if (sufficiency.status === 'more_photos_required') {
+      nextStatus = 'needs_more_photos';
+      await requestAdditionalDonationPhotos({
+        donationRequestId: request.id,
+        phone: normalizedPhone || phone,
+        missingEvidence: sufficiency.missing_evidence,
+        requestedPhotoTypes: sufficiency.requested_photo_types,
+        donationAiAnalysisId: analysis.id,
+        actorType: 'system',
+      });
+    } else {
+      await recordPhotoSufficiency({
+        donationRequestId: request.id,
+        donationAiAnalysisId: analysis.id,
+        status: sufficiency.status,
+        missingEvidence: sufficiency.missing_evidence,
+        requestedPhotoTypes: sufficiency.requested_photo_types,
+      });
+      if (sufficiency.status === 'manual_review_required') {
+        nextStatus = 'manual_review';
+      } else {
+        nextStatus = ai_recommendation.outcome === 'AI_APPROVED'
+          ? 'ai_approved'
+          : ai_recommendation.outcome === 'OFFER_PAID_JUNK_REMOVAL'
+            ? 'paid_quote_offered'
+            : 'manual_review';
+      }
+    }
+    assertDonationTransition('analyzing', nextStatus);
 
     await supabaseAdmin.from('donation_requests').update({
       status: nextStatus,
-      ai_outcome: analysis.outcome,
-      confidence: analysis.confidence,
-      status_reason: (analysis.rejection_reasons || analysis.missing_photos || []).join(', ') || null,
+      ai_outcome: ai_recommendation.outcome,
+      confidence: ai_recommendation.confidence,
+      status_reason: (ai_recommendation.rejection_reasons || []).join(', ') || null,
     }).eq('id', request.id);
+
+    if (nextStatus === 'ai_approved') {
+      try { await computeCapacityEstimate({ donationRequestId: request.id }); } catch (e) { console.error('capacity estimate failed:', e.message); }
+    }
 
     const attr = session_id ? await captureAttribution({
       session_id,
@@ -155,7 +184,7 @@ export async function POST(req) {
       event_type: 'donation_submitted',
       actor_type: 'customer',
       source: 'donation_form',
-      metadata: { photo_count: storedPhotos?.length || 0, ai_outcome: analysis.outcome, first_touch_id: attr?.first?.id || null },
+      metadata: { photo_count: storedPhotos?.length || 0, ai_outcome: ai_recommendation.outcome, fallback_used, first_touch_id: attr?.first?.id || null },
     });
     await recordTimelineEvent({
       entity_type: 'donation_request',
@@ -164,18 +193,20 @@ export async function POST(req) {
       source: 'donation_ai',
       before: { status: 'submitted' },
       after: { status: nextStatus },
-      reason: analysis.outcome,
-      metadata: analysis,
+      reason: ai_recommendation.outcome,
+      metadata: { ai_recommendation, sufficiency, analysis_id: analysis.id, fallback_used },
     });
 
-    try {
-      await sendSMS(normalizedPhone || phone, 'We received your donation pickup request. This is not a confirmed pickup yet — we review item quality and route fit first. We’ll text the next step shortly. — Junk Haul Calgary', {
-        donation_request_id: request.id,
-        message_type: 'donation_submission_received',
-        workflow_action: 'donation_received',
-      });
-    } catch {
-      // visible in messages table via central SMS failure logging
+    if (sufficiency.status !== 'more_photos_required') {
+      try {
+        await sendSMS(normalizedPhone || phone, 'We received your donation pickup request. This is not a confirmed pickup yet — we review item quality and route fit first. We’ll text the next step shortly. — Junk Haul Calgary', {
+          donation_request_id: request.id,
+          message_type: 'donation_submission_received',
+          workflow_action: 'donation_received',
+        });
+      } catch {
+        // visible in messages table via central SMS failure logging
+      }
     }
 
     return NextResponse.json({ ok: true, donation_request_id: request.id, request_ref: request.request_ref, status: nextStatus });
