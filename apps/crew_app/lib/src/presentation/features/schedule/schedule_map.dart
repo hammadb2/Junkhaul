@@ -1,189 +1,305 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../core/app_theme.dart';
+import '../../../core/secrets.dart';
 import '../../../domain/models/booking.dart';
+import '../../../domain/providers/location_provider.dart';
 
-/// Mapbox map showing the truck's current location and all job markers.
-/// Uses the crew_app's daily schedule bookings to place markers.
-class ScheduleMap extends StatefulWidget {
+/// Live Google Maps view showing the crew's truck position and numbered job
+/// pins for the day's route.
+///
+/// Renders a GoogleMap with:
+/// - Crew's current position (truck marker)
+/// - Today's job markers (numbered in route order)
+/// - Selected job highlight
+/// - Recenter control
+/// - Permission-denied / loading / GPS-unavailable states
+class ScheduleMap extends ConsumerStatefulWidget {
   const ScheduleMap({
     super.key,
-    required this.bookings,
-    this.truckPosition,
-    this.onMarkerTap,
+    this.bookings = const [],
+    this.selectedBookingId,
+    this.onJobTap,
   });
 
+  /// Today's bookings to show as markers.
   final List<Booking> bookings;
-  final TruckPosition? truckPosition;
-  final ValueChanged<Booking>? onMarkerTap;
+
+  /// ID of the currently selected booking (highlighted marker).
+  final String? selectedBookingId;
+
+  /// Called when the user taps a job marker.
+  final ValueChanged<Booking>? onJobTap;
 
   @override
-  State<ScheduleMap> createState() => _ScheduleMapState();
+  ConsumerState<ScheduleMap> createState() => _ScheduleMapState();
 }
 
-/// Simple lat/lng holder for the truck's current position.
-class TruckPosition {
-  const TruckPosition({required this.lat, required this.lng});
-  final double lat;
-  final double lng;
-}
-
-class _ScheduleMapState extends State<ScheduleMap> {
-  mapbox.MapboxMap? _mapboxMap;
-  mapbox.PointAnnotationManager? _pointAnnotationManager;
-  bool _isMapReady = false;
-  Uint8List? _truckMarkerImage;
-
-  // Default center: Calgary downtown
-  static final _calgaryCenter = mapbox.Point(
-    coordinates: mapbox.Position(-114.0719, 51.0447),
-  );
+class _ScheduleMapState extends ConsumerState<ScheduleMap> {
+  GoogleMapController? _mapController;
+  Set<Marker> _markers = {};
+  bool _mapReady = false;
 
   @override
   void initState() {
     super.initState();
-    _loadTruckMarker();
-  }
-
-  Future<void> _loadTruckMarker() async {
-    try {
-      final byteData = await rootBundle.load('assets/images/truck_marker_medium.png');
-      _truckMarkerImage = byteData.buffer.asUint8List();
-      if (mounted && _isMapReady) _addMarkers();
-    } catch (e) {
-      // Marker image not available — will use default markers
-      debugPrint('Failed to load truck marker: $e');
-    }
+    // Start GPS when the map mounts.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(locationProvider.notifier).start();
+    });
   }
 
   @override
   void didUpdateWidget(ScheduleMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((oldWidget.bookings != widget.bookings ||
-         oldWidget.truckPosition != widget.truckPosition) &&
-        _isMapReady) {
-      _addMarkers();
+    if (oldWidget.bookings != widget.bookings ||
+        oldWidget.selectedBookingId != widget.selectedBookingId) {
+      _updateMarkers();
+    }
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+    _mapReady = true;
+    _updateMarkers();
+    _fitToMarkers();
+  }
+
+  void _updateMarkers() {
+    final markers = <Marker>{};
+    final truckPos = ref.read(locationProvider).position;
+
+    // Truck marker at current GPS position.
+    if (truckPos != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('truck'),
+          position: LatLng(truckPos.latitude, truckPos.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          infoWindow: const InfoWindow(title: 'Your truck'),
+          zIndex: 1,
+        ),
+      );
+    }
+
+    // Job markers numbered in route order.
+    for (var i = 0; i < widget.bookings.length; i++) {
+      final b = widget.bookings[i];
+      final coords = b.addressData;
+      if (coords?.lat == null || coords?.lng == null) continue;
+
+      final isSelected = b.id == widget.selectedBookingId;
+      markers.add(
+        Marker(
+          markerId: MarkerId('job_${b.id}'),
+          position: LatLng(coords!.lat!, coords.lng!),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            isSelected ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: InfoWindow(
+            title: '${i + 1}. ${b.name ?? 'Job'}',
+            snippet: b.address ?? '',
+          ),
+          onTap: () => widget.onJobTap?.call(b),
+          zIndex: isSelected ? 2 : 0,
+        ),
+      );
+    }
+
+    setState(() => _markers = markers);
+  }
+
+  void _fitToMarkers() {
+    if (!_mapReady || _mapController == null) return;
+    final positions = <LatLng>[];
+    final truckPos = ref.read(locationProvider).position;
+    if (truckPos != null) {
+      positions.add(LatLng(truckPos.latitude, truckPos.longitude));
+    }
+    for (final b in widget.bookings) {
+      final c = b.addressData;
+      if (c?.lat != null && c?.lng != null) {
+        final lat = c!.lat!;
+        final lng = c.lng!;
+        positions.add(LatLng(lat, lng));
+      }
+      // ignore: unnecessary_non_null_assertion
+    }
+    if (positions.isEmpty) return;
+    if (positions.length == 1) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(positions.first, 14),
+      );
+      return;
+    }
+    final bounds = _boundsFromPositions(positions);
+    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
+  }
+
+  LatLngBounds _boundsFromPositions(List<LatLng> positions) {
+    final southwest = LatLng(
+      positions.map((p) => p.latitude).reduce((a, b) => a < b ? a : b),
+      positions.map((p) => p.longitude).reduce((a, b) => a < b ? a : b),
+    );
+    final northeast = LatLng(
+      positions.map((p) => p.latitude).reduce((a, b) => a > b ? a : b),
+      positions.map((p) => p.longitude).reduce((a, b) => a > b ? a : b),
+    );
+    return LatLngBounds(southwest: southwest, northeast: northeast);
+  }
+
+  void _recenter() {
+    final truckPos = ref.read(locationProvider).position;
+    if (truckPos != null && _mapController != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(truckPos.latitude, truckPos.longitude),
+          14,
+        ),
+      );
+    } else {
+      _fitToMarkers();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return mapbox.MapWidget(
-      key: const ValueKey('schedule_map'),
-      styleUri: 'mapbox://styles/mapbox/streets-v12',
-      cameraOptions: mapbox.CameraOptions(
-        center: _calgaryCenter,
-        zoom: 11.0,
-      ),
-      onMapCreated: _onMapCreated,
-    );
-  }
+    final gps = ref.watch(locationProvider);
 
-  void _onMapCreated(mapbox.MapboxMap controller) {
-    _mapboxMap = controller;
-    setState(() => _isMapReady = true);
-
-    // Create the point annotation manager asynchronously
-    controller.annotations.createPointAnnotationManager().then((manager) {
-      _pointAnnotationManager = manager;
-      _addMarkers();
-    });
-
-    // Fit camera to show all markers
-    _fitAllBookings();
-  }
-
-  Future<void> _addMarkers() async {
-    final manager = _pointAnnotationManager;
-    if (manager == null) return;
-
-    // Clear existing annotations
-    await manager.deleteAll();
-
-    final bookingsWithCoords = widget.bookings.where((b) {
-      final addr = b.addressData;
-      return addr?.lat != null && addr?.lng != null;
-    }).toList();
-
-    // Add truck marker if we have a position
-    if (widget.truckPosition != null && _truckMarkerImage != null) {
-      await manager.create(mapbox.PointAnnotationOptions(
-        geometry: mapbox.Point(
-          coordinates: mapbox.Position(widget.truckPosition!.lng, widget.truckPosition!.lat),
-        ),
-        image: _truckMarkerImage,
-        iconSize: 1.0,
-        iconAnchor: mapbox.IconAnchor.CENTER,
-      ));
-    }
-
-    if (bookingsWithCoords.isEmpty) return;
-
-    // Add job markers with numbered circles
-    final options = bookingsWithCoords.asMap().entries.map((entry) {
-      final i = entry.key;
-      final b = entry.value;
-      return mapbox.PointAnnotationOptions(
-        geometry: mapbox.Point(
-          coordinates: mapbox.Position(b.addressData!.lng!, b.addressData!.lat!),
-        ),
-        iconSize: 1.5,
-        textField: '${i + 1}',
-        textOffset: [0.0, 0.0],
-        textSize: 14.0,
-        textColor: 0xFFFFFFFF,
-        textAnchor: mapbox.TextAnchor.CENTER,
+    // No API key — show configuration error.
+    if (AppSecrets.googleMapsApiKey.isEmpty) {
+      return _MapStateView(
+        icon: Icons.key_off_outlined,
+        message: 'Google Maps API key not configured',
+        subtext: 'Set GOOGLE_MAPS_API_KEY via --dart-define or secrets.dart',
       );
-    }).toList();
-
-    await manager.createMulti(options);
-
-    // Fit camera to show all markers
-    _fitAllBookings();
-  }
-
-  Future<void> _fitAllBookings() async {
-    final map = _mapboxMap;
-    if (map == null) return;
-
-    final bookingsWithCoords = widget.bookings.where((b) {
-      final addr = b.addressData;
-      return addr?.lat != null && addr?.lng != null;
-    }).toList();
-
-    if (bookingsWithCoords.isEmpty && widget.truckPosition == null) return;
-
-    final points = <mapbox.Point>[];
-
-    for (final b in bookingsWithCoords) {
-      points.add(mapbox.Point(
-        coordinates: mapbox.Position(b.addressData!.lng!, b.addressData!.lat!),
-      ));
     }
 
-    // Add truck position to bounds if available
-    if (widget.truckPosition != null) {
-      points.add(mapbox.Point(
-        coordinates: mapbox.Position(widget.truckPosition!.lng, widget.truckPosition!.lat),
-      ));
+    // GPS denied or disabled.
+    if (gps.state == GpsState.denied || gps.state == GpsState.disabled) {
+      return _MapStateView(
+        icon: gps.state == GpsState.disabled
+            ? Icons.location_disabled
+            : Icons.location_off,
+        message: gps.state == GpsState.disabled
+            ? 'Location services disabled'
+            : 'Location permission denied',
+        subtext: gps.error,
+      );
     }
 
-    if (points.isEmpty) return;
-
-    final camera = await map.cameraForCoordinates(
-      points,
-      mapbox.MbxEdgeInsets(top: 80, left: 60, bottom: 250, right: 60),
-      null,
-      null,
-    );
-
-    await map.flyTo(
-      camera,
-      mapbox.MapAnimationOptions(duration: 800),
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: const CameraPosition(
+            target: LatLng(51.0447, -114.0719), // Calgary, AB
+            zoom: 11,
+          ),
+          onMapCreated: _onMapCreated,
+          markers: _markers,
+          myLocationButtonEnabled: false,
+          myLocationEnabled: gps.state == GpsState.ready,
+          compassEnabled: true,
+          trafficEnabled: false,
+          mapToolbarEnabled: false,
+          zoomControlsEnabled: false,
+          onCameraIdle: () {
+            // Refresh markers after camera settles to keep zIndex correct.
+          },
+        ),
+        // Recenter button.
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: Material(
+            color: Colors.white,
+            shape: const CircleBorder(),
+            elevation: 3,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _recenter,
+              child: const Padding(
+                padding: EdgeInsets.all(12),
+                child: Icon(
+                  Icons.my_location,
+                  size: 22,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Loading overlay while GPS is acquiring position.
+        if (gps.state == GpsState.loading)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.1),
+              child: const Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
+              ),
+            ),
+          ),
+      ],
     );
   }
+}
 
+/// Simple centered state view for error / permission / config states.
+class _MapStateView extends StatelessWidget {
+  const _MapStateView({
+    required this.icon,
+    required this.message,
+    this.subtext,
+  });
+
+  final IconData icon;
+  final String message;
+  final String? subtext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFDCE4E0),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 40, color: const Color(0xFFB7C2BC)),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7B73),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (subtext != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtext!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF9AA8A1),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

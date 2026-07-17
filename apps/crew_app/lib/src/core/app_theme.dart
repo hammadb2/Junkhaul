@@ -96,7 +96,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.bgInput,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -109,8 +112,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
-        labelStyle: textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-        hintStyle: textTheme.bodyMedium?.copyWith(color: AppColors.textDisabled),
+        labelStyle: textTheme.bodyMedium?.copyWith(
+          color: AppColors.textSecondary,
+        ),
+        hintStyle: textTheme.bodyMedium?.copyWith(
+          color: AppColors.textDisabled,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -168,8 +175,6 @@ class AppTheme {
   static TextStyle tabularTextStyle(TextStyle? style) {
     return style == null
         ? const TextStyle(fontFeatures: [FontFeature.tabularFigures()])
-        : style.copyWith(
-            fontFeatures: const [FontFeature.tabularFigures()],
-          );
+        : style.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
   }
 }

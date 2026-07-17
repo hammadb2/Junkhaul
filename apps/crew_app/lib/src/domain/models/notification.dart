@@ -16,7 +16,8 @@ abstract class AppNotification with _$AppNotification {
     @JsonKey(name: 'created_at') String? createdAt,
   }) = _AppNotification;
 
-  factory AppNotification.fromJson(Map<String, dynamic> json) => _$AppNotificationFromJson(json);
+  factory AppNotification.fromJson(Map<String, dynamic> json) =>
+      _$AppNotificationFromJson(json);
 }
 
 /// GET /api/employee/notifications response.
@@ -27,5 +28,6 @@ abstract class NotificationsResponse with _$NotificationsResponse {
     @Default(0) int unread,
   }) = _NotificationsResponse;
 
-  factory NotificationsResponse.fromJson(Map<String, dynamic> json) => _$NotificationsResponseFromJson(json);
+  factory NotificationsResponse.fromJson(Map<String, dynamic> json) =>
+      _$NotificationsResponseFromJson(json);
 }

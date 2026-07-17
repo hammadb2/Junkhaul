@@ -172,4 +172,69 @@ for (const action of ['create_manager', 'assign_role', 'assign_scope', 'change_s
 }
 assert.match(staffAccessRouteSource, /await auditAccess/);
 
+// Session security: blocked statuses must be rejected by getSessionEmployee.
+// We verify by reading the source (the module imports supabase which is
+// lazily proxied for Next.js but not importable in raw Node test context).
+const employeeAuthSource = readFileSync(new URL('../lib/employeeAuth.js', import.meta.url), 'utf8');
+assert.match(employeeAuthSource, /BLOCKED_STATUSES.*terminated.*rejected.*deletion_requested/, 'must define all three blocked statuses');
+assert.match(employeeAuthSource, /BLOCKED_STATUSES\.has\(emp\.status\)/, 'getSessionEmployee must check blocked statuses');
+assert.match(employeeAuthSource, /BLOCKED_STATUSES.*has.*emp\.status.*\n.*delete\(\)\.eq\('token', token\)/, 'getSessionEmployee must destroy session for blocked employees');
+// Ensure active/onboarded/pending_verification are NOT in the blocked set.
+assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*active/, 'active must not be blocked');
+assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*onboarded/, 'onboarded must not be blocked');
+assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*pending_verification/, 'pending_verification must not be blocked');
+
+// Booking assignment check: crew endpoints must verify the employee is
+// assigned to the booking before allowing photo upload, payment collection,
+// or payment link resend.
+assert.match(employeeAuthSource, /isEmployeeAssignedToBooking/, 'must export isEmployeeAssignedToBooking');
+assert.match(employeeAuthSource, /driver_employee_id\.eq.*secondary_employee_id\.eq/, 'must check driver or secondary assignment');
+
+// Fail-closed: null employeeId or bookingId must return false.
+assert.match(employeeAuthSource, /if\s*\(!employeeId\s*\|\|\s*!bookingId\)\s*return false/, 'must fail closed on null inputs');
+// Fail-closed: missing booking or job_date must return false.
+assert.match(employeeAuthSource, /if\s*\(!booking\s*\|\|\s*!booking\.job_date\)\s*return false/, 'must fail closed on missing booking/job_date');
+// Must query crew_assignments by assignment_date matching booking.job_date.
+assert.match(employeeAuthSource, /assignment_date.*booking\.job_date/, 'must match assignment_date to booking job_date');
+
+// Verify all three crew endpoints import and use the assignment check.
+const uploadPhotoSource = readFileSync(new URL('../app/api/crew/upload-photo/route.js', import.meta.url), 'utf8');
+assert.match(uploadPhotoSource, /isEmployeeAssignedToBooking/, 'upload-photo must check booking assignment');
+assert.match(uploadPhotoSource, /Not assigned to this booking/, 'upload-photo must reject unassigned employees');
+assert.match(uploadPhotoSource, /status: 403/, 'upload-photo must return 403 for unassigned');
+// Photo upload safety: file size limit, MIME type check, category allowlist.
+assert.match(uploadPhotoSource, /MAX_FILE_SIZE/, 'upload-photo must enforce file size limit');
+assert.match(uploadPhotoSource, /photo\.size.*MAX_FILE_SIZE/, 'upload-photo must check photo.size against limit');
+assert.match(uploadPhotoSource, /status: 413/, 'upload-photo must return 413 for oversized files');
+assert.match(uploadPhotoSource, /photo\.type.*image\//, 'upload-photo must verify MIME type is image');
+assert.match(uploadPhotoSource, /VALID_TYPES\.includes/, 'upload-photo must validate category against allowlist');
+assert.match(uploadPhotoSource, /upsert: false/, 'upload-photo must not overwrite existing photos');
+
+const collectPaymentSource = readFileSync(new URL('../app/api/crew/collect-payment/route.js', import.meta.url), 'utf8');
+assert.match(collectPaymentSource, /isEmployeeAssignedToBooking/, 'collect-payment must check booking assignment');
+assert.match(collectPaymentSource, /Not assigned to this booking/, 'collect-payment must reject unassigned employees');
+assert.match(collectPaymentSource, /status: 403/, 'collect-payment must return 403 for unassigned');
+assert.match(collectPaymentSource, /already paid/, 'collect-payment must reject duplicate payments');
+assert.match(collectPaymentSource, /payment_status.*pending.*unpaid/, 'collect-payment must only allow pending/unpaid');
+assert.match(collectPaymentSource, /status: 409/, 'collect-payment must return 409 for duplicate');
+// Atomic conditional update (race condition protection).
+assert.match(collectPaymentSource, /or\('payment_status\.in\.\(pending,unpaid\),payment_status\.is\.null'\)/, 'collect-payment must use atomic conditional update');
+assert.match(collectPaymentSource, /concurrent update prevented/, 'collect-payment must report concurrent update prevention');
+assert.match(collectPaymentSource, /updated\.length === 0/, 'collect-payment must check if 0 rows updated');
+
+const resendLinkSource = readFileSync(new URL('../app/api/crew/resend-payment-link/route.js', import.meta.url), 'utf8');
+assert.match(resendLinkSource, /isEmployeeAssignedToBooking/, 'resend-payment-link must check booking assignment');
+assert.match(resendLinkSource, /Not assigned to this booking/, 'resend-payment-link must reject unassigned employees');
+assert.match(resendLinkSource, /status: 403/, 'resend-payment-link must return 403 for unassigned');
+
+// Legacy crew PIN auth must still work (bypasses assignment check).
+assert.match(uploadPhotoSource, /crewAuth/, 'upload-photo must still accept crew PIN auth');
+assert.match(collectPaymentSource, /crewAuth/, 'collect-payment must still accept crew PIN auth');
+assert.match(resendLinkSource, /crewAuth/, 'resend-payment-link must still accept crew PIN auth');
+
+// Employee session auth must be tried first, PIN as fallback.
+assert.match(uploadPhotoSource, /getAuthedEmployee[\s\S]*!employee[\s\S]*crewAuth/, 'upload-photo must try employee session first');
+assert.match(collectPaymentSource, /getAuthedEmployee[\s\S]*!employee[\s\S]*crewAuth/, 'collect-payment must try employee session first');
+assert.match(resendLinkSource, /getAuthedEmployee[\s\S]*!employee[\s\S]*crewAuth/, 'resend-payment-link must try employee session first');
+
 console.log('foundation tests passed');

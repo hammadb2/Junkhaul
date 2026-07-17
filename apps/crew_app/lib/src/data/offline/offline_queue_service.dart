@@ -48,7 +48,9 @@ class OfflineQueueService {
     for (final key in keys) {
       final raw = _box.get(key);
       if (raw == null) continue;
-      final action = OfflineAction.fromJson(Map<String, dynamic>.from(raw as Map));
+      final action = OfflineAction.fromJson(
+        Map<String, dynamic>.from(raw as Map),
+      );
       action.attempts += 1;
       _box.put(key, action.toJson());
       try {
@@ -99,6 +101,12 @@ class OfflineQueueService {
         return '/api/employee/truck-check';
       case 'storage_drop':
         return '/api/employee/storage-drop';
+      case 'item_conditions':
+        return '/api/crew/item-conditions';
+      case 'resend_payment_link':
+        return '/api/crew/resend-payment-link';
+      case 'collect_payment':
+        return '/api/crew/collect-payment';
       default:
         return null;
     }

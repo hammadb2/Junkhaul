@@ -1,53 +1,50 @@
 import 'package:flutter/material.dart';
-
 import '../../core/app_theme.dart';
 
 class JhTextField extends StatelessWidget {
   const JhTextField({
     super.key,
+    required this.label,
     this.controller,
-    this.label,
     this.hint,
     this.keyboardType,
     this.obscureText = false,
-    this.autocorrect = true,
+    this.maxLines = 1,
     this.validator,
-    this.onChanged,
-    this.prefixIcon,
-    this.suffixIcon,
   });
 
+  final String label;
   final TextEditingController? controller;
-  final String? label;
   final String? hint;
   final TextInputType? keyboardType;
   final bool obscureText;
-  final bool autocorrect;
-  final FormFieldValidator<String>? validator;
-  final ValueChanged<String>? onChanged;
-  final Widget? prefixIcon;
-  final Widget? suffixIcon;
+  final int maxLines;
+  final String? Function(String?)? validator;
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      autocorrect: autocorrect,
-      validator: validator,
-      onChanged: onChanged,
-      style: const TextStyle(
-        color: AppColors.textPrimary,
-        fontSize: 15,
-        fontWeight: FontWeight.w400,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: prefixIcon,
-        suffixIcon: suffixIcon,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          obscureText: obscureText,
+          maxLines: obscureText ? 1 : maxLines,
+          validator: validator,
+          style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
+          decoration: InputDecoration(hintText: hint),
+        ),
+      ],
     );
   }
 }

@@ -73,8 +73,8 @@ final permissionServiceProvider = Provider<PermissionService>((ref) {
 /// to decide whether to redirect to /permissions-gate.
 final locationPermissionProvider =
     NotifierProvider<LocationPermissionNotifier, PermissionStatus>(
-  LocationPermissionNotifier.new,
-);
+      LocationPermissionNotifier.new,
+    );
 
 class LocationPermissionNotifier extends Notifier<PermissionStatus> {
   @override

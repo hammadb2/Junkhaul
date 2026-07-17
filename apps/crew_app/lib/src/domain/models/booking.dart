@@ -21,7 +21,9 @@ abstract class Booking with _$Booking {
     @Default('confirmed') String status,
     @JsonKey(name: 'load_size') String? loadSize,
     String? notes,
-    @JsonKey(name: 'itemized_items') @Default(<ItemizedItem>[]) List<ItemizedItem> itemizedItems,
+    @JsonKey(name: 'itemized_items')
+    @Default(<ItemizedItem>[])
+    List<ItemizedItem> itemizedItems,
     String? quadrant,
     @JsonKey(name: 'payment_method') String? paymentMethod,
     @JsonKey(name: 'payment_status') String? paymentStatus,
@@ -31,7 +33,8 @@ abstract class Booking with _$Booking {
     @JsonKey(name: 'truck_fullness') String? truckFullness,
   }) = _Booking;
 
-  factory Booking.fromJson(Map<String, dynamic> json) => _$BookingFromJson(json);
+  factory Booking.fromJson(Map<String, dynamic> json) =>
+      _$BookingFromJson(json);
 }
 
 /// Geocoded address payload from Mapbox stored on bookings.
@@ -44,7 +47,8 @@ abstract class AddressData with _$AddressData {
     String? fullAddress,
   }) = _AddressData;
 
-  factory AddressData.fromJson(Map<String, dynamic> json) => _$AddressDataFromJson(json);
+  factory AddressData.fromJson(Map<String, dynamic> json) =>
+      _$AddressDataFromJson(json);
 }
 
 /// Single line item on a booking.
@@ -59,5 +63,6 @@ abstract class ItemizedItem with _$ItemizedItem {
     @JsonKey(name: 'condition_note') String? conditionNote,
   }) = _ItemizedItem;
 
-  factory ItemizedItem.fromJson(Map<String, dynamic> json) => _$ItemizedItemFromJson(json);
+  factory ItemizedItem.fromJson(Map<String, dynamic> json) =>
+      _$ItemizedItemFromJson(json);
 }

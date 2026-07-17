@@ -6,14 +6,18 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../core/animations.dart';
 import '../data/repositories/auth_repository.dart';
+import '../domain/models/job.dart';
+import '../domain/models/job_mappers.dart';
+import '../domain/providers/schedule_provider.dart';
 import '../presentation/features/job/job_screen.dart';
 import '../presentation/features/login/login_screen.dart';
 import '../presentation/features/onboard/onboard_screen.dart';
 import '../presentation/features/permissions/permission_gate_screen.dart';
 import '../presentation/features/schedule/schedule_screen.dart';
 import '../presentation/features/splash/splash_screen.dart';
-import '../presentation/features/theme_preview/theme_preview_screen.dart';
 import '../presentation/features/verification/verification_pending_screen.dart';
+import '../presentation/features/closeout/closeout_screen.dart';
+import '../presentation/shared/jh_sync_banner.dart';
 
 /// A [Listenable] that mirrors the [AuthRepository] state so [GoRouter] can
 /// re-run its redirect whenever auth changes.
@@ -40,8 +44,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final status = auth.status;
       final location = state.uri.path;
 
-      // Allow splash and theme-preview during bootstrap.
-      if (location == '/splash' || location == '/theme-preview') {
+      // Allow splash during bootstrap.
+      if (location == '/splash') {
         if (status == AuthStatus.unknown) return null;
         return _destinationForStatus(status, location);
       }
@@ -50,9 +54,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (status == AuthStatus.unknown) return '/splash';
 
       // Authenticated routes require auth.
-      final isAuthedRoute = location.startsWith('/schedule') ||
+      final isAuthedRoute =
+          location.startsWith('/schedule') ||
           location.startsWith('/job') ||
           location.startsWith('/clock') ||
+          location.startsWith('/closeout') ||
           location.startsWith('/documents') ||
           location.startsWith('/paystubs') ||
           location.startsWith('/notifications') ||
@@ -63,7 +69,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // Login/onboard/verification should redirect away if already authed.
-      if ((location == '/login' || location.startsWith('/onboard') || location == '/verification') &&
+      if ((location == '/login' ||
+              location.startsWith('/onboard') ||
+              location == '/verification') &&
           status == AuthStatus.authenticated) {
         return '/schedule';
       }
@@ -73,45 +81,49 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/splash',
-        pageBuilder: (context, state) => pageFadeTransition(context, state, const SplashScreen()),
+        pageBuilder: (context, state) =>
+            pageFadeTransition(context, state, const SplashScreen()),
       ),
       GoRoute(
         path: '/login',
-        pageBuilder: (context, state) => pageSharedAxisTransition(context, state, const LoginScreen()),
+        pageBuilder: (context, state) =>
+            pageSharedAxisTransition(context, state, const LoginScreen()),
       ),
       GoRoute(
         path: '/onboard',
-        pageBuilder: (context, state) => pageSharedAxisTransition(context, state, const OnboardScreen()),
+        pageBuilder: (context, state) =>
+            pageSharedAxisTransition(context, state, const OnboardScreen()),
       ),
       GoRoute(
         path: '/verification',
-        pageBuilder: (context, state) => pageFadeTransition(context, state, const VerificationPendingScreen()),
+        pageBuilder: (context, state) => pageFadeTransition(
+          context,
+          state,
+          const VerificationPendingScreen(),
+        ),
       ),
       GoRoute(
         path: '/schedule',
-        pageBuilder: (context, state) => pageFadeTransition(context, state, const ScheduleScreen()),
+        pageBuilder: (context, state) =>
+            pageFadeTransition(context, state, const ScheduleScreen()),
       ),
       GoRoute(
         path: '/job/:bookingId',
         pageBuilder: (context, state) => pageSharedAxisTransition(
           context,
           state,
-          JobScreen(bookingId: state.pathParameters['bookingId']!),
+          _jobScreenBuilder(state.pathParameters['bookingId']!),
         ),
       ),
       GoRoute(
         path: '/permissions-gate',
-        pageBuilder: (context, state) => pageFadeTransition(
-          context,
-          state,
-          PermissionGateScreen(
-            type: _parsePermissionType(state.uri.queryParameters['type']),
-          ),
-        ),
+        pageBuilder: (context, state) =>
+            pageFadeTransition(context, state, const PermissionGateScreen()),
       ),
       GoRoute(
-        path: '/theme-preview',
-        pageBuilder: (context, state) => pageSharedAxisTransition(context, state, const ThemePreviewScreen()),
+        path: '/closeout',
+        pageBuilder: (context, state) =>
+            pageSharedAxisTransition(context, state, const CloseoutScreen()),
       ),
     ],
   );
@@ -136,13 +148,61 @@ String _destinationForStatus(AuthStatus status, String currentLocation) {
 String destinationForStatus(AuthStatus status, String currentLocation) =>
     _destinationForStatus(status, currentLocation);
 
-PermissionType _parsePermissionType(String? value) {
-  switch (value) {
-    case 'camera':
-      return PermissionType.camera;
-    case 'notification':
-      return PermissionType.notification;
-    default:
-      return PermissionType.location;
-  }
+/// Builds a [JobScreen] for the given booking ID by fetching the booking
+/// from the schedule and converting it to a [Job].
+Widget _jobScreenBuilder(String bookingId) {
+  return Consumer(
+    builder: (context, ref, _) {
+      final scheduleAsync = ref.watch(todayScheduleProvider);
+      return scheduleAsync.when(
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (_, __) => Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Could not load job'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.invalidate(todayScheduleProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        data: (schedule) {
+          try {
+            final booking = schedule.bookings.firstWhere(
+              (b) => b.id == bookingId,
+            );
+            final job = booking.toJob();
+            return JobScreen(
+              job: job,
+              bookingId: booking.id,
+              syncState: SyncState.online,
+              onJobComplete: () => context.go('/schedule'),
+            );
+          } catch (_) {
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Job not found'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => context.go('/schedule'),
+                      child: const Text('Back to Schedule'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        },
+      );
+    },
+  );
 }

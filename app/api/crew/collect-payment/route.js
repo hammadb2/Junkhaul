@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
+import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
 import { sendSMS } from '@/lib/sms';
 
 export const runtime = 'nodejs';
@@ -9,9 +10,15 @@ export const runtime = 'nodejs';
 // For digital payments (card/apple pay), the /pay/[booking_id] page handles
 // the Stripe charge and updates payment_status directly via webhook.
 // This route is only for the cash_crew method.
+//
+// Auth: accepts either the employee session cookie (jh_employee_session)
+// or the legacy x-crew-pin header.
 export async function POST(req) {
-  const authed = await crewAuth(req);
-  if (!authed) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const employee = await getAuthedEmployee(req);
+  const pinAuthed = !employee && await crewAuth(req);
+  if (!employee && !pinAuthed) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   let body;
   try {
@@ -24,6 +31,12 @@ export async function POST(req) {
 
   if (!booking_id || !method) {
     return NextResponse.json({ error: 'Missing booking_id or method' }, { status: 400 });
+  }
+
+  // If authenticated via employee session, verify the employee is assigned
+  // to this booking's crew. Legacy PIN auth bypasses this check.
+  if (employee && !await isEmployeeAssignedToBooking(employee.id, booking_id)) {
+    return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
   }
 
   if (method !== 'cash_crew') {
@@ -51,9 +64,24 @@ export async function POST(req) {
     );
   }
 
+  // Duplicate payment protection: reject if already paid.
+  if (booking.payment_status && booking.payment_status !== 'pending' && booking.payment_status !== 'unpaid') {
+    return NextResponse.json(
+      { error: `Booking already paid via ${booking.payment_status}` },
+      { status: 409 }
+    );
+  }
+
   const now = new Date().toISOString();
 
-  const { error: updateErr } = await supabaseAdmin
+  // Atomic conditional update: only update if payment_status is still
+  // pending/unpaid/null. This prevents race conditions where two requests
+  // pass the read check above simultaneously. If 0 rows are updated,
+  // another request already collected the payment.
+  //
+  // We use .in() for non-null values and .is() for null, combined via .or().
+  // Postgres IN clause does not match NULL, so we need the explicit .is() check.
+  const { data: updated, error: updateErr } = await supabaseAdmin
     .from('bookings')
     .update({
       payment_status: 'cash_crew',
@@ -65,10 +93,21 @@ export async function POST(req) {
       review_requested: true,
       review_requested_at: now,
     })
-    .eq('id', booking_id);
+    .eq('id', booking_id)
+    .or('payment_status.in.(pending,unpaid),payment_status.is.null')
+    .select('id');
 
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
+
+  // If no rows were updated, the payment was already collected by a
+  // concurrent request (race condition won the read check but lost the update).
+  if (!updated || updated.length === 0) {
+    return NextResponse.json(
+      { error: 'Booking already paid (concurrent update prevented)' },
+      { status: 409 }
+    );
   }
 
   // Send receipt email (via the existing email system)

@@ -32,14 +32,13 @@ class ApiException implements Exception {
   final int statusCode;
   final Map<String, dynamic>? body;
 
-  ApiError get error =>
-      statusCode == 401 || statusCode == 403
-          ? ApiError.auth
-          : statusCode == 404
-          ? ApiError.notFound
-          : statusCode == 422
-          ? ApiError.validation
-          : ApiError.unknown;
+  ApiError get error => statusCode == 401 || statusCode == 403
+      ? ApiError.auth
+      : statusCode == 404
+      ? ApiError.notFound
+      : statusCode == 422
+      ? ApiError.validation
+      : ApiError.unknown;
 
   @override
   String toString() => 'ApiException($statusCode): $message';

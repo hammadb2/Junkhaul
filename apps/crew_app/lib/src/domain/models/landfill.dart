@@ -17,7 +17,8 @@ abstract class Landfill with _$Landfill {
     @JsonKey(name: 'summer_only_sunday') bool? summerOnlySunday,
   }) = _Landfill;
 
-  factory Landfill.fromJson(Map<String, dynamic> json) => _$LandfillFromJson(json);
+  factory Landfill.fromJson(Map<String, dynamic> json) =>
+      _$LandfillFromJson(json);
 }
 
 /// GET /api/employee/landfill response.
@@ -31,5 +32,6 @@ abstract class LandfillResponse with _$LandfillResponse {
     @JsonKey(name: 'is_sunday') @Default(false) bool isSunday,
   }) = _LandfillResponse;
 
-  factory LandfillResponse.fromJson(Map<String, dynamic> json) => _$LandfillResponseFromJson(json);
+  factory LandfillResponse.fromJson(Map<String, dynamic> json) =>
+      _$LandfillResponseFromJson(json);
 }

@@ -18,7 +18,8 @@ abstract class Incident with _$Incident {
     @JsonKey(name: 'created_at') String? createdAt,
   }) = _Incident;
 
-  factory Incident.fromJson(Map<String, dynamic> json) => _$IncidentFromJson(json);
+  factory Incident.fromJson(Map<String, dynamic> json) =>
+      _$IncidentFromJson(json);
 }
 
 /// GET /api/employee/incidents response.
@@ -28,5 +29,6 @@ abstract class IncidentsResponse with _$IncidentsResponse {
     @Default(<Incident>[]) List<Incident> incidents,
   }) = _IncidentsResponse;
 
-  factory IncidentsResponse.fromJson(Map<String, dynamic> json) => _$IncidentsResponseFromJson(json);
+  factory IncidentsResponse.fromJson(Map<String, dynamic> json) =>
+      _$IncidentsResponseFromJson(json);
 }

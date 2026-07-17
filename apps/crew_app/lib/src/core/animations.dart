@@ -53,7 +53,10 @@ CustomTransitionPage<T> pageSharedAxisTransition<T>(
     transitionDuration: JhAnimationDurations.pageTransition,
     reverseTransitionDuration: JhAnimationDurations.pageTransition,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+      final tween = Tween(
+        begin: begin,
+        end: end,
+      ).chain(CurveTween(curve: curve));
       final fadeAnimation = CurvedAnimation(
         parent: animation,
         curve: const Interval(0, 0.8, curve: curve),
@@ -61,10 +64,7 @@ CustomTransitionPage<T> pageSharedAxisTransition<T>(
 
       return SlideTransition(
         position: animation.drive(tween),
-        child: FadeTransition(
-          opacity: fadeAnimation,
-          child: child,
-        ),
+        child: FadeTransition(opacity: fadeAnimation, child: child),
       );
     },
   );
@@ -76,9 +76,10 @@ Animation<Color?> animateColor({
   required Color end,
   Curve curve = JhAnimationCurves.stateTransition,
 }) {
-  return ColorTween(begin: begin, end: end).animate(
-    CurvedAnimation(parent: animation, curve: curve),
-  );
+  return ColorTween(
+    begin: begin,
+    end: end,
+  ).animate(CurvedAnimation(parent: animation, curve: curve));
 }
 
 Animation<EdgeInsets?> animateEdgeInsets({
@@ -87,7 +88,8 @@ Animation<EdgeInsets?> animateEdgeInsets({
   required EdgeInsets end,
   Curve curve = JhAnimationCurves.stateTransition,
 }) {
-  return EdgeInsetsTween(begin: begin, end: end).animate(
-    CurvedAnimation(parent: animation, curve: curve),
-  );
+  return EdgeInsetsTween(
+    begin: begin,
+    end: end,
+  ).animate(CurvedAnimation(parent: animation, curve: curve));
 }

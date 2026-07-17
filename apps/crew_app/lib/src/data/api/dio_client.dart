@@ -43,7 +43,8 @@ class DioClient {
         receiveTimeout: receiveTimeout,
         sendTimeout: connectTimeout,
         headers: const {'Accept': 'application/json'},
-        validateStatus: (status) => status != null && status >= 200 && status < 400,
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 400,
       ),
     );
 
@@ -56,13 +57,12 @@ class DioClient {
     final savedCookie = await storage.read(key: _kSessionCookieKey);
     if (savedCookie != null && savedCookie.isNotEmpty) {
       final uri = Uri.parse(baseUrl);
-      await cookieJar.saveFromResponse(
-        uri,
-        [Cookie(_kSessionCookieName, savedCookie)
+      await cookieJar.saveFromResponse(uri, [
+        Cookie(_kSessionCookieName, savedCookie)
           ..domain = uri.host
           ..path = '/'
-          ..httpOnly = true],
-      );
+          ..httpOnly = true,
+      ]);
     }
 
     return DioClient._(dio, cookieJar);
@@ -78,7 +78,9 @@ class DioClient {
   }) async {
     try {
       final r = await _dio.get<dynamic>(path, queryParameters: query);
-      return r.data is String ? _decodeString(r.data as String) : (r.data as Map).cast<String, dynamic>();
+      return r.data is String
+          ? _decodeString(r.data as String)
+          : (r.data as Map).cast<String, dynamic>();
     } on DioException catch (e) {
       throw _mapDioException(e);
     }
@@ -91,8 +93,34 @@ class DioClient {
     Map<String, dynamic>? query,
   }) async {
     try {
-      final r = await _dio.post<dynamic>(path, data: body, queryParameters: query);
-      return r.data is String ? _decodeString(r.data as String) : (r.data as Map).cast<String, dynamic>();
+      final r = await _dio.post<dynamic>(
+        path,
+        data: body,
+        queryParameters: query,
+      );
+      return r.data is String
+          ? _decodeString(r.data as String)
+          : (r.data as Map).cast<String, dynamic>();
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    }
+  }
+
+  /// Convenience PUT that encodes JSON and decodes JSON.
+  Future<Map<String, dynamic>> putJson(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      final r = await _dio.put<dynamic>(
+        path,
+        data: body,
+        queryParameters: query,
+      );
+      return r.data is String
+          ? _decodeString(r.data as String)
+          : (r.data as Map).cast<String, dynamic>();
     } on DioException catch (e) {
       throw _mapDioException(e);
     }
@@ -105,7 +133,9 @@ class DioClient {
   }) async {
     try {
       final r = await _dio.post<dynamic>(path, data: formData);
-      return r.data is String ? _decodeString(r.data as String) : (r.data as Map).cast<String, dynamic>();
+      return r.data is String
+          ? _decodeString(r.data as String)
+          : (r.data as Map).cast<String, dynamic>();
     } on DioException catch (e) {
       throw _mapDioException(e);
     }
@@ -152,7 +182,9 @@ Exception _mapDioException(DioException e) {
       return ApiException(
         _extractErrorMessage(e.response) ?? 'Request failed',
         statusCode: status,
-        body: e.response?.data is Map ? (e.response!.data as Map).cast<String, dynamic>() : null,
+        body: e.response?.data is Map
+            ? (e.response!.data as Map).cast<String, dynamic>()
+            : null,
       );
     }
     if (status >= 500) {
@@ -195,9 +227,13 @@ class _RetryInterceptor extends Interceptor {
   static const _maxAttempts = 3;
 
   @override
-  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
     final attempt = (err.requestOptions.extra['retry_attempt'] as int?) ?? 0;
-    final retriable = err.type == DioExceptionType.connectionTimeout ||
+    final retriable =
+        err.type == DioExceptionType.connectionTimeout ||
         err.type == DioExceptionType.sendTimeout ||
         err.type == DioExceptionType.receiveTimeout ||
         err.type == DioExceptionType.connectionError;
@@ -210,7 +246,9 @@ class _RetryInterceptor extends Interceptor {
     await Future<void>.delayed(backoff);
 
     try {
-      final opts = err.requestOptions.copyWith(extra: {...err.requestOptions.extra, 'retry_attempt': attempt + 1});
+      final opts = err.requestOptions.copyWith(
+        extra: {...err.requestOptions.extra, 'retry_attempt': attempt + 1},
+      );
       final dio = Dio();
       // Reuse the same base options as the parent Dio.
       dio.options
@@ -240,12 +278,12 @@ class _AuthInterceptor extends Interceptor {
           requestOptions: err.requestOptions,
           response: err.response,
           type: err.type,
-          error: AuthException(_extractErrorMessage(err.response) ?? 'Unauthorized'),
+          error: AuthException(
+            _extractErrorMessage(err.response) ?? 'Unauthorized',
+          ),
         ),
       );
     }
     handler.next(err);
   }
 }
-
-
