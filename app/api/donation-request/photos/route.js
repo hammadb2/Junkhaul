@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, DONATION_PHOTO_BUCKET } from '@/lib/supabase';
 import { assertDonationUploadAllowed, storeDonationPhoto } from '@/lib/donationPhotos';
 import { recordTimelineEvent } from '@/lib/timeline';
+import { assertRateLimit, getClientKey } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -15,6 +16,8 @@ export async function POST(req) {
     const replacePhotoId = form.get('replace_photo_id') || null;
     const file = form.get('file');
     if (!file || typeof file.arrayBuffer !== 'function') return NextResponse.json({ error: 'file is required.' }, { status: 400 });
+    assertRateLimit({ scope: 'donation_photo_ip', key: getClientKey(req, donationRequestId), limit: 30, windowMs: 60 * 60 * 1000 });
+    assertRateLimit({ scope: 'donation_photo_request', key: donationRequestId, limit: 20, windowMs: 60 * 60 * 1000 });
     const photo = await storeDonationPhoto({ donationRequestId, token, file, photoType, replacePhotoId });
     await recordTimelineEvent({
       entity_type: 'donation_request',
@@ -27,13 +30,17 @@ export async function POST(req) {
     return NextResponse.json({ ok: true, photo });
   } catch (err) {
     console.error('donation photo upload failed:', err);
-    return NextResponse.json({ error: err.message || 'Could not upload photo.' }, { status: 400 });
+    return NextResponse.json(
+      { error: err.message || 'Could not upload photo.' },
+      { status: err.status || 400, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+    );
   }
 }
 
 export async function DELETE(req) {
   try {
     const { donation_request_id, token, photo_id } = await req.json();
+    assertRateLimit({ scope: 'donation_photo_delete_ip', key: getClientKey(req, donation_request_id), limit: 30, windowMs: 60 * 60 * 1000 });
     await assertDonationUploadAllowed({ donationRequestId: donation_request_id, token });
     const { data: photo } = await supabaseAdmin
       .from('donation_request_photos')
@@ -43,6 +50,9 @@ export async function DELETE(req) {
       .select()
       .maybeSingle();
     if (!photo) return NextResponse.json({ error: 'Photo not found.' }, { status: 404 });
+    if (photo.storage_path) {
+      await supabaseAdmin.storage.from(DONATION_PHOTO_BUCKET).remove([photo.storage_path]).catch(() => {});
+    }
     await recordTimelineEvent({
       entity_type: 'donation_request',
       entity_id: donation_request_id,
@@ -53,6 +63,9 @@ export async function DELETE(req) {
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: err.message || 'Could not remove photo.' }, { status: 400 });
+    return NextResponse.json(
+      { error: err.message || 'Could not remove photo.' },
+      { status: err.status || 400, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+    );
   }
 }

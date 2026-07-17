@@ -6,6 +6,7 @@ import { captureAttribution } from '@/lib/attribution';
 import { validateDonationPhotos, analyzeDonationSubmission } from '@/lib/donation';
 import { assertDonationUploadAllowed, REQUIRED_DONATION_PHOTO_TYPES } from '@/lib/donationPhotos';
 import { recordTimelineEvent } from '@/lib/timeline';
+import { assertRateLimit, getClientKey } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +36,8 @@ export async function POST(req) {
     } = body;
 
     if (!phone || !address) return NextResponse.json({ error: 'Phone and address are required.' }, { status: 400 });
+    assertRateLimit({ scope: 'donation_submit_ip', key: getClientKey(req, session_id || donation_request_id), limit: 10, windowMs: 60 * 60 * 1000 });
+    assertRateLimit({ scope: 'donation_submit_phone', key: phone, limit: 4, windowMs: 60 * 60 * 1000 });
     if (!donation_request_id || !token) {
       return NextResponse.json({ error: 'Start a donation draft and upload photos before submitting.' }, { status: 400 });
     }
@@ -178,6 +181,9 @@ export async function POST(req) {
     return NextResponse.json({ ok: true, donation_request_id: request.id, request_ref: request.request_ref, status: nextStatus });
   } catch (err) {
     console.error('donation request failed:', err);
-    return NextResponse.json({ error: 'Could not submit donation request.' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.status === 429 ? err.message : 'Could not submit donation request.' },
+      { status: err.status || 500, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+    );
   }
 }

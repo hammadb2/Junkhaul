@@ -5,6 +5,7 @@ import { captureAttribution } from '@/lib/attribution';
 import { upsertSmsConsent } from '@/lib/sms';
 import { newResumeToken, hashToken } from '@/lib/donationPhotos';
 import { recordTimelineEvent } from '@/lib/timeline';
+import { assertRateLimit, getClientKey } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -13,6 +14,8 @@ export async function POST(req) {
     const body = await req.json();
     const { session_id, name = null, phone, email = null, address = null, attribution = {}, sms_consent_source = 'donation_draft' } = body;
     if (!session_id || !phone) return NextResponse.json({ error: 'session_id and phone are required.' }, { status: 400 });
+    assertRateLimit({ scope: 'donation_draft_ip', key: getClientKey(req, session_id), limit: 12, windowMs: 10 * 60 * 1000 });
+    assertRateLimit({ scope: 'donation_draft_phone', key: phone, limit: 5, windowMs: 60 * 60 * 1000 });
 
     const normalizedPhone = normalizePhone(phone);
     const token = newResumeToken();
@@ -74,6 +77,9 @@ export async function POST(req) {
     return NextResponse.json({ ok: true, donation_request_id: request.id, request_ref: request.request_ref, token });
   } catch (err) {
     console.error('donation draft failed:', err);
-    return NextResponse.json({ error: 'Could not start donation request.' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.status === 429 ? err.message : 'Could not start donation request.' },
+      { status: err.status || 500, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+    );
   }
 }

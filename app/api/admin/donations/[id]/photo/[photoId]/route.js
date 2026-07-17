@@ -19,6 +19,7 @@ export async function GET(req, { params }) {
     .select('storage_path')
     .eq('id', photoId)
     .eq('donation_request_id', id)
+    .is('removed_at', null)
     .maybeSingle();
   if (!photo?.storage_path) return NextResponse.json({ error: 'Photo not found.' }, { status: 404 });
   const url = await getDonationPhotoSignedUrl(photo.storage_path, 300);
