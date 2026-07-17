@@ -83,6 +83,104 @@ export async function POST(req, { params }) {
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     after = data;
+  } else if (action === 'mark_spam') {
+    if (!reason) return NextResponse.json({ error: 'reason is required' }, { status: 422 });
+    const { data, error } = await supabaseAdmin
+      .from('leads')
+      .update({ status: 'spam', abandonment_point: 'marked_spam', last_activity_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    after = data;
+  } else if (action === 'convert_to_booking') {
+    if (!reason || !payload.booking_id) return NextResponse.json({ error: 'reason and booking_id are required' }, { status: 422 });
+    const { data: booking } = await supabaseAdmin.from('bookings').select('id,booking_ref').eq('id', payload.booking_id).maybeSingle();
+    if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    await supabaseAdmin.from('bookings').update({ lead_id: id }).eq('id', booking.id);
+    const { data, error } = await supabaseAdmin
+      .from('leads')
+      .update({ status: 'converted', converted_to_booking_id: booking.id, last_activity_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    after = data;
+    result.booking = booking;
+  } else if (action === 'convert_to_donation') {
+    if (!reason) return NextResponse.json({ error: 'reason is required' }, { status: 422 });
+    const { data: donation, error: donationError } = await supabaseAdmin
+      .from('donation_requests')
+      .insert({
+        lead_id: id,
+        session_id: lead.session_id,
+        name: lead.name,
+        phone: lead.phone,
+        email: lead.email,
+        address: lead.address,
+        status: 'draft',
+        last_completed_step: 'admin_converted_from_lead',
+        attribution_record_id: lead.attribution_record_id,
+        first_touch_attribution_id: lead.first_touch_attribution_id,
+        last_touch_attribution_id: lead.last_touch_attribution_id,
+      })
+      .select('*')
+      .single();
+    if (donationError) return NextResponse.json({ error: donationError.message }, { status: 500 });
+    const { data, error } = await supabaseAdmin
+      .from('leads')
+      .update({ status: 'engaged', last_activity_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    after = data;
+    result.donation_request = donation;
+  } else if (action === 'add_to_waitlist') {
+    if (!reason) return NextResponse.json({ error: 'reason is required' }, { status: 422 });
+    const { data: waitlist, error: waitlistError } = await supabaseAdmin
+      .from('waitlist')
+      .insert({
+        name: lead.name || payload.name || 'Unknown lead',
+        phone: lead.phone,
+        email: lead.email,
+        address: lead.address,
+        preferred_date: payload.preferred_date || null,
+        preferred_time: payload.preferred_time || null,
+        source: 'admin_lead_detail',
+        lead_id: id,
+      })
+      .select('*')
+      .single();
+    if (waitlistError) return NextResponse.json({ error: waitlistError.message }, { status: 500 });
+    const { data, error } = await supabaseAdmin.from('leads').update({ last_activity_at: new Date().toISOString() }).eq('id', id).select('*').single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    after = data;
+    result.waitlist = waitlist;
+  } else if (action === 'merge_duplicate') {
+    if (!reason || !payload.duplicate_lead_id) return NextResponse.json({ error: 'reason and duplicate_lead_id are required' }, { status: 422 });
+    if (payload.duplicate_lead_id === id) return NextResponse.json({ error: 'duplicate_lead_id must be different from canonical lead' }, { status: 409 });
+    const { data: duplicate } = await supabaseAdmin.from('leads').select('*').eq('id', payload.duplicate_lead_id).maybeSingle();
+    if (!duplicate) return NextResponse.json({ error: 'Duplicate lead not found' }, { status: 404 });
+    await Promise.all([
+      supabaseAdmin.from('attribution_records').update({ lead_id: id }).eq('lead_id', duplicate.id),
+      supabaseAdmin.from('messages').update({ lead_id: id }).eq('lead_id', duplicate.id),
+      supabaseAdmin.from('phone_calls').update({ lead_id: id }).eq('lead_id', duplicate.id),
+      supabaseAdmin.from('bookings').update({ lead_id: id }).eq('lead_id', duplicate.id),
+      supabaseAdmin.from('donation_requests').update({ lead_id: id }).eq('lead_id', duplicate.id),
+      supabaseAdmin.from('timeline_events').update({ entity_id: id }).eq('entity_type', 'lead').eq('entity_id', duplicate.id),
+    ]);
+    const mergedIds = new Set([...(Array.isArray(lead.merged_lead_ids) ? lead.merged_lead_ids : []), duplicate.id]);
+    const { data, error } = await supabaseAdmin
+      .from('leads')
+      .update({ merged_lead_ids: [...mergedIds], last_activity_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await supabaseAdmin.from('leads').update({ status: 'merged', merged_into_lead_id: id, last_activity_at: new Date().toISOString() }).eq('id', duplicate.id);
+    after = data;
+    result.merged_lead_id = duplicate.id;
   } else if (action === 'correct_attribution') {
     if (!reason) return NextResponse.json({ error: 'reason is required' }, { status: 422 });
     const update = {

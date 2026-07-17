@@ -232,7 +232,12 @@ export default function LeadsView({ flash }) {
                     <button onClick={() => leadAction('send_follow_up')} style={smallBtn}>Send follow-up</button>
                     <button onClick={() => leadAction('request_photos')} style={smallBtn}>Request photos</button>
                     <button onClick={() => leadAction('correct_attribution', { customer_reported_source: window.prompt('Customer-reported source:') || '' })} style={smallBtn}>Correct attribution</button>
-                    <button onClick={() => leadAction('mark_invalid')} style={smallBtn}>Mark invalid/spam</button>
+                    <button onClick={() => leadAction('convert_to_booking', { booking_id: window.prompt('Booking UUID to link:') || '' })} style={smallBtn}>Convert to booking</button>
+                    <button onClick={() => leadAction('convert_to_donation')} style={smallBtn}>Convert to donation</button>
+                    <button onClick={() => leadAction('add_to_waitlist', { preferred_date: window.prompt('Preferred date (optional):') || null })} style={smallBtn}>Add to waitlist</button>
+                    <button onClick={() => leadAction('merge_duplicate', { duplicate_lead_id: window.prompt('Duplicate lead UUID to merge into this lead:') || '' })} style={smallBtn}>Merge duplicate</button>
+                    <button onClick={() => leadAction('mark_invalid')} style={smallBtn}>Mark invalid</button>
+                    <button onClick={() => leadAction('mark_spam')} style={smallBtn}>Mark spam</button>
                     <button onClick={() => leadAction('escalate')} style={smallBtn}>Escalate</button>
                   </div>
                 </Section>

@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { recordAuditEvent } from '@/lib/auditEvents';
 import { recordTimelineEvent } from '@/lib/timeline';
-import { hasManagerScope, requireStaffPermission } from '@/lib/staffAuth';
+import { managerCanAccessAny, requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
@@ -17,6 +17,9 @@ const ACTION_PERMISSIONS = {
   unassign_truck: 'bookings.assign',
   reschedule: 'bookings.reschedule',
   cancel_without_refund: 'bookings.cancel',
+  move_to_waitlist: 'bookings.reschedule',
+  return_from_waitlist: 'bookings.reschedule',
+  reopen: 'bookings.reschedule',
   mark_customer_unavailable: 'bookings.reschedule',
   record_no_show: 'bookings.reschedule',
   correct_address: 'bookings.correct_address',
@@ -70,11 +73,12 @@ async function assertManagerCanAct(context, booking) {
     ['date', booking.job_date],
     ['quadrant', booking.quadrant],
     ['crew_assignment', booking.crew_assignment_id],
-  ].filter(([, value]) => value);
-  for (const [type, value] of checks) {
-    if (await hasManagerScope(context.employee.id, type, value)) return true;
-  }
-  return false;
+    ['crew', booking.crew_assignment_id],
+    ['truck', booking.truck_id || booking.truck_size],
+    ['route_plan', booking.route_plan_id],
+    ['daily_operation', booking.job_date],
+  ].filter(([, value]) => value).map(([scope_type, scope_value]) => ({ scope_type, scope_value }));
+  return managerCanAccessAny ? managerCanAccessAny(context.employee.id, checks) : false;
 }
 
 async function writeActionEvents({ context, booking, action, reason, before, after, metadata, correlationId }) {
@@ -104,7 +108,7 @@ export async function POST(req, { params }) {
   const permission = ACTION_PERMISSIONS[action];
 
   if (!permission) return NextResponse.json({ error: 'Unsupported booking action' }, { status: 422 });
-  if (['reschedule', 'cancel_without_refund', 'correct_address', 'override_service_area', 'manual_quote_correction', 'flag_hazardous_item', 'flag_quote_mismatch', 'flag_issue', 'escalate'].includes(action) && !reason) {
+  if (['reschedule', 'cancel_without_refund', 'move_to_waitlist', 'return_from_waitlist', 'reopen', 'correct_address', 'override_service_area', 'manual_quote_correction', 'flag_hazardous_item', 'flag_quote_mismatch', 'flag_issue', 'escalate'].includes(action) && !reason) {
     return NextResponse.json({ error: 'reason is required for this action' }, { status: 422 });
   }
 
@@ -121,7 +125,7 @@ export async function POST(req, { params }) {
   const { data: booking, error } = await supabaseAdmin.from('bookings').select('*').eq('id', id).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
-  if (['completed', 'cancelled'].includes(booking.status) && !['add_internal_note', 'send_quo_template', 'escalate'].includes(action)) {
+  if (['completed', 'cancelled'].includes(booking.status) && !['add_internal_note', 'send_quo_template', 'escalate', 'reopen'].includes(action)) {
     return NextResponse.json({ error: `Cannot perform ${action} on ${booking.status} booking` }, { status: 409 });
   }
   if (!(await assertManagerCanAct(auth.context, booking))) {
@@ -151,6 +155,17 @@ export async function POST(req, { params }) {
     if (assignment.assignment_date && booking.job_date && assignment.assignment_date !== booking.job_date) {
       return NextResponse.json({ error: 'Crew assignment date does not match booking date' }, { status: 409 });
     }
+    const { data: conflict } = await supabaseAdmin
+      .from('bookings')
+      .select('id, booking_ref, job_time, status')
+      .eq('crew_assignment_id', assignmentId)
+      .eq('job_date', booking.job_date)
+      .eq('job_time', booking.job_time)
+      .in('status', ['confirmed', 'rescheduled'])
+      .neq('id', id)
+      .limit(1)
+      .maybeSingle();
+    if (conflict) return NextResponse.json({ error: 'Crew already has a booking in this window', conflict }, { status: 409 });
     const { data, error: updateError } = await supabaseAdmin
       .from('bookings')
       .update({ crew_assignment_id: assignmentId })
@@ -191,6 +206,7 @@ export async function POST(req, { params }) {
     after = data;
   } else if (action === 'reschedule') {
     if (!payload.job_date || !payload.job_time) return NextResponse.json({ error: 'job_date and job_time required' }, { status: 422 });
+    const history = Array.isArray(booking.schedule_history) ? booking.schedule_history : [];
     const { data, error: updateError } = await supabaseAdmin
       .from('bookings')
       .update({
@@ -201,6 +217,33 @@ export async function POST(req, { params }) {
         job_datetime: `${payload.job_date}T${payload.job_time}:00`,
         status: booking.status === 'pending_payment' ? booking.status : 'rescheduled',
         reschedule_count: Number(booking.reschedule_count || 0) + 1,
+        schedule_history: [...history, { at: new Date().toISOString(), actor_id: auth.context.employee.id, action, reason, before: { job_date: booking.job_date, job_time: booking.job_time }, after: { job_date: payload.job_date, job_time: payload.job_time } }],
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+    after = data;
+  } else if (action === 'move_to_waitlist') {
+    const { data, error: updateError } = await supabaseAdmin
+      .from('bookings')
+      .update({
+        operator_notes: appendNote(booking.operator_notes, reason || 'Moved to waitlist', auth.context.employee.id),
+        schedule_history: [...(Array.isArray(booking.schedule_history) ? booking.schedule_history : []), { at: new Date().toISOString(), actor_id: auth.context.employee.id, action, reason, before: { status: booking.status, job_date: booking.job_date, job_time: booking.job_time }, after: { waitlist_pending: true } }],
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+    after = data;
+  } else if (action === 'return_from_waitlist' || action === 'reopen') {
+    const nextStatus = action === 'reopen' ? 'confirmed' : 'confirmed';
+    const { data, error: updateError } = await supabaseAdmin
+      .from('bookings')
+      .update({
+        status: nextStatus,
+        operator_notes: appendNote(booking.operator_notes, reason || action, auth.context.employee.id),
+        schedule_history: [...(Array.isArray(booking.schedule_history) ? booking.schedule_history : []), { at: new Date().toISOString(), actor_id: auth.context.employee.id, action, reason, before: { status: booking.status }, after: { status: nextStatus } }],
       })
       .eq('id', id)
       .select('*')

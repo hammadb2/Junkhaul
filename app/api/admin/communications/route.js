@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { recordAuditEvent } from '@/lib/auditEvents';
+import { recordTimelineEvent } from '@/lib/timeline';
 import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
@@ -112,6 +113,20 @@ export async function POST(req) {
     before: original,
     after: retryResult,
     metadata: { message_type: original.message_type, provider_status: original.provider_status },
+  });
+  const entityType = original.booking_id ? 'booking' : original.lead_id ? 'lead' : original.donation_request_id ? 'donation_request' : 'message';
+  const entityId = original.booking_id || original.lead_id || original.donation_request_id || message_id;
+  await recordTimelineEvent({
+    entity_type: entityType,
+    entity_id: entityId,
+    event_type: 'message_retry_attempted',
+    actor_type: 'employee',
+    actor_id: auth.context.employee.id,
+    source: 'admin_communications',
+    before: original,
+    after: retryResult,
+    reason,
+    metadata: { message_id, message_type: original.message_type, provider_status: original.provider_status },
   });
 
   return NextResponse.json({ ok: retryResult?.ok !== false, retry: retryResult });

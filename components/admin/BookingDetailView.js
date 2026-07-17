@@ -69,7 +69,7 @@ export default function BookingDetailView() {
           <Card title="Admin actions">
             <div style={{ display: 'grid', gap: 8 }}>
               <select value={action} onChange={(e) => setAction(e.target.value)} style={input}>
-                {['add_internal_note','assign_crew','unassign_crew','assign_truck','unassign_truck','reschedule','correct_address','request_photos','send_reschedule_confirmation','send_cancellation_notice','flag_issue','escalate','cancel_without_refund','record_no_show','mark_ready_for_dispatch'].map((a) => <option key={a} value={a}>{a}</option>)}
+                {['add_internal_note','assign_crew','change_crew','unassign_crew','assign_truck','change_truck','unassign_truck','reschedule','move_to_waitlist','return_from_waitlist','reopen','correct_address','correct_access','correct_property','override_service_area','request_photos','send_quo_template','resend_payment_link','send_photo_upload_link','send_reschedule_confirmation','send_cancellation_notice','review_quote','manual_quote_correction','flag_hazardous_item','flag_quote_mismatch','flag_issue','escalate','cancel_without_refund','record_no_show','mark_customer_unavailable','mark_ready_for_dispatch'].map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
               <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for audit/timeline" style={input} />
               <textarea value={payloadText} onChange={(e) => setPayloadText(e.target.value)} rows={5} style={{ ...input, fontFamily: 'monospace' }} />
