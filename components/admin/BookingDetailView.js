@@ -6,6 +6,9 @@ export default function BookingDetailView() {
   const [id, setId] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [action, setAction] = useState('add_internal_note');
+  const [reason, setReason] = useState('');
+  const [payloadText, setPayloadText] = useState('{"note":"Customer called; manager reviewed."}');
   const load = async () => {
     setError(null);
     const res = await fetch(`/api/admin/bookings/${id}/detail`);
@@ -14,6 +17,19 @@ export default function BookingDetailView() {
     else setData(d);
   };
   const b = data?.booking;
+  const runAction = async () => {
+    setError(null);
+    let payload = {};
+    try { payload = payloadText ? JSON.parse(payloadText) : {}; } catch { setError('Payload must be valid JSON'); return; }
+    const res = await fetch(`/api/admin/bookings/${b.id}/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, reason, payload }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { setError(d.error || 'Action failed'); return; }
+    await load();
+  };
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: 18 }}>
@@ -51,7 +67,15 @@ export default function BookingDetailView() {
             {(data.timeline || []).map((t) => <p key={t.id}>{new Date(t.created_at).toLocaleString()} · {t.event_type}</p>)}
           </Card>
           <Card title="Admin actions">
-            <p>Action APIs will require permission + audit/timeline records. Current foundation supports assign crew/truck, reschedule, address correction, quote review, notes, SMS, payment link, photo request, attribution correction, flags, cancel, escalate.</p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <select value={action} onChange={(e) => setAction(e.target.value)} style={input}>
+                {['add_internal_note','assign_crew','unassign_crew','assign_truck','unassign_truck','reschedule','correct_address','request_photos','send_reschedule_confirmation','send_cancellation_notice','flag_issue','escalate','cancel_without_refund','record_no_show','mark_ready_for_dispatch'].map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for audit/timeline" style={input} />
+              <textarea value={payloadText} onChange={(e) => setPayloadText(e.target.value)} rows={5} style={{ ...input, fontFamily: 'monospace' }} />
+              <button onClick={runAction} style={{ border: 'none', borderRadius: 9, padding: '9px 12px', background: '#1a1a1a', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Run action</button>
+              <p>Refund execution is intentionally not available here. Use owner-only refund workflows separately.</p>
+            </div>
           </Card>
         </div>
       )}
@@ -63,3 +87,4 @@ function Card({ title, children }) {
   return <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: 16 }}><div style={{ fontWeight: 800, marginBottom: 8 }}>{title}</div><div style={{ fontSize: 13, color: 'rgba(0,0,0,.68)' }}>{children}</div></div>;
 }
 const pre = { whiteSpace: 'pre-wrap', fontSize: 11, maxHeight: 180, overflow: 'auto', background: '#FAFAFA', padding: 8, borderRadius: 8 };
+const input = { width: '100%', boxSizing: 'border-box', border: '1px solid rgba(0,0,0,.12)', borderRadius: 9, padding: 9, fontSize: 13 };

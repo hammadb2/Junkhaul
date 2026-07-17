@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  return token === await adminToken();
-}
-
 export async function GET(req, { params }) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { id } = await params;
+  const auth = await requireStaffPermission(req, {
+    permission: 'admin.read',
+    entityType: 'booking',
+    entityId: id,
+    action: 'booking_detail.read',
+    metadata: { route: '/api/admin/bookings/[id]/detail' },
+  });
+  if (!auth.ok) return auth.response;
   const { data: booking, error } = await supabaseAdmin.from('bookings').select('*').eq('id', id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const [
