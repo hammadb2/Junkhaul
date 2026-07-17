@@ -1,13 +1,13 @@
 # Junkhaul — Complete Progress & Status
 
-**Last updated:** 2026-07-16
+**Last updated:** 2026-07-17
 **Total commits:** 175+
 **Repo:** `/Users/hammadbhatti/Junkhaul` (Next.js web platform)
 **Crew app:** `/Users/hammadbhatti/Desktop/crew_app` (Flutter iOS/Android)
 
 ---
 
-## 2026-07-16 Repository-grounded implementation update
+## 2026-07-17 Repository-grounded implementation update
 
 This section supersedes broad claims below such as “everything built.” Status values used here are only `COMPLETE_AND_VERIFIED`, `BUILT_NOT_VERIFIED`, `PARTIAL`, `NOT_BUILT`.
 
@@ -26,6 +26,22 @@ This section supersedes broad claims below such as “everything built.” Statu
 - Manual verification: `BUILT_NOT_VERIFIED`; build/lint/tests pass locally.
 - Production status: `PARTIAL`; migration must be applied and seeded.
 - Known gaps: customer change history is still not fully captured per field; photo metadata is not fully stored for website upload; admin action endpoints are not complete.
+
+### Verification phase status
+
+- Status: `PARTIAL`
+- Repository path: `tests/integration/foundation.integration.js`, `tests/foundation.test.js`, `package.json`, `package-lock.json`
+- API: no production API added by the harness.
+- Database table: validates foundation tables when an isolated test DB is provided.
+- Admin visibility: `NO_APP_IMPACT`
+- Manager visibility: `NO_APP_IMPACT`
+- Quo integration: parser fixtures cover current expected payload shape; live Quo payload/auth verification remains `NOT_BUILT`.
+- Vapi integration: `NO_APP_IMPACT`
+- App impact: `NO_APP_IMPACT`
+- Tests: `COMPLETE_AND_VERIFIED` for pure helper/unit tests; `BUILT_NOT_VERIFIED` for the integration harness itself; database integration execution is `NOT_BUILT` in this environment because no isolated staging DB URL is configured and local Supabase cannot start without Docker socket access.
+- Manual verification: `COMPLETE_AND_VERIFIED` for `npm test`, `npm run lint`, and `npm run build`; `npm run test:integration` correctly exits `NOT_RUN` without `TEST_SUPABASE_DB_URL`/`TEST_DATABASE_URL`.
+- Production status: `PARTIAL`; do not apply the migration to production until a staging/disposable database has run the full chain and second-run/idempotency validation.
+- Known gaps: no staging project was available in this environment; route-level DB integration tests still need credentials and seed data.
 
 ### Door-hanger and flyer attribution
 
@@ -62,34 +78,34 @@ This section supersedes broad claims below such as “everything built.” Statu
 ### Free donation-only pickup
 
 - Status: `PARTIAL`
-- Repository path: `app/book/donation/page.js`, `app/api/donation-request/route.js`, `lib/donation.js`, `components/admin/DonationsView.js`, `app/api/admin/donations/route.js`
-- API: `/api/donation-request`, `/api/admin/donations`
+- Repository path: `app/book/donation/page.js`, `app/api/donation-request/route.js`, `app/api/donation-request/draft/route.js`, `app/api/donation-request/photos/route.js`, `app/api/admin/donations/[id]/photo/[photoId]/route.js`, `lib/donation.js`, `lib/donationPhotos.js`, `components/admin/DonationsView.js`, `app/api/admin/donations/route.js`
+- API: `/api/donation-request`, `/api/donation-request/draft`, `/api/donation-request/photos`, `/api/admin/donations`, `/api/admin/donations/[id]/photo/[photoId]`
 - Database table: `donation_requests`, `donation_request_items`, `donation_request_photos`, `donation_policy_versions`, `donation_ai_analyses`, `donation_route_matches`
 - Admin visibility: `PARTIAL`; queue and actions exist, full detail workspace is not complete.
 - Manager visibility: `PARTIAL`; permission tables exist, manager UI not built.
 - Quo integration: `PARTIAL`; templates are represented by message types, versioned template admin is not built.
 - Vapi integration: `NOT_BUILT` for donation-specific tools.
 - App impact: `APP_REQUIRES_NEW_WORKFLOW`, `APP_WRITES_THIS`, `APP_RECEIVES_REALTIME_UPDATE`; backlog documented.
-- Tests: `PARTIAL`; validation/state-machine pure tests added.
-- Manual verification: `BUILT_NOT_VERIFIED`
-- Production status: `PARTIAL`; photo upload currently accepts URL payloads, not complete storage upload UX.
-- Known gaps: route-fit algorithm foundation exists as table only; actual route matching is not implemented.
+- Tests: `PARTIAL`; validation/state-machine pure tests and image-inspection helper tests added. Route/database upload tests still require isolated Supabase credentials.
+- Manual verification: `BUILT_NOT_VERIFIED`; build/lint/unit tests pass, but storage upload has not been exercised against staging.
+- Production status: `PARTIAL`; storage bucket and metadata schema are in the migration, but staging migration/upload verification is still required.
+- Known gaps: route-fit algorithm foundation exists as table only; actual route matching is not implemented. Donation “AI” remains rule-based pre-screening and must not be represented as real image AI.
 
 ### Quo SMS infrastructure
 
 - Status: `PARTIAL`
-- Repository path: `lib/sms.js`, `lib/quoInbound.js`, `lib/quoRules.js`, `app/api/quo/inbound/route.js`, `app/api/sms-webhook/route.js`
+- Repository path: `lib/sms.js`, `lib/quoInbound.js`, `lib/quoPayload.js`, `lib/quoRules.js`, `app/api/quo/inbound/route.js`, `app/api/sms-webhook/route.js`, `supabase/functions/_shared/clients.ts`
 - API: `/api/quo/inbound`, legacy `/api/sms-webhook`, `/api/sms/inbound`
 - Database table: `messages`, `message_entity_links`, `sms_consent`, `sms_suppression`, `expected_replies`
 - Admin visibility: `PARTIAL`; messages visible through Booking Detail, but full retry/failure dashboard is not built.
 - Manager visibility: `NOT_BUILT`
-- Quo integration: `PARTIAL`; central outbound suppression and canonical inbound helper exist.
+- Quo integration: `PARTIAL`; central Next.js outbound suppression exists, the edge-function sender now checks suppression, and canonical inbound helper exists.
 - Vapi integration: `PARTIAL`; Vapi-triggered SMS uses central sender where existing callers use `sendSMS`.
 - App impact: `APP_RECEIVES_REALTIME_UPDATE` later for message-triggered assignments.
-- Tests: `PARTIAL`; pure expected reply/STOP/START classification tests added.
+- Tests: `PARTIAL`; pure expected reply/STOP/START classification tests and parser fixture tests added.
 - Manual verification: `BUILT_NOT_VERIFIED`
 - Production status: `PARTIAL`; Quo webhook should be pointed to canonical route after payload verification.
-- Known gaps: existing conversational SMS route still contains legacy booking logic; full migration to canonical router remains.
+- Known gaps: existing conversational SMS route still contains legacy booking logic; full migration to canonical router remains. Actual Quo payload examples and webhook authentication must be verified before production webhook cutover.
 
 ### Booking Detail workspace
 
@@ -121,7 +137,7 @@ This section supersedes broad claims below such as “everything built.” Statu
 - Tests: `PARTIAL`; manager denial rules tested.
 - Manual verification: `BUILT_NOT_VERIFIED`
 - Production status: `PARTIAL`; owner/admin role assignment seed required.
-- Known gaps: existing admin APIs still use admin cookie only; permission enforcement must be rolled through action routes.
+- Known gaps: existing admin APIs still use admin cookie only except the runtime migration endpoint, which is now permanently disabled. Permission enforcement must be rolled through high-risk action routes.
 
 ### Timeline and audit architecture
 
