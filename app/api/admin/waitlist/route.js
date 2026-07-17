@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  return token === await adminToken();
-}
-
-export async function GET() {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req) {
+  const auth = await requireStaffPermission(req, { permission: 'waitlist.manage', action: 'waitlist.list' });
+  if (!auth.ok) return auth.response;
   const { data, error } = await supabaseAdmin
     .from('waitlist')
     .select('*')
@@ -23,8 +18,9 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { id, phone, name } = await req.json();
+  const auth = await requireStaffPermission(req, { permission: 'waitlist.manage', entityType: 'waitlist', entityId: id || null, action: 'waitlist.notify' });
+  if (!auth.ok) return auth.response;
 
   const msg = `Hi ${name}! A slot just opened up at Junk Haul Calgary. Book now before it's gone: https://junkhaul.ca/book`;
 

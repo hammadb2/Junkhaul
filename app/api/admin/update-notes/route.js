@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  return token === await adminToken();
-}
-
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { booking_id, operator_notes } = await req.json();
+  const auth = await requireStaffPermission(req, { permission: 'bookings.notes', entityType: 'booking', entityId: booking_id || null, action: 'booking.update_notes' });
+  if (!auth.ok) return auth.response;
   if (!booking_id) return NextResponse.json({ error: 'booking_id required' }, { status: 400 });
 
   const { error } = await supabaseAdmin

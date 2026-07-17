@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  return token === await adminToken();
-}
-
-export async function GET() {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req) {
+  const auth = await requireStaffPermission(req, { permission: 'reports.read', action: 'marketing.read' });
+  if (!auth.ok) return auth.response;
 
   const [{ data: campaigns }, { data: batches }, { data: codes }, { data: attribution }, { data: funnel }, { data: bookings }, { data: donations }] = await Promise.all([
     supabaseAdmin.from('marketing_campaigns').select('*').order('created_at', { ascending: false }),

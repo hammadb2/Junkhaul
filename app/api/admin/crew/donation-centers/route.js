@@ -1,21 +1,13 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  const expected = await adminToken();
-  return token === expected;
-}
-
 // GET — list donation centers
-export async function GET() {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req) {
+  const auth = await requireStaffPermission(req, { permission: 'donation_centers.manage', action: 'donation_centers.list' });
+  if (!auth.ok) return auth.response;
   const { data, error } = await supabaseAdmin
     .from('donation_centers')
     .select('*')
@@ -26,7 +18,8 @@ export async function GET() {
 
 // POST — create or update donation center
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'donation_centers.manage', action: 'donation_centers.manage' });
+  if (!auth.ok) return auth.response;
   const body = await req.json();
   const { id, name, address, lat, lng, phone, hours, accepted_items } = body;
   if (!name || !address) return NextResponse.json({ error: 'Name and address required' }, { status: 400 });

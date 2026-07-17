@@ -1,21 +1,13 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  const expected = await adminToken();
-  return token === expected;
-}
-
 // GET /api/admin/crew/assignments — list crew assignments (optionally filter by date)
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'crew.assignments.manage', action: 'crew_assignments.list' });
+  if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date');
@@ -47,7 +39,8 @@ export async function GET(req) {
 
 // POST /api/admin/crew/assignments — create/update crew assignment for a date
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'crew.assignments.manage', action: 'crew_assignments.manage' });
+  if (!auth.ok) return auth.response;
 
   const body = await req.json().catch(() => ({}));
   const {

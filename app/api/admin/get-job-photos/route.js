@@ -1,25 +1,31 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === (await adminToken());
+const SIGNED_URL_SECONDS = 300;
+
+async function withSignedCrewUrl(photo) {
+  if (!photo?.path) return photo?.url || null;
+  const bucket = photo.bucket || 'job-photos';
+  const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(photo.path, SIGNED_URL_SECONDS);
+  if (error) return null;
+  return data?.signedUrl || null;
 }
 
 // GET /api/admin/get-job-photos?booking_id=...  or  ?phone=...
 export async function GET(req) {
-  if (!(await checkAuth()))
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { searchParams } = new URL(req.url);
   const bookingId = searchParams.get('booking_id');
   const phone = searchParams.get('phone');
+  const auth = await requireStaffPermission(req, {
+    permission: 'media.view',
+    entityType: 'booking',
+    entityId: bookingId || null,
+    action: 'booking.view_photos',
+  });
+  if (!auth.ok) return auth.response;
 
   if (!bookingId && !phone)
     return NextResponse.json(
@@ -48,11 +54,9 @@ export async function GET(req) {
   const customerPhotos = Array.isArray(booking.photos) ? booking.photos : [];
 
   const crewArrivalPhotos = crewPhotos
-    .filter((p) => p.type === 'crew_arrival')
-    .map((p) => p.url);
+    .filter((p) => p.type === 'crew_arrival');
   const crewCompletionPhotos = crewPhotos
-    .filter((p) => p.type === 'crew_completion')
-    .map((p) => p.url);
+    .filter((p) => p.type === 'crew_completion');
 
   return NextResponse.json({
     booking_id: booking.id,
@@ -62,8 +66,9 @@ export async function GET(req) {
     status: booking.status,
     crew_arrived_at: booking.crew_arrived_at,
     customer_photos: customerPhotos,
-    crew_arrival_photos: crewArrivalPhotos,
-    crew_completion_photos: crewCompletionPhotos,
+    crew_arrival_photos: await Promise.all(crewArrivalPhotos.map(withSignedCrewUrl)),
+    crew_completion_photos: await Promise.all(crewCompletionPhotos.map(withSignedCrewUrl)),
+    signed_url_expires_in_seconds: SIGNED_URL_SECONDS,
     total_crew_photos: crewPhotos.length,
   });
 }

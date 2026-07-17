@@ -7,12 +7,13 @@ import { useState } from 'react';
 
 export default function AdminLoginPage({ onSubmit }) {
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!password) return;
+    if (!password || !email) return;
     setLoading(true);
     setError(null);
     try {
@@ -20,7 +21,7 @@ export default function AdminLoginPage({ onSubmit }) {
       // const res = await fetch('/api/admin/login', { method: 'POST', headers: {...}, body: JSON.stringify({ password }) });
       // if (!res.ok) throw new Error((await res.json()).error || 'Login failed');
       // router.push('/admin'); router.refresh();
-      await onSubmit?.(password);
+      await onSubmit?.({ email, password });
     } catch (err) {
       setError(err.message || 'Incorrect password. Try again.');
     } finally {
@@ -39,13 +40,21 @@ export default function AdminLoginPage({ onSubmit }) {
           <h1 style={{ margin: '0 0 4px', fontSize: 19, fontWeight: 700, color: '#1a1a1a', letterSpacing: '-0.01em' }}>Operator sign in</h1>
           <p style={{ margin: '0 0 24px', fontSize: 13, color: 'rgba(0,0,0,.5)' }}>Sign in to access the dispatch console.</p>
           <form onSubmit={handleSubmit}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'rgba(0,0,0,.6)', marginBottom: 6 }}>Staff email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(null); }}
+              placeholder="you@junkhaul.ca"
+              autoFocus
+              style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid rgba(0,0,0,.1)', fontSize: 14, outline: 'none', marginBottom: 12 }}
+            />
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'rgba(0,0,0,.6)', marginBottom: 6 }}>Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(null); }}
               placeholder="Enter password"
-              autoFocus
               style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid rgba(0,0,0,.1)', fontSize: 14, outline: 'none' }}
             />
             {error && (
@@ -55,7 +64,7 @@ export default function AdminLoginPage({ onSubmit }) {
             )}
             <button
               type="submit"
-              disabled={loading || !password}
+              disabled={loading || !password || !email}
               style={{ width: '100%', marginTop: 16, padding: '12px 0', border: 'none', borderRadius: 10, background: '#f97316', color: '#fff', fontSize: 14, fontWeight: 700, cursor: loading ? 'default' : 'pointer' }}
             >
               {loading ? 'Signing in…' : 'Sign in'}

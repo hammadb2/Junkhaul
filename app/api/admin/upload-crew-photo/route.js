@@ -1,27 +1,23 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === (await adminToken());
-}
 
 const CREW_PHOTO_BUCKET = 'job-photos';
 
 export async function POST(req) {
-  if (!(await checkAuth()))
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const form = await req.formData();
   const file = form.get('file');
   const bookingId = form.get('booking_id');
   const type = form.get('type'); // 'crew_arrival' | 'crew_completion'
+  const auth = await requireStaffPermission(req, {
+    permission: 'bookings.photos',
+    entityType: 'booking',
+    entityId: bookingId || null,
+    action: 'booking.upload_crew_photo',
+  });
+  if (!auth.ok) return auth.response;
 
   if (!file || !bookingId || !type)
     return NextResponse.json(
@@ -41,7 +37,9 @@ export async function POST(req) {
   const { data: buckets } = await supabaseAdmin.storage.listBuckets();
   const exists = (buckets || []).some((b) => b.id === CREW_PHOTO_BUCKET);
   if (!exists) {
-    await supabaseAdmin.storage.createBucket(CREW_PHOTO_BUCKET, { public: true });
+    await supabaseAdmin.storage.createBucket(CREW_PHOTO_BUCKET, { public: false });
+  } else {
+    await supabaseAdmin.storage.updateBucket(CREW_PHOTO_BUCKET, { public: false });
   }
 
   // ----------------------------------------------------------
@@ -63,13 +61,6 @@ export async function POST(req) {
   if (uploadError)
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
-  const { data: urlData } = supabaseAdmin
-    .storage
-    .from(CREW_PHOTO_BUCKET)
-    .getPublicUrl(fileName);
-
-  const publicUrl = urlData?.publicUrl;
-
   // ----------------------------------------------------------
   // 3. Append the photo record to crew_photos on the booking.
   // ----------------------------------------------------------
@@ -84,7 +75,8 @@ export async function POST(req) {
 
   const existing = Array.isArray(booking.crew_photos) ? booking.crew_photos : [];
   const photoRecord = {
-    url: publicUrl,
+    url: null,
+    bucket: CREW_PHOTO_BUCKET,
     type,
     path: fileName,
     uploaded_at: new Date().toISOString(),
@@ -101,5 +93,5 @@ export async function POST(req) {
   if (updateErr)
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
-  return NextResponse.json({ url: publicUrl });
+  return NextResponse.json({ bucket: CREW_PHOTO_BUCKET, path: fileName });
 }

@@ -1,24 +1,17 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { runAgent } from '@/lib/aiAgent';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === await adminToken();
-}
 
 // POST /api/admin/agent
 // Body: { message: string, conversation: [{role, content}] }
 // Returns: { response, actions, usage }
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, { permission: 'agent.use', action: 'agent.run' });
+  if (!auth.ok) return auth.response;
 
   try {
     const { message, conversation = [] } = await req.json();
@@ -51,8 +44,9 @@ export async function POST(req) {
 }
 
 // GET /api/admin/agent/actions — recent agent actions
-export async function GET() {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req) {
+  const auth = await requireStaffPermission(req, { permission: 'agent.use', action: 'agent.read_actions' });
+  if (!auth.ok) return auth.response;
 
   try {
     // Try ai_agent_actions table first

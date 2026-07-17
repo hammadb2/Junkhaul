@@ -1,20 +1,15 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  return token === await adminToken();
-}
 
 // GET /api/admin/crew-locations
 // Returns all crew members' current GPS positions joined with employee info.
 // Used by the admin live crew map (Dispatch view).
-export async function GET() {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req) {
+  const auth = await requireStaffPermission(req, { permission: 'admin.read', action: 'crew_locations.list' });
+  if (!auth.ok) return auth.response;
 
   // Fetch all crew locations joined with employee data
   const { data, error } = await supabaseAdmin
