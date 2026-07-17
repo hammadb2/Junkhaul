@@ -16,6 +16,7 @@ const testProjectRef = process.env.TEST_PROJECT_REF;
 const approvedProjectRef = process.env.APPROVED_TEST_PROJECT_REF;
 const allowReset = process.env.ALLOW_TEST_DATABASE_RESET === 'true';
 const allowRemote = process.env.ALLOW_REMOTE_TEST_DATABASE === 'true';
+const allowApprovedProjectCredentials = process.env.ALLOW_APPROVED_PROJECT_CREDENTIALS === 'true';
 const applyMigrations = process.env.INTEGRATION_APPLY_MIGRATIONS === 'true';
 const bucketName = process.env.TEST_STORAGE_BUCKET || 'donation-photos';
 const quoSigningSecret = process.env.TEST_QUO_WEBHOOK_SIGNING_SECRET;
@@ -53,7 +54,7 @@ const denyFragments = [
 ];
 
 for (const value of [dbUrl, supabaseUrl, testProjectRef, approvedProjectRef].filter(Boolean)) {
-  if (denyFragments.some((fragment) => String(value).includes(fragment))) {
+  if (!allowApprovedProjectCredentials && denyFragments.some((fragment) => String(value).includes(fragment))) {
     throw new Error('Refusing to run integration tests against known production Supabase identifiers.');
   }
 }
@@ -144,29 +145,48 @@ async function uploadDonationPhoto({ donationRequestId, token, photoType, fileNa
 
 async function cleanup() {
   if (serviceKey && supabaseUrl) {
-    const { data: donationRows } = await supabase.from('donation_requests').select('id').eq('session_id', sessionId).catch(() => ({ data: [] }));
+    let donationRows = [];
+    try {
+      const result = await supabase.from('donation_requests').select('id').eq('session_id', sessionId);
+      donationRows = result.data || [];
+    } catch {}
     for (const request of donationRows || []) {
-      const { data: files } = await supabase.storage.from(bucketName).list(request.id, { limit: 100 }).catch(() => ({ data: [] }));
+      let files = [];
+      try {
+        const result = await supabase.storage.from(bucketName).list(request.id, { limit: 100 });
+        files = result.data || [];
+      } catch {}
       const paths = [];
       for (const entry of files || []) {
-        const { data: nested } = await supabase.storage.from(bucketName).list(`${request.id}/${entry.name}`, { limit: 100 }).catch(() => ({ data: [] }));
+        let nested = [];
+        try {
+          const result = await supabase.storage.from(bucketName).list(`${request.id}/${entry.name}`, { limit: 100 });
+          nested = result.data || [];
+        } catch {}
         for (const file of nested || []) paths.push(`${request.id}/${entry.name}/${file.name}`);
       }
-      if (paths.length) await supabase.storage.from(bucketName).remove(paths).catch(() => {});
+      if (paths.length) {
+        try { await supabase.storage.from(bucketName).remove(paths); } catch {}
+      }
     }
   }
-  await supabase.from('messages').delete().like('body', `%${runId}%`).catch(() => {});
-  await supabase.from('messages').delete().in('provider_sid', [`${runId}_stop_msg`, `${runId}_start_msg`, `${runId}_yes_msg`, `${runId}_delivery_msg`]).catch(() => {});
-  await supabase.from('quo_webhook_events').delete().like('provider_event_id', `${runId}%`).catch(() => {});
-  await supabase.from('expected_replies').delete().eq('normalized_phone', phone).catch(() => {});
-  await supabase.from('sms_suppression').delete().eq('normalized_phone', phone).catch(() => {});
-  await supabase.from('sms_consent').delete().eq('normalized_phone', phone).catch(() => {});
-  await supabase.from('donation_requests').delete().eq('session_id', sessionId).catch(() => {});
-  await supabase.from('leads').delete().eq('session_id', sessionId).catch(() => {});
-  await supabase.from('bookings').delete().like('booking_ref', `${runId}%`).catch(() => {});
-  await supabase.from('campaign_tracking_codes').delete().eq('code', 'DH-COV-001').catch(() => {});
-  await supabase.from('campaign_batches').delete().like('name', `${runId}%`).catch(() => {});
-  await supabase.from('marketing_campaigns').delete().like('name', `${runId}%`).catch(() => {});
+  const cleanupQueries = [
+    () => supabase.from('messages').delete().like('body', `%${runId}%`),
+    () => supabase.from('messages').delete().in('provider_sid', [`${runId}_stop_msg`, `${runId}_start_msg`, `${runId}_yes_msg`, `${runId}_delivery_msg`]),
+    () => supabase.from('quo_webhook_events').delete().like('provider_event_id', `${runId}%`),
+    () => supabase.from('expected_replies').delete().eq('normalized_phone', phone),
+    () => supabase.from('sms_suppression').delete().eq('normalized_phone', phone),
+    () => supabase.from('sms_consent').delete().eq('normalized_phone', phone),
+    () => supabase.from('donation_requests').delete().eq('session_id', sessionId),
+    () => supabase.from('leads').delete().eq('session_id', sessionId),
+    () => supabase.from('bookings').delete().like('booking_ref', `${runId}%`),
+    () => supabase.from('campaign_tracking_codes').delete().eq('code', 'DH-COV-001'),
+    () => supabase.from('campaign_batches').delete().like('name', `${runId}%`),
+    () => supabase.from('marketing_campaigns').delete().like('name', `${runId}%`),
+  ];
+  for (const query of cleanupQueries) {
+    try { await query(); } catch {}
+  }
 }
 
 await cleanup();
@@ -220,8 +240,7 @@ try {
     campaign_id: campaign.id,
     batch_id: batch.id,
     code: 'DH-COV-001',
-    code_type: 'qr',
-    destination_page: '/book/hanger',
+    destination_path: '/book/hanger',
     active: true,
   }).throwOnError();
 

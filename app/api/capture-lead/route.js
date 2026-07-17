@@ -167,13 +167,15 @@ export async function POST(req) {
 
     // Insert a row into lead_quotes so we keep the full history.
     if (leadRow && ai_price_estimate) {
-      await supabaseAdmin.from('lead_quotes').insert({
-        lead_id: leadRow.id,
-        price: ai_price_estimate,
-        load_size,
-        photos: photos || null,
-        itemized: itemized || null,
-      }).catch(() => {}); // best-effort — don't fail the quote over history
+      try {
+        await supabaseAdmin.from('lead_quotes').insert({
+          lead_id: leadRow.id,
+          price: ai_price_estimate,
+          load_size,
+          photos: photos || null,
+          itemized: itemized || null,
+        });
+      } catch {} // best-effort — don't fail the quote over history
     }
 
     if (ai_price_estimate && hasRealPhone) {
@@ -210,16 +212,20 @@ export async function POST(req) {
       stepUpdate.ab_variant = rest.ab_variant;
       stepUpdate.ab_variant_assigned_at = new Date().toISOString();
     }
-    await supabaseAdmin.from('leads').update(stepUpdate).eq('session_id', session_id).catch(() => {});
+    try {
+      await supabaseAdmin.from('leads').update(stepUpdate).eq('session_id', session_id);
+    } catch {}
     const { data: leadForStep } = await supabaseAdmin.from('leads').select('id').eq('session_id', session_id).maybeSingle();
     if (leadForStep?.id) {
-      await supabaseAdmin.from('funnel_events').insert({
-        session_id,
-        lead_id: leadForStep.id,
-        event_type: 'booking_step',
-        step: step_name,
-        metadata: { ab_variant: rest.ab_variant || null },
-      }).catch(() => {});
+      try {
+        await supabaseAdmin.from('funnel_events').insert({
+          session_id,
+          lead_id: leadForStep.id,
+          event_type: 'booking_step',
+          step: step_name,
+          metadata: { ab_variant: rest.ab_variant || null },
+        });
+      } catch {}
       await recordTimelineEvent({
         entity_type: 'lead',
         entity_id: leadForStep.id,
@@ -270,9 +276,11 @@ export async function POST(req) {
 
     // Try to update out_of_area flag separately (may fail if column doesn't exist)
     if (!error) {
-      await supabaseAdmin.from('leads')
-        .update({ out_of_area: true, out_of_area_notes: rest.notes || null })
-        .eq('session_id', session_id).catch(() => {});
+      try {
+        await supabaseAdmin.from('leads')
+          .update({ out_of_area: true, out_of_area_notes: rest.notes || null })
+          .eq('session_id', session_id);
+      } catch {}
     }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

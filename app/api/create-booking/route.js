@@ -334,11 +334,13 @@ export async function POST(req) {
         },
       });
       if (attr?.first || attr?.last) {
-        await supabaseAdmin.from('bookings').update({
-          attribution_record_id: attr.last?.id || attr.first?.id || null,
-          first_touch_attribution_id: attr.first?.id || null,
-          last_touch_attribution_id: attr.last?.id || null,
-        }).eq('id', booking.id).catch(() => {});
+        try {
+          await supabaseAdmin.from('bookings').update({
+            attribution_record_id: attr.last?.id || attr.first?.id || null,
+            first_touch_attribution_id: attr.first?.id || null,
+            last_touch_attribution_id: attr.last?.id || null,
+          }).eq('id', booking.id);
+        } catch {}
       }
     }
 
