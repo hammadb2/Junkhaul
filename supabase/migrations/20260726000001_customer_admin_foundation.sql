@@ -57,6 +57,10 @@ ALTER TABLE messages
   ADD COLUMN IF NOT EXISTS correlation_id text,
   ADD COLUMN IF NOT EXISTS delivered_at timestamptz,
   ADD COLUMN IF NOT EXISTS failed_at timestamptz,
+  ADD COLUMN IF NOT EXISTS provider_event_id text,
+  ADD COLUMN IF NOT EXISTS provider_event_type text,
+  ADD COLUMN IF NOT EXISTS provider_event_at timestamptz,
+  ADD COLUMN IF NOT EXISTS failure_code text,
   ADD COLUMN IF NOT EXISTS failure_reason text,
   ADD COLUMN IF NOT EXISTS retry_count integer NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS provider_payload jsonb;
@@ -162,15 +166,18 @@ CREATE TABLE IF NOT EXISTS attribution_records (
 );
 
 DO $$
+DECLARE conflict_count integer;
 BEGIN
-  IF EXISTS (
-    SELECT 1
+  SELECT COUNT(*) INTO conflict_count
+  FROM (
+    SELECT session_id
     FROM attribution_records
     WHERE touch_type = 'first'
     GROUP BY session_id
     HAVING COUNT(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'Cannot create attribution_first_touch_once: duplicate first-touch attribution rows exist. Inspect and reconcile attribution_records by session_id before applying this migration.';
+  ) conflicts;
+  IF conflict_count > 0 THEN
+    RAISE EXCEPTION 'Cannot create attribution_first_touch_once: attribution_records contains % session_id group(s) with duplicate first-touch rows. Remediation: inspect those sessions, create authorized correction records if needed, and preserve history before adding the unique index. No rows were deleted by this migration.', conflict_count;
   END IF;
 END $$;
 
@@ -236,15 +243,18 @@ CREATE TABLE IF NOT EXISTS expected_replies (
 );
 CREATE INDEX IF NOT EXISTS expected_replies_phone_idx ON expected_replies(normalized_phone, status, expires_at);
 DO $$
+DECLARE conflict_count integer;
 BEGIN
-  IF EXISTS (
-    SELECT 1
+  SELECT COUNT(*) INTO conflict_count
+  FROM (
+    SELECT entity_type, entity_id, expected_intent
     FROM expected_replies
     WHERE status = 'active'
     GROUP BY entity_type, entity_id, expected_intent
     HAVING COUNT(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'Cannot create expected_replies_active_entity_idx: duplicate active expected replies exist for the same entity and intent.';
+  ) conflicts;
+  IF conflict_count > 0 THEN
+    RAISE EXCEPTION 'Cannot create expected_replies_active_entity_idx: expected_replies contains % active entity/intent group(s) with duplicates. Remediation: expire or cancel obsolete active replies while preserving consumed/history rows. No rows were deleted by this migration.', conflict_count;
   END IF;
 END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS expected_replies_active_entity_idx
@@ -261,19 +271,37 @@ CREATE TABLE IF NOT EXISTS message_entity_links (
   UNIQUE(message_id, entity_type, entity_id)
 );
 DO $$
+DECLARE conflict_count integer;
 BEGIN
-  IF EXISTS (
-    SELECT 1
+  SELECT COUNT(*) INTO conflict_count
+  FROM (
+    SELECT message_id, entity_type, entity_id
     FROM message_entity_links
     GROUP BY message_id, entity_type, entity_id
     HAVING COUNT(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'Cannot create message_entity_links uniqueness: duplicate message/entity links exist.';
+  ) conflicts;
+  IF conflict_count > 0 THEN
+    RAISE EXCEPTION 'Cannot create message_entity_links_unique_idx: message_entity_links contains % duplicate message/entity group(s). Remediation: merge duplicate link rows only after preserving link history in audit/timeline. No rows were deleted by this migration.', conflict_count;
   END IF;
 END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS message_entity_links_unique_idx
   ON message_entity_links(message_id, entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS message_entity_links_entity_idx ON message_entity_links(entity_type, entity_id);
+
+CREATE TABLE IF NOT EXISTS quo_webhook_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  provider_event_id text NOT NULL UNIQUE,
+  provider_event_type text,
+  provider_message_id text,
+  signature_timestamp bigint,
+  status text NOT NULL DEFAULT 'received' CHECK (status IN ('received','processed','duplicate','rejected','failed')),
+  rejection_reason text,
+  raw_payload jsonb DEFAULT '{}'::jsonb,
+  processed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS quo_webhook_events_message_idx ON quo_webhook_events(provider_message_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS quo_webhook_events_type_idx ON quo_webhook_events(provider_event_type, created_at DESC);
 
 -- ---------- Donation-only pickup ----------
 CREATE TABLE IF NOT EXISTS donation_policy_versions (
@@ -488,15 +516,18 @@ CREATE TABLE IF NOT EXISTS quote_price_ledger (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 DO $$
+DECLARE conflict_count integer;
 BEGIN
-  IF EXISTS (
-    SELECT 1
+  SELECT COUNT(*) INTO conflict_count
+  FROM (
+    SELECT booking_id
     FROM quote_price_ledger
     WHERE ledger_type = 'initial_quote' AND booking_id IS NOT NULL
     GROUP BY booking_id
     HAVING COUNT(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'Cannot create quote_price_ledger_one_initial_booking: duplicate initial quotes exist for at least one booking.';
+  ) conflicts;
+  IF conflict_count > 0 THEN
+    RAISE EXCEPTION 'Cannot create quote_price_ledger_one_initial_booking: quote_price_ledger contains % booking(s) with duplicate initial_quote rows. Remediation: preserve all quote rows, classify later rows as revised_quote if appropriate, and document actor/reason before adding the unique index. No rows were deleted by this migration.', conflict_count;
   END IF;
 END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS quote_price_ledger_one_initial_booking
@@ -759,6 +790,7 @@ ALTER TABLE sms_consent ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sms_suppression ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expected_replies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_entity_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quo_webhook_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE donation_policy_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE donation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE donation_request_items ENABLE ROW LEVEL SECURITY;
@@ -783,7 +815,7 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'marketing_campaigns','campaign_batches','campaign_tracking_codes','attribution_records','funnel_events',
-    'sms_consent','sms_suppression','expected_replies','message_entity_links','donation_policy_versions',
+    'sms_consent','sms_suppression','expected_replies','message_entity_links','quo_webhook_events','donation_policy_versions',
     'donation_requests','donation_request_items','donation_request_photos','donation_ai_analyses',
     'donation_route_matches','quote_price_ledger','timeline_events','audit_events','staff_roles',
     'permissions','staff_role_permissions','staff_role_assignments','manager_scopes','service_requests',
