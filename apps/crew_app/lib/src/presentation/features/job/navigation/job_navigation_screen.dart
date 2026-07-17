@@ -50,7 +50,6 @@ class JobNavigationScreen extends ConsumerStatefulWidget {
 }
 
 class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
-  GoogleNavigationViewController? _viewController;
   bool _navigationInitialized = false;
   bool _guidanceStarted = false;
   bool _arrived = false;
@@ -85,8 +84,6 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
   /// Called when the native view is created. Initializes the navigation
   /// session, sets destinations, starts guidance, and wires event listeners.
   Future<void> _onViewCreated(GoogleNavigationViewController controller) async {
-    _viewController = controller;
-
     if (AppSecrets.googleNavigationApiKey.isEmpty) {
       // No API key — can't initialize. Fallback UI will show.
       return;

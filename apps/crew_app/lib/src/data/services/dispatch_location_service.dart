@@ -27,7 +27,6 @@ class DispatchLocationService extends Notifier<DispatchTrackingState> {
   Timer? _stationaryTimer;
   Position? _lastSentPosition;
   DateTime? _lastSentAt;
-  bool _isStationary = false;
 
   @override
   DispatchTrackingState build() {
@@ -73,7 +72,6 @@ class DispatchLocationService extends Notifier<DispatchTrackingState> {
     _stationaryTimer = null;
     _lastSentPosition = null;
     _lastSentAt = null;
-    _isStationary = false;
     state = DispatchTrackingState.idle;
   }
 
@@ -101,11 +99,9 @@ class DispatchLocationService extends Notifier<DispatchTrackingState> {
     } else if (distanceMeters > 10) {
       // Moving — send if at least 3 seconds since last send.
       shouldSend = now.difference(_lastSentAt!).inSeconds >= 3;
-      _isStationary = false;
     } else {
       // Stationary — send if at least 15 seconds since last send.
       shouldSend = now.difference(_lastSentAt!).inSeconds >= 15;
-      _isStationary = true;
     }
 
     if (shouldSend) {

@@ -81,9 +81,6 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   RouteChoice _routeChoice = RouteChoice.landfillRun;
   PaymentResult? _payment;
 
-  /// Error message shown in a snackbar when an API call fails.
-  String? _lastError;
-
   static const _stepLabels = [
     'En Route',
     'Item Conditions',
@@ -101,7 +98,6 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   void _goTo(_JobStep step) => setState(() => _step = step);
 
   void _showError(String message) {
-    setState(() => _lastError = message);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

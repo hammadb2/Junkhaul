@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 
 import '../api/employee_api.dart';
-import 'camera_service.dart';
 
 /// Photo categories supported by the backend.
 class PhotoCategory {

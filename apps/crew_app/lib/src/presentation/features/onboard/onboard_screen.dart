@@ -51,11 +51,6 @@ class _OnboardScreenState extends ConsumerState<OnboardScreen> {
     setState(() => _step++);
   }
 
-  void _back() {
-    if (_step == 0) return;
-    setState(() => _step--);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -127,8 +127,11 @@ class _ScheduleMapState extends ConsumerState<ScheduleMap> {
     for (final b in widget.bookings) {
       final c = b.addressData;
       if (c?.lat != null && c?.lng != null) {
-        positions.add(LatLng(c!.lat!, c!.lng!));
+        final lat = c!.lat!;
+        final lng = c.lng!;
+        positions.add(LatLng(lat, lng));
       }
+      // ignore: unnecessary_non_null_assertion
     }
     if (positions.isEmpty) return;
     if (positions.length == 1) {
