@@ -40,10 +40,12 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     # Google ML Kit (google_mlkit_text_recognition, google_mlkit_commons)
-    # does not include arm64 simulator slices. Exclude arm64 for the
-    # simulator build so it falls back to x86_64.
+    # does not include arm64 simulator slices. Exclude arm64 for simulator
+    # builds so they fall back to x86_64.
     target.build_configurations.each do |config|
-      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+      if config.name == 'Debug'
+        config.build_settings['EXCLUDED_ARCHS'] = 'arm64'
+      end
     end
   end
 
