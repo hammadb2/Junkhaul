@@ -163,6 +163,11 @@ class _ScheduleBodyState extends ConsumerState<_ScheduleBody> {
                           },
                         ),
                         const SizedBox(width: 8),
+                        _RoundIconButton(
+                          icon: Icons.assignment_outlined,
+                          onTap: () => context.push('/closeout'),
+                        ),
+                        const SizedBox(width: 8),
                         _RoundIconButton(icon: Icons.logout_rounded, onTap: widget.onSignOut),
                       ],
                     ),

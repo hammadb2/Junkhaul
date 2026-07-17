@@ -16,6 +16,7 @@ import '../presentation/features/permissions/permission_gate_screen.dart';
 import '../presentation/features/schedule/schedule_screen.dart';
 import '../presentation/features/splash/splash_screen.dart';
 import '../presentation/features/verification/verification_pending_screen.dart';
+import '../presentation/features/closeout/closeout_screen.dart';
 import '../presentation/shared/jh_sync_banner.dart';
 
 /// A [Listenable] that mirrors the [AuthRepository] state so [GoRouter] can
@@ -56,6 +57,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthedRoute = location.startsWith('/schedule') ||
           location.startsWith('/job') ||
           location.startsWith('/clock') ||
+          location.startsWith('/closeout') ||
           location.startsWith('/documents') ||
           location.startsWith('/paystubs') ||
           location.startsWith('/notifications') ||
@@ -108,6 +110,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           context,
           state,
           const PermissionGateScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/closeout',
+        pageBuilder: (context, state) => pageSharedAxisTransition(
+          context,
+          state,
+          const CloseoutScreen(),
         ),
       ),
     ],
