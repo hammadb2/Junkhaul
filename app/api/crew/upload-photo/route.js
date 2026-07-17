@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
 import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
-import { checkRouteVersion, staleRouteResponse } from '@/lib/routeVersionGuard';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -47,11 +47,16 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
   }
 
-  // Stale-write protection: reject if route_version is stale.
+  // Stale-write protection: reject if route_version is stale or missing.
   const routeVersionNum = route_version ? parseInt(route_version, 10) : null;
-  const routeCheck = await checkRouteVersion(booking_id, route_id, routeVersionNum);
+  const routeCheck = await checkRouteVersion(booking_id, route_id, routeVersionNum, {
+    isLegacyPinAuth: !employee && pinAuthed,
+    actionType: 'photo_upload',
+    employeeId: employee?.id,
+  });
   if (!routeCheck.valid) {
-    return staleRouteResponse(routeCheck.conflict);
+    if (routeCheck.status === 400) return missingVersionResponse();
+    return staleRouteResponse(routeCheck.body);
   }
 
   if (!VALID_TYPES.includes(type)) {

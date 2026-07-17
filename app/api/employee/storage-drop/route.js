@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getAuthedEmployee } from '@/lib/employeeAuth';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -13,10 +14,21 @@ export async function POST(req) {
   const {
     assignment_id, facility_id, booking_id,
     item_photos, capacity_photo_url, capacity_estimate_pct,
+    route_id, route_version,
   } = body;
 
   if (!facility_id) {
     return NextResponse.json({ error: 'facility_id is required' }, { status: 400 });
+  }
+
+  const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
+    isLegacyPinAuth: false,
+    actionType: 'storage_drop',
+    employeeId: emp?.id,
+  });
+  if (!routeCheck.valid) {
+    if (routeCheck.status === 400) return missingVersionResponse();
+    return staleRouteResponse(routeCheck.body);
   }
 
   const { data, error } = await supabaseAdmin

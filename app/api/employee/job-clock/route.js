@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getAuthedEmployee } from '@/lib/employeeAuth';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -15,11 +16,21 @@ export async function POST(req) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { booking_id, assignment_id, action } = body;
+  const { booking_id, assignment_id, action, route_id, route_version } = body;
   // action: 'in' or 'out'
 
   if (!booking_id || !action) {
     return NextResponse.json({ error: 'booking_id and action are required' }, { status: 400 });
+  }
+
+  const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
+    isLegacyPinAuth: false,
+    actionType: 'job_clock',
+    employeeId: emp?.id,
+  });
+  if (!routeCheck.valid) {
+    if (routeCheck.status === 400) return missingVersionResponse();
+    return staleRouteResponse(routeCheck.body);
   }
 
   if (action === 'in') {

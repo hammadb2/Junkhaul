@@ -108,9 +108,11 @@ Map<String, dynamic> _$RouteChangeToJson(_RouteChange instance) =>
 _RouteConflict _$RouteConflictFromJson(Map<String, dynamic> json) =>
     _RouteConflict(
       currentRouteVersion: (json['current_route_version'] as num).toInt(),
-      submittedRouteVersion: (json['submitted_route_version'] as num).toInt(),
+      submittedRouteVersion: (json['submitted_route_version'] as num?)?.toInt(),
       refreshRequired: json['refresh_required'] as bool? ?? true,
       safeRetry: json['safe_retry'] as bool? ?? false,
+      actionType: json['action_type'] as String?,
+      message: json['message'] as String?,
     );
 
 Map<String, dynamic> _$RouteConflictToJson(_RouteConflict instance) =>
@@ -119,4 +121,6 @@ Map<String, dynamic> _$RouteConflictToJson(_RouteConflict instance) =>
       'submitted_route_version': instance.submittedRouteVersion,
       'refresh_required': instance.refreshRequired,
       'safe_retry': instance.safeRetry,
+      'action_type': instance.actionType,
+      'message': instance.message,
     };

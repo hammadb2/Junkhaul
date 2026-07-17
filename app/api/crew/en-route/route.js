@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
 import { sendSMS } from '@/lib/sms';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -19,9 +20,19 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { booking_id } = body;
+  const { booking_id, route_id, route_version } = body;
   if (!booking_id) {
     return NextResponse.json({ error: 'Missing booking_id' }, { status: 400 });
+  }
+
+  const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
+    isLegacyPinAuth: true,
+    actionType: 'en_route',
+    employeeId: undefined,
+  });
+  if (!routeCheck.valid) {
+    if (routeCheck.status === 400) return missingVersionResponse();
+    return staleRouteResponse(routeCheck.body);
   }
 
   const { data: booking, error: bErr } = await supabaseAdmin

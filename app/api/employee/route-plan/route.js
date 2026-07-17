@@ -213,12 +213,19 @@ export async function POST(req) {
     return NextResponse.json({ error: ackErr.message }, { status: 500 });
   }
 
-  // Write audit event to geofence_events (reusing as timeline/audit log).
-  await supabaseAdmin.from('geofence_events').insert({
-    employee_id: employee.id,
-    booking_id: `route_ack_${route_id}`,
+  // Write audit event to audit_events (the canonical audit/timeline table).
+  await supabaseAdmin.from('audit_events').insert({
+    entity_type: 'route_plan',
+    entity_id: route_id,
     event_type: 'route_acknowledged',
-    timestamp: new Date().toISOString(),
+    actor_type: 'employee',
+    actor_id: employee.id,
+    source: 'crew_app',
+    metadata: {
+      route_version: route_version,
+      device_id: device_id || null,
+      acknowledged_at: new Date().toISOString(),
+    },
   });
 
   return NextResponse.json({ ok: true, acknowledged: true });

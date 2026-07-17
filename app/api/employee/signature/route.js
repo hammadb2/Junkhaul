@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getAuthedEmployee } from '@/lib/employeeAuth';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -13,10 +14,21 @@ export async function POST(req) {
   const {
     booking_id, customer_name_typed, customer_signature_url,
     amount_confirmed, payment_method, // 'cash' or 'card'
+    route_id, route_version,
   } = body;
 
   if (!booking_id || !customer_name_typed || !amount_confirmed) {
     return NextResponse.json({ error: 'booking_id, customer_name_typed, and amount_confirmed are required' }, { status: 400 });
+  }
+
+  const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
+    isLegacyPinAuth: false,
+    actionType: 'signature',
+    employeeId: emp?.id,
+  });
+  if (!routeCheck.valid) {
+    if (routeCheck.status === 400) return missingVersionResponse();
+    return staleRouteResponse(routeCheck.body);
   }
 
   const { data, error } = await supabaseAdmin

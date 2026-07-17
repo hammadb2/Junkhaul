@@ -84,9 +84,11 @@ abstract class RouteChange with _$RouteChange {
 abstract class RouteConflict with _$RouteConflict {
   const factory RouteConflict({
     @JsonKey(name: 'current_route_version') required int currentRouteVersion,
-    @JsonKey(name: 'submitted_route_version') required int submittedRouteVersion,
+    @JsonKey(name: 'submitted_route_version') int? submittedRouteVersion,
     @JsonKey(name: 'refresh_required') @Default(true) bool refreshRequired,
     @JsonKey(name: 'safe_retry') @Default(false) bool safeRetry,
+    @JsonKey(name: 'action_type') String? actionType,
+    String? message,
   }) = _RouteConflict;
 
   factory RouteConflict.fromJson(Map<String, dynamic> json) => _$RouteConflictFromJson(json);

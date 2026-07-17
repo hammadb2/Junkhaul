@@ -1189,7 +1189,7 @@ as int?,
 /// @nodoc
 mixin _$RouteConflict {
 
-@JsonKey(name: 'current_route_version') int get currentRouteVersion;@JsonKey(name: 'submitted_route_version') int get submittedRouteVersion;@JsonKey(name: 'refresh_required') bool get refreshRequired;@JsonKey(name: 'safe_retry') bool get safeRetry;
+@JsonKey(name: 'current_route_version') int get currentRouteVersion;@JsonKey(name: 'submitted_route_version') int? get submittedRouteVersion;@JsonKey(name: 'refresh_required') bool get refreshRequired;@JsonKey(name: 'safe_retry') bool get safeRetry;@JsonKey(name: 'action_type') String? get actionType; String? get message;
 /// Create a copy of RouteConflict
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1202,16 +1202,16 @@ $RouteConflictCopyWith<RouteConflict> get copyWith => _$RouteConflictCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is RouteConflict&&(identical(other.currentRouteVersion, currentRouteVersion) || other.currentRouteVersion == currentRouteVersion)&&(identical(other.submittedRouteVersion, submittedRouteVersion) || other.submittedRouteVersion == submittedRouteVersion)&&(identical(other.refreshRequired, refreshRequired) || other.refreshRequired == refreshRequired)&&(identical(other.safeRetry, safeRetry) || other.safeRetry == safeRetry));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RouteConflict&&(identical(other.currentRouteVersion, currentRouteVersion) || other.currentRouteVersion == currentRouteVersion)&&(identical(other.submittedRouteVersion, submittedRouteVersion) || other.submittedRouteVersion == submittedRouteVersion)&&(identical(other.refreshRequired, refreshRequired) || other.refreshRequired == refreshRequired)&&(identical(other.safeRetry, safeRetry) || other.safeRetry == safeRetry)&&(identical(other.actionType, actionType) || other.actionType == actionType)&&(identical(other.message, message) || other.message == message));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,currentRouteVersion,submittedRouteVersion,refreshRequired,safeRetry);
+int get hashCode => Object.hash(runtimeType,currentRouteVersion,submittedRouteVersion,refreshRequired,safeRetry,actionType,message);
 
 @override
 String toString() {
-  return 'RouteConflict(currentRouteVersion: $currentRouteVersion, submittedRouteVersion: $submittedRouteVersion, refreshRequired: $refreshRequired, safeRetry: $safeRetry)';
+  return 'RouteConflict(currentRouteVersion: $currentRouteVersion, submittedRouteVersion: $submittedRouteVersion, refreshRequired: $refreshRequired, safeRetry: $safeRetry, actionType: $actionType, message: $message)';
 }
 
 
@@ -1222,7 +1222,7 @@ abstract mixin class $RouteConflictCopyWith<$Res>  {
   factory $RouteConflictCopyWith(RouteConflict value, $Res Function(RouteConflict) _then) = _$RouteConflictCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'current_route_version') int currentRouteVersion,@JsonKey(name: 'submitted_route_version') int submittedRouteVersion,@JsonKey(name: 'refresh_required') bool refreshRequired,@JsonKey(name: 'safe_retry') bool safeRetry
+@JsonKey(name: 'current_route_version') int currentRouteVersion,@JsonKey(name: 'submitted_route_version') int? submittedRouteVersion,@JsonKey(name: 'refresh_required') bool refreshRequired,@JsonKey(name: 'safe_retry') bool safeRetry,@JsonKey(name: 'action_type') String? actionType, String? message
 });
 
 
@@ -1239,13 +1239,15 @@ class _$RouteConflictCopyWithImpl<$Res>
 
 /// Create a copy of RouteConflict
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? currentRouteVersion = null,Object? submittedRouteVersion = null,Object? refreshRequired = null,Object? safeRetry = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? currentRouteVersion = null,Object? submittedRouteVersion = freezed,Object? refreshRequired = null,Object? safeRetry = null,Object? actionType = freezed,Object? message = freezed,}) {
   return _then(_self.copyWith(
 currentRouteVersion: null == currentRouteVersion ? _self.currentRouteVersion : currentRouteVersion // ignore: cast_nullable_to_non_nullable
-as int,submittedRouteVersion: null == submittedRouteVersion ? _self.submittedRouteVersion : submittedRouteVersion // ignore: cast_nullable_to_non_nullable
-as int,refreshRequired: null == refreshRequired ? _self.refreshRequired : refreshRequired // ignore: cast_nullable_to_non_nullable
+as int,submittedRouteVersion: freezed == submittedRouteVersion ? _self.submittedRouteVersion : submittedRouteVersion // ignore: cast_nullable_to_non_nullable
+as int?,refreshRequired: null == refreshRequired ? _self.refreshRequired : refreshRequired // ignore: cast_nullable_to_non_nullable
 as bool,safeRetry: null == safeRetry ? _self.safeRetry : safeRetry // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,actionType: freezed == actionType ? _self.actionType : actionType // ignore: cast_nullable_to_non_nullable
+as String?,message: freezed == message ? _self.message : message // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -1330,10 +1332,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'current_route_version')  int currentRouteVersion, @JsonKey(name: 'submitted_route_version')  int submittedRouteVersion, @JsonKey(name: 'refresh_required')  bool refreshRequired, @JsonKey(name: 'safe_retry')  bool safeRetry)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'current_route_version')  int currentRouteVersion, @JsonKey(name: 'submitted_route_version')  int? submittedRouteVersion, @JsonKey(name: 'refresh_required')  bool refreshRequired, @JsonKey(name: 'safe_retry')  bool safeRetry, @JsonKey(name: 'action_type')  String? actionType,  String? message)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _RouteConflict() when $default != null:
-return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refreshRequired,_that.safeRetry);case _:
+return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refreshRequired,_that.safeRetry,_that.actionType,_that.message);case _:
   return orElse();
 
 }
@@ -1351,10 +1353,10 @@ return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refr
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'current_route_version')  int currentRouteVersion, @JsonKey(name: 'submitted_route_version')  int submittedRouteVersion, @JsonKey(name: 'refresh_required')  bool refreshRequired, @JsonKey(name: 'safe_retry')  bool safeRetry)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'current_route_version')  int currentRouteVersion, @JsonKey(name: 'submitted_route_version')  int? submittedRouteVersion, @JsonKey(name: 'refresh_required')  bool refreshRequired, @JsonKey(name: 'safe_retry')  bool safeRetry, @JsonKey(name: 'action_type')  String? actionType,  String? message)  $default,) {final _that = this;
 switch (_that) {
 case _RouteConflict():
-return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refreshRequired,_that.safeRetry);case _:
+return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refreshRequired,_that.safeRetry,_that.actionType,_that.message);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1371,10 +1373,10 @@ return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refr
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'current_route_version')  int currentRouteVersion, @JsonKey(name: 'submitted_route_version')  int submittedRouteVersion, @JsonKey(name: 'refresh_required')  bool refreshRequired, @JsonKey(name: 'safe_retry')  bool safeRetry)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'current_route_version')  int currentRouteVersion, @JsonKey(name: 'submitted_route_version')  int? submittedRouteVersion, @JsonKey(name: 'refresh_required')  bool refreshRequired, @JsonKey(name: 'safe_retry')  bool safeRetry, @JsonKey(name: 'action_type')  String? actionType,  String? message)?  $default,) {final _that = this;
 switch (_that) {
 case _RouteConflict() when $default != null:
-return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refreshRequired,_that.safeRetry);case _:
+return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refreshRequired,_that.safeRetry,_that.actionType,_that.message);case _:
   return null;
 
 }
@@ -1386,13 +1388,15 @@ return $default(_that.currentRouteVersion,_that.submittedRouteVersion,_that.refr
 @JsonSerializable()
 
 class _RouteConflict implements RouteConflict {
-  const _RouteConflict({@JsonKey(name: 'current_route_version') required this.currentRouteVersion, @JsonKey(name: 'submitted_route_version') required this.submittedRouteVersion, @JsonKey(name: 'refresh_required') this.refreshRequired = true, @JsonKey(name: 'safe_retry') this.safeRetry = false});
+  const _RouteConflict({@JsonKey(name: 'current_route_version') required this.currentRouteVersion, @JsonKey(name: 'submitted_route_version') this.submittedRouteVersion, @JsonKey(name: 'refresh_required') this.refreshRequired = true, @JsonKey(name: 'safe_retry') this.safeRetry = false, @JsonKey(name: 'action_type') this.actionType, this.message});
   factory _RouteConflict.fromJson(Map<String, dynamic> json) => _$RouteConflictFromJson(json);
 
 @override@JsonKey(name: 'current_route_version') final  int currentRouteVersion;
-@override@JsonKey(name: 'submitted_route_version') final  int submittedRouteVersion;
+@override@JsonKey(name: 'submitted_route_version') final  int? submittedRouteVersion;
 @override@JsonKey(name: 'refresh_required') final  bool refreshRequired;
 @override@JsonKey(name: 'safe_retry') final  bool safeRetry;
+@override@JsonKey(name: 'action_type') final  String? actionType;
+@override final  String? message;
 
 /// Create a copy of RouteConflict
 /// with the given fields replaced by the non-null parameter values.
@@ -1407,16 +1411,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RouteConflict&&(identical(other.currentRouteVersion, currentRouteVersion) || other.currentRouteVersion == currentRouteVersion)&&(identical(other.submittedRouteVersion, submittedRouteVersion) || other.submittedRouteVersion == submittedRouteVersion)&&(identical(other.refreshRequired, refreshRequired) || other.refreshRequired == refreshRequired)&&(identical(other.safeRetry, safeRetry) || other.safeRetry == safeRetry));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RouteConflict&&(identical(other.currentRouteVersion, currentRouteVersion) || other.currentRouteVersion == currentRouteVersion)&&(identical(other.submittedRouteVersion, submittedRouteVersion) || other.submittedRouteVersion == submittedRouteVersion)&&(identical(other.refreshRequired, refreshRequired) || other.refreshRequired == refreshRequired)&&(identical(other.safeRetry, safeRetry) || other.safeRetry == safeRetry)&&(identical(other.actionType, actionType) || other.actionType == actionType)&&(identical(other.message, message) || other.message == message));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,currentRouteVersion,submittedRouteVersion,refreshRequired,safeRetry);
+int get hashCode => Object.hash(runtimeType,currentRouteVersion,submittedRouteVersion,refreshRequired,safeRetry,actionType,message);
 
 @override
 String toString() {
-  return 'RouteConflict(currentRouteVersion: $currentRouteVersion, submittedRouteVersion: $submittedRouteVersion, refreshRequired: $refreshRequired, safeRetry: $safeRetry)';
+  return 'RouteConflict(currentRouteVersion: $currentRouteVersion, submittedRouteVersion: $submittedRouteVersion, refreshRequired: $refreshRequired, safeRetry: $safeRetry, actionType: $actionType, message: $message)';
 }
 
 
@@ -1427,7 +1431,7 @@ abstract mixin class _$RouteConflictCopyWith<$Res> implements $RouteConflictCopy
   factory _$RouteConflictCopyWith(_RouteConflict value, $Res Function(_RouteConflict) _then) = __$RouteConflictCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'current_route_version') int currentRouteVersion,@JsonKey(name: 'submitted_route_version') int submittedRouteVersion,@JsonKey(name: 'refresh_required') bool refreshRequired,@JsonKey(name: 'safe_retry') bool safeRetry
+@JsonKey(name: 'current_route_version') int currentRouteVersion,@JsonKey(name: 'submitted_route_version') int? submittedRouteVersion,@JsonKey(name: 'refresh_required') bool refreshRequired,@JsonKey(name: 'safe_retry') bool safeRetry,@JsonKey(name: 'action_type') String? actionType, String? message
 });
 
 
@@ -1444,13 +1448,15 @@ class __$RouteConflictCopyWithImpl<$Res>
 
 /// Create a copy of RouteConflict
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? currentRouteVersion = null,Object? submittedRouteVersion = null,Object? refreshRequired = null,Object? safeRetry = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? currentRouteVersion = null,Object? submittedRouteVersion = freezed,Object? refreshRequired = null,Object? safeRetry = null,Object? actionType = freezed,Object? message = freezed,}) {
   return _then(_RouteConflict(
 currentRouteVersion: null == currentRouteVersion ? _self.currentRouteVersion : currentRouteVersion // ignore: cast_nullable_to_non_nullable
-as int,submittedRouteVersion: null == submittedRouteVersion ? _self.submittedRouteVersion : submittedRouteVersion // ignore: cast_nullable_to_non_nullable
-as int,refreshRequired: null == refreshRequired ? _self.refreshRequired : refreshRequired // ignore: cast_nullable_to_non_nullable
+as int,submittedRouteVersion: freezed == submittedRouteVersion ? _self.submittedRouteVersion : submittedRouteVersion // ignore: cast_nullable_to_non_nullable
+as int?,refreshRequired: null == refreshRequired ? _self.refreshRequired : refreshRequired // ignore: cast_nullable_to_non_nullable
 as bool,safeRetry: null == safeRetry ? _self.safeRetry : safeRetry // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,actionType: freezed == actionType ? _self.actionType : actionType // ignore: cast_nullable_to_non_nullable
+as String?,message: freezed == message ? _self.message : message // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

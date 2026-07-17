@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
 import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
 import { sendSMS } from '@/lib/sms';
-import { checkRouteVersion, staleRouteResponse } from '@/lib/routeVersionGuard';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -40,10 +40,15 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
   }
 
-  // Stale-write protection: reject if route_version is stale.
-  const routeCheck = await checkRouteVersion(booking_id, route_id, route_version);
+  // Stale-write protection: reject if route_version is stale or missing.
+  const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
+    isLegacyPinAuth: !employee && pinAuthed,
+    actionType: 'payment',
+    employeeId: employee?.id,
+  });
   if (!routeCheck.valid) {
-    return staleRouteResponse(routeCheck.conflict);
+    if (routeCheck.status === 400) return missingVersionResponse();
+    return staleRouteResponse(routeCheck.body);
   }
 
   if (method !== 'cash_crew') {

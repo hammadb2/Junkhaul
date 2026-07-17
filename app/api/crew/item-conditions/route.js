@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -19,9 +20,19 @@ export async function POST(req) {
     const emp = await crewAuth(req);
     if (!emp) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { booking_id, conditions } = await req.json();
+    const { booking_id, conditions, route_id, route_version } = await req.json();
     if (!booking_id || !conditions) {
       return NextResponse.json({ error: 'Missing booking_id or conditions' }, { status: 400 });
+    }
+
+    const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
+      isLegacyPinAuth: true,
+      actionType: 'item_conditions',
+      employeeId: undefined,
+    });
+    if (!routeCheck.valid) {
+      if (routeCheck.status === 400) return missingVersionResponse();
+      return staleRouteResponse(routeCheck.body);
     }
 
     // Fetch current booking to get existing itemized_items

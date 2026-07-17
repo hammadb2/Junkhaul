@@ -18,6 +18,8 @@ class RouteState {
     this.conflict,
     this.isLoading = false,
     this.error,
+    this.isWatchingRealtime = false,
+    this.crewAssignmentId,
   });
 
   final CrewRoute? route;
@@ -27,6 +29,8 @@ class RouteState {
   final RouteConflict? conflict;
   final bool isLoading;
   final String? error;
+  final bool isWatchingRealtime;
+  final String? crewAssignmentId;
 
   RouteState copyWith({
     CrewRoute? route,
@@ -37,6 +41,8 @@ class RouteState {
     bool? isLoading,
     String? error,
     bool clearConflict = false,
+    bool? isWatchingRealtime,
+    String? crewAssignmentId,
   }) {
     return RouteState(
       route: route ?? this.route,
@@ -46,6 +52,8 @@ class RouteState {
       conflict: clearConflict ? null : (conflict ?? this.conflict),
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      isWatchingRealtime: isWatchingRealtime ?? this.isWatchingRealtime,
+      crewAssignmentId: crewAssignmentId ?? this.crewAssignmentId,
     );
   }
 
@@ -119,12 +127,17 @@ class RouteNotifier extends Notifier<RouteState> {
           // On any route_plans change, re-fetch the authoritative route.
           fetchRoute();
         });
+    state = state.copyWith(
+      isWatchingRealtime: true,
+      crewAssignmentId: crewAssignmentId,
+    );
   }
 
   /// Stop realtime listening.
   void stopRealtimeWatch() {
     _realtimeSub?.cancel();
     _realtimeSub = null;
+    state = state.copyWith(isWatchingRealtime: false);
   }
 
   /// Acknowledge the current route version.
