@@ -59,17 +59,17 @@ class EmployeeApi {
     required String bookingId,
     required String assignmentId,
     required String action, // 'in' or 'out'
-    String? routeId,
-    int? routeVersion,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/employee/job-clock',
       body: {
         'booking_id': bookingId,
+        'route_id': routeId,
+        'route_version': routeVersion,
         'assignment_id': assignmentId,
         'action': action,
-        if (routeId != null) 'route_id': routeId,
-        if (routeVersion != null) 'route_version': routeVersion,
       },
     );
   }
@@ -142,25 +142,25 @@ class EmployeeApi {
   Future<Map<String, dynamic>> storageDrop({
     required String assignmentId,
     required String facilityId,
+    required String routeId,
+    required int routeVersion,
     String? bookingId,
     List<String>? itemPhotos,
     String? capacityPhotoUrl,
     double? capacityEstimatePct,
-    String? routeId,
-    int? routeVersion,
   }) async {
     return _dio.postJson(
       '/api/employee/storage-drop',
       body: {
         'assignment_id': assignmentId,
         'facility_id': facilityId,
+        'route_id': routeId,
+        'route_version': routeVersion,
         if (bookingId != null) 'booking_id': bookingId,
         if (itemPhotos != null) 'item_photos': itemPhotos,
         if (capacityPhotoUrl != null) 'capacity_photo_url': capacityPhotoUrl,
         if (capacityEstimatePct != null)
           'capacity_estimate_pct': capacityEstimatePct,
-        if (routeId != null) 'route_id': routeId,
-        if (routeVersion != null) 'route_version': routeVersion,
       },
     );
   }
@@ -261,8 +261,8 @@ class EmployeeApi {
     String? customerSignatureUrl,
     required double amountConfirmed,
     required String paymentMethod,
-    String? routeId,
-    int? routeVersion,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/employee/signature',
@@ -273,8 +273,8 @@ class EmployeeApi {
           'customer_signature_url': customerSignatureUrl,
         'amount_confirmed': amountConfirmed,
         'payment_method': paymentMethod,
-        if (routeId != null) 'route_id': routeId,
-        if (routeVersion != null) 'route_version': routeVersion,
+        'route_id': routeId,
+        'route_version': routeVersion,
       },
     );
   }
@@ -324,31 +324,31 @@ class EmployeeApi {
   Future<Map<String, dynamic>> submitItemConditions({
     required String bookingId,
     required Map<String, String> conditions,
-    String? routeId,
-    int? routeVersion,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/item-conditions',
       body: {
         'booking_id': bookingId,
         'conditions': conditions,
-        if (routeId != null) 'route_id': routeId,
-        if (routeVersion != null) 'route_version': routeVersion,
+        'route_id': routeId,
+        'route_version': routeVersion,
       },
     );
   }
 
   Future<Map<String, dynamic>> resendPaymentLink({
     required String bookingId,
-    String? routeId,
-    int? routeVersion,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/resend-payment-link',
       body: {
         'booking_id': bookingId,
-        if (routeId != null) 'route_id': routeId,
-        if (routeVersion != null) 'route_version': routeVersion,
+        'route_id': routeId,
+        'route_version': routeVersion,
       },
     );
   }
@@ -358,8 +358,8 @@ class EmployeeApi {
   Future<Map<String, dynamic>> collectCashPayment({
     required String bookingId,
     required double amount,
-    String? routeId,
-    int? routeVersion,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/collect-payment',
@@ -367,8 +367,8 @@ class EmployeeApi {
         'booking_id': bookingId,
         'method': 'cash_crew',
         'amount': amount,
-        if (routeId != null) 'route_id': routeId,
-        if (routeVersion != null) 'route_version': routeVersion,
+        'route_id': routeId,
+        'route_version': routeVersion,
       },
     );
   }
@@ -402,8 +402,8 @@ class EmployeeApi {
     double? lat,
     double? lng,
     String? takenAt,
-    String? routeId,
-    int? routeVersion,
+    required String routeId,
+    required int routeVersion,
   }) async {
     final formData = FormData.fromMap({
       'booking_id': bookingId,
@@ -418,9 +418,8 @@ class EmployeeApi {
         contentType: DioMediaType.parse('image/jpeg'),
       ),
     });
-    if (routeId != null) formData.fields.add(MapEntry('route_id', routeId));
-    if (routeVersion != null)
-      formData.fields.add(MapEntry('route_version', routeVersion.toString()));
+    formData.fields.add(MapEntry('route_id', routeId));
+    formData.fields.add(MapEntry('route_version', routeVersion.toString()));
     final body = await _dio.postMultipart(
       '/api/crew/upload-photo',
       formData: formData,

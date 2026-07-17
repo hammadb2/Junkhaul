@@ -22,8 +22,19 @@ export const maxDuration = 60;
 //
 // The client then fetches /api/employee/route-plan for the full route.
 //
-// Falls back gracefully: if no assignment exists, sends a no_assignment
-// event and closes. If the session terminates, the stream closes.
+// Robustness:
+// - Heartbeat comments sent every 15s to keep proxies/Vercel alive
+// - Bounded lifetime: stream closes after 55s (Vercel maxDuration=60)
+//   and the client reconnects with backoff
+// - Poll timers and heartbeat cleaned up on disconnect/cancel
+// - Abort signal handled
+// - Session re-validated on each poll
+// - Falls back to foreground refresh and pull-to-refresh on the client
+
+const POLL_INTERVAL_MS = 5000;
+const HEARTBEAT_INTERVAL_MS = 15000;
+const MAX_STREAM_LIFETIME_MS = 55000; // Close before Vercel's 60s limit
+
 export async function GET(req) {
   const employee = await getAuthedEmployee(req);
   if (!employee) {
@@ -47,10 +58,12 @@ export async function GET(req) {
     );
   }
 
-  // Track the last known route version. Poll for changes.
   let lastVersion = assignment.current_route_version || 0;
   let lastPlanId = assignment.current_route_plan_id;
   let closed = false;
+  let pollTimer = null;
+  let heartbeatTimer = null;
+  let lifetimeTimer = null;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -63,22 +76,46 @@ export async function GET(req) {
         }))
       );
 
+      // Heartbeat: send SSE comment every 15s to keep proxies alive.
+      // SSE comments start with ":" and are ignored by the client parser.
+      heartbeatTimer = setInterval(() => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(': heartbeat\n\n'));
+        } catch (_) {
+          // Stream already closed — stop heartbeat.
+          _cleanup();
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+
+      // Bounded lifetime: close the stream before Vercel's maxDuration.
+      // The client will reconnect with backoff.
+      lifetimeTimer = setTimeout(() => {
+        if (closed) return;
+        try {
+          controller.enqueue(
+            encoder.encode(_sseEvent('stream_timeout', {
+              message: 'Stream lifetime reached, please reconnect',
+            }))
+          );
+        } catch (_) {}
+        _cleanup();
+        try { controller.close(); } catch (_) {}
+      }, MAX_STREAM_LIFETIME_MS);
+
       // Poll every 5 seconds for route changes.
-      const interval = setInterval(async () => {
+      pollTimer = setInterval(async () => {
         if (closed) return;
 
         try {
           // Re-validate the session on each poll.
-          // If the employee logged out, the cookie is gone and
-          // getAuthedEmployee will return null.
           const stillValid = await getAuthedEmployee(req);
           if (!stillValid) {
             controller.enqueue(
               encoder.encode(_sseEvent('session_terminated', {}))
             );
-            controller.close();
-            clearInterval(interval);
-            closed = true;
+            _cleanup();
+            try { controller.close(); } catch (_) {}
             return;
           }
 
@@ -104,19 +141,28 @@ export async function GET(req) {
           }
         } catch (err) {
           // Network/transient error — keep polling.
-          // Log but don't close the stream.
           console.error('route-stream poll error:', err.message);
         }
-      }, 5000);
+      }, POLL_INTERVAL_MS);
 
-      // Clean up on cancel.
+      // Clean up on abort (client disconnect).
       req.signal?.addEventListener('abort', () => {
-        closed = true;
-        clearInterval(interval);
+        _cleanup();
         try { controller.close(); } catch (_) {}
       });
+
+      function _cleanup() {
+        if (closed) return;
+        closed = true;
+        if (pollTimer) clearInterval(pollTimer);
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        if (lifetimeTimer) clearTimeout(lifetimeTimer);
+      }
     },
     cancel() {
+      if (pollTimer) clearInterval(pollTimer);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      if (lifetimeTimer) clearTimeout(lifetimeTimer);
       closed = true;
     },
   });

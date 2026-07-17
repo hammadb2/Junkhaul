@@ -57,6 +57,8 @@ class PhotoUploadService {
     required String bookingId,
     required String category,
     required File file,
+    required String routeId,
+    required int routeVersion,
     double? lat,
     double? lng,
   }) async {
@@ -72,6 +74,8 @@ class PhotoUploadService {
         lat: lat,
         lng: lng,
         takenAt: DateTime.now().toIso8601String(),
+        routeId: routeId,
+        routeVersion: routeVersion,
       );
 
       // Clean up the temp compressed file if it's different from the original.

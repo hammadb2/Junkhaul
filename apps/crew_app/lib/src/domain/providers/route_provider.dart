@@ -67,6 +67,13 @@ class RouteNotifier extends Notifier<RouteState> {
   // Supabase anon key or Supabase Auth involved.
   StreamSubscription<List<int>>? _sseByteSub;
   bool _sseConnected = false;
+  int _reconnectAttempts = 0;
+  Timer? _reconnectTimer;
+  bool _intentionallyStopped = false;
+
+  // Reconnect backoff: 1s, 2s, 4s, 8s, 16s, capped at 30s.
+  static const _maxReconnectDelay = Duration(seconds: 30);
+
   static const _storageKey = 'jh_last_acknowledged_route';
   static const _storage = FlutterSecureStorage();
 
@@ -127,6 +134,8 @@ class RouteNotifier extends Notifier<RouteState> {
   void startRealtimeWatch(String crewAssignmentId) {
     // Cancel any existing connection to avoid duplicate listeners.
     _cancelSse();
+    _intentionallyStopped = false;
+    _reconnectAttempts = 0;
 
     state = state.copyWith(
       isWatchingRealtime: true,
@@ -139,6 +148,7 @@ class RouteNotifier extends Notifier<RouteState> {
 
   Future<void> _connectSse() async {
     if (_sseConnected) return;
+    if (_intentionallyStopped) return;
     _sseConnected = true;
 
     try {
@@ -152,31 +162,60 @@ class RouteNotifier extends Notifier<RouteState> {
           _parseSseEvents(text);
         },
         onError: (error) {
-          // Connection lost — mark as disconnected and allow reconnect.
+          // Connection lost — schedule reconnect with backoff.
           _sseConnected = false;
-          state = state.copyWith(isWatchingRealtime: false);
+          _scheduleReconnect();
         },
         onDone: () {
-          // Stream closed by server or network — allow reconnect.
+          // Stream closed by server (timeout/heartbeat failure) or network.
+          // Schedule reconnect with backoff unless intentionally stopped.
           _sseConnected = false;
-          state = state.copyWith(isWatchingRealtime: false);
+          if (!_intentionallyStopped) {
+            _scheduleReconnect();
+          }
         },
         cancelOnError: true,
       );
+      // Reset reconnect attempts on successful connection.
+      _reconnectAttempts = 0;
     } catch (e) {
       _sseConnected = false;
-      // SSE connection failed — fall back to foreground refresh.
-      // The schedule screen's WidgetsBindingObserver will refresh
+      // SSE connection failed — schedule reconnect with backoff.
+      // The schedule screen's WidgetsBindingObserver will also refresh
       // on resume, and pull-to-refresh is always available.
+      if (!_intentionallyStopped) {
+        _scheduleReconnect();
+      }
     }
+  }
+
+  /// Schedule a reconnect with exponential backoff.
+  /// Delay: 1s, 2s, 4s, 8s, 16s, capped at 30s.
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    final delay = Duration(
+      seconds: (1 << _reconnectAttempts).clamp(1, _maxReconnectDelay.inSeconds),
+    );
+    _reconnectAttempts = (_reconnectAttempts + 1).clamp(0, 5);
+
+    state = state.copyWith(isWatchingRealtime: false);
+
+    _reconnectTimer = Timer(delay, () {
+      if (!_intentionallyStopped && !_sseConnected) {
+        _connectSse();
+      }
+    });
   }
 
   void _parseSseEvents(String text) {
     // SSE events are separated by double newlines.
     // Each event has "event: <type>" and "data: <json>" lines.
+    // Lines starting with ":" are comments (heartbeats) — ignored.
     final events = text.split('\n\n');
     for (final eventBlock in events) {
       if (eventBlock.trim().isEmpty) continue;
+      // Skip comment lines (heartbeats).
+      if (eventBlock.trimLeft().startsWith(':')) continue;
 
       String? eventType;
       String? dataLine;
@@ -193,9 +232,13 @@ class RouteNotifier extends Notifier<RouteState> {
         // Route changed — fetch the authoritative route.
         fetchRoute();
       } else if (eventType == 'session_terminated') {
-        // Server says session is invalid — disconnect.
+        // Server says session is invalid — disconnect permanently.
+        _intentionallyStopped = true;
         _cancelSse();
         state = state.copyWith(isWatchingRealtime: false);
+      } else if (eventType == 'stream_timeout') {
+        // Server closed the stream due to lifetime limit.
+        // The onDone handler will schedule a reconnect.
       }
       // 'route_state' and 'no_assignment' events don't require action
       // — the initial fetchRoute() call handles those cases.
@@ -206,10 +249,13 @@ class RouteNotifier extends Notifier<RouteState> {
     _sseByteSub?.cancel();
     _sseByteSub = null;
     _sseConnected = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
   }
 
   /// Stop SSE route-stream listening.
   void stopRealtimeWatch() {
+    _intentionallyStopped = true;
     _cancelSse();
     state = state.copyWith(isWatchingRealtime: false);
   }
@@ -237,6 +283,11 @@ class RouteNotifier extends Notifier<RouteState> {
       state = state.copyWith(error: e.toString());
       return false;
     }
+  }
+
+  /// Set a conflict state (from a 409 response).
+  void setConflict(RouteConflict conflict) {
+    state = state.copyWith(conflict: conflict);
   }
 
   /// Generate a change summary between the current route and a new route.

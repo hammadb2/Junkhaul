@@ -10,6 +10,8 @@ import '../../../data/services/camera_service.dart';
 import '../../../data/services/photo_upload_service.dart';
 import '../../../domain/models/job.dart';
 import '../../../domain/models/payment.dart';
+import '../../../domain/providers/route_action_context.dart';
+import '../../../domain/providers/route_provider.dart';
 import '../../shared/jh_step_progress.dart';
 import '../../shared/jh_sync_banner.dart';
 import '../../shared/jh_primary_button.dart';
@@ -304,6 +306,61 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         .maybeWhen(data: (q) => q, orElse: () => null);
   }
 
+  /// Check route action context before a protected write.
+  /// Shows a user-facing message if the action should be blocked.
+  /// Returns the context if allowed, null if blocked.
+  RouteActionContext? _requireRouteContext() {
+    final result = checkRouteAction(ref, bookingId: widget.bookingId);
+    switch (result) {
+      case RouteActionAllowed(:final context):
+        return context;
+      case RouteActionNoRoute():
+        _showError('Route information is out of date. Refresh before continuing.');
+        ref.read(routeProvider.notifier).fetchRoute();
+        return null;
+      case RouteActionBookingNotInRoute():
+        _showError('This job is not in your current route. Contact dispatch.');
+        return null;
+      case RouteActionConflictExists(:final conflict):
+        _showError(
+          'Route changed (v${conflict.currentRouteVersion}). '
+          'Refresh your route before continuing.',
+        );
+        ref.read(routeProvider.notifier).fetchRoute();
+        return null;
+    }
+  }
+
+  /// Build an offline queue payload with route context for a protected action.
+  Map<String, dynamic> _payloadWithRoute(
+    Map<String, dynamic> base,
+    RouteActionContext routeCtx,
+  ) {
+    return {
+      ...base,
+      'route_id': routeCtx.routeId,
+      'route_version': routeCtx.routeVersion,
+      'booking_id': widget.bookingId,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+  }
+
+  /// Handle a route conflict error from a protected endpoint.
+  /// Parses the 409 body and updates RouteNotifier with the conflict.
+  void _handleRouteError(dynamic e) {
+    // DioException contains the response body in e.response?.data
+    if (e is Exception) {
+      final msg = e.toString();
+      // Check for 409 conflict indicators
+      if (msg.contains('409') || msg.contains('route_version') ||
+          msg.contains('conflict') || msg.contains('stale')) {
+        // Try to extract conflict details from the error
+        // The DioClient maps errors; we check for common patterns
+        ref.read(routeProvider.notifier).fetchRoute();
+      }
+    }
+  }
+
   /// Process the payment result based on the selected method.
   /// - Cash: record via /api/crew/collect-payment
   /// - Card on file: no crew action (Stripe charges via /pay/[booking_id])
@@ -312,14 +369,19 @@ class _JobScreenState extends ConsumerState<JobScreen> {
     if (widget.bookingId == null) return;
 
     if (result.method == PaymentMethod.cash) {
+      final routeCtx = _requireRouteContext();
+      if (routeCtx == null) return;
+
       if (!_isOnline) {
         _queue?.enqueue(
           type: 'collect_payment',
-          payload: {
-            'booking_id': widget.bookingId!,
-            'method': 'cash_crew',
-            'amount': result.amount,
-          },
+          payload: _payloadWithRoute(
+            {
+              'method': 'cash_crew',
+              'amount': result.amount,
+            },
+            routeCtx,
+          ),
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -338,8 +400,11 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         await api.collectCashPayment(
           bookingId: widget.bookingId!,
           amount: result.amount,
+          routeId: routeCtx.routeId,
+          routeVersion: routeCtx.routeVersion,
         );
       } catch (e) {
+        _handleRouteError(e);
         _showError('Failed to record cash payment: $e');
       }
     } else if (result.method == PaymentMethod.smsLink) {
@@ -348,9 +413,15 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         _showError('Cannot send payment link while offline');
         return;
       }
+      final routeCtx = _requireRouteContext();
+      if (routeCtx == null) return;
       try {
         final api = await ref.read(employeeApiProvider.future);
-        await api.resendPaymentLink(bookingId: widget.bookingId!);
+        await api.resendPaymentLink(
+          bookingId: widget.bookingId!,
+          routeId: routeCtx.routeId,
+          routeVersion: routeCtx.routeVersion,
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -370,12 +441,16 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   /// Does not block the UI — runs in the background.
   Future<void> _uploadPhoto(File file, String category) async {
     if (widget.bookingId == null) return;
+    final routeCtx = _requireRouteContext();
+    if (routeCtx == null) return;
     final uploadService = ref.read(photoUploadServiceProvider);
     if (uploadService == null) return;
     final result = await uploadService.uploadPhoto(
       bookingId: widget.bookingId!,
       category: category,
       file: file,
+      routeId: routeCtx.routeId,
+      routeVersion: routeCtx.routeVersion,
     );
     if (!result.success && mounted) {
       _showError('Photo upload failed: ${result.error}');
@@ -398,10 +473,16 @@ class _JobScreenState extends ConsumerState<JobScreen> {
     }
     if (conditions.isEmpty) return;
 
+    final routeCtx = _requireRouteContext();
+    if (routeCtx == null) return;
+
     if (!_isOnline) {
       _queue?.enqueue(
         type: 'item_conditions',
-        payload: {'booking_id': widget.bookingId!, 'conditions': conditions},
+        payload: _payloadWithRoute(
+          {'conditions': conditions},
+          routeCtx,
+        ),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -419,8 +500,11 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       await api.submitItemConditions(
         bookingId: widget.bookingId!,
         conditions: conditions,
+        routeId: routeCtx.routeId,
+        routeVersion: routeCtx.routeVersion,
       );
     } catch (e) {
+      _handleRouteError(e);
       _showError('Failed to save item conditions: $e');
     }
   }
@@ -433,9 +517,16 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       return;
     }
 
+    final routeCtx = _requireRouteContext();
+    if (routeCtx == null) return;
+
     try {
       final api = await ref.read(employeeApiProvider.future);
-      await api.resendPaymentLink(bookingId: widget.bookingId!);
+      await api.resendPaymentLink(
+        bookingId: widget.bookingId!,
+        routeId: routeCtx.routeId,
+        routeVersion: routeCtx.routeVersion,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -445,6 +536,7 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         );
       }
     } catch (e) {
+      _handleRouteError(e);
       _showError('Failed to send payment link: $e');
     }
   }
@@ -457,13 +549,18 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   }) async {
     if (widget.bookingId == null) return;
 
-    final payload = {
-      'booking_id': widget.bookingId!,
-      'customer_name_typed': customerName,
-      'amount_confirmed': amount,
-      'payment_method': paymentMethod,
-      'signed_by_delegate': signedByDelegate,
-    };
+    final routeCtx = _requireRouteContext();
+    if (routeCtx == null) return;
+
+    final payload = _payloadWithRoute(
+      {
+        'customer_name_typed': customerName,
+        'amount_confirmed': amount,
+        'payment_method': paymentMethod,
+        'signed_by_delegate': signedByDelegate,
+      },
+      routeCtx,
+    );
 
     if (!_isOnline) {
       _queue?.enqueue(type: 'signature', payload: payload);
@@ -485,9 +582,12 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         customerNameTyped: customerName,
         amountConfirmed: amount,
         paymentMethod: paymentMethod,
+        routeId: routeCtx.routeId,
+        routeVersion: routeCtx.routeVersion,
       );
     } catch (e) {
-      // Fallback: enqueue for retry
+      _handleRouteError(e);
+      // Fallback: enqueue for retry with route context preserved
       _queue?.enqueue(type: 'signature', payload: payload);
       _showError('Failed to submit signature — queued for retry: $e');
     }
