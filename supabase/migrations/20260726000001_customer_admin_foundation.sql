@@ -70,6 +70,10 @@ ALTER TABLE phone_calls
   ADD COLUMN IF NOT EXISTS sentiment text,
   ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT '{}'::jsonb;
 
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('donation-photos', 'donation-photos', false)
+ON CONFLICT (id) DO UPDATE SET public = false;
+
 -- ---------- Marketing and attribution ----------
 CREATE TABLE IF NOT EXISTS marketing_campaigns (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,6 +161,19 @@ CREATE TABLE IF NOT EXISTS attribution_records (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM attribution_records
+    WHERE touch_type = 'first'
+    GROUP BY session_id
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'Cannot create attribution_first_touch_once: duplicate first-touch attribution rows exist. Inspect and reconcile attribution_records by session_id before applying this migration.';
+  END IF;
+END $$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS attribution_first_touch_once
   ON attribution_records(session_id) WHERE touch_type = 'first';
 CREATE INDEX IF NOT EXISTS attribution_session_idx ON attribution_records(session_id, created_at DESC);
@@ -218,6 +235,18 @@ CREATE TABLE IF NOT EXISTS expected_replies (
   metadata jsonb DEFAULT '{}'::jsonb
 );
 CREATE INDEX IF NOT EXISTS expected_replies_phone_idx ON expected_replies(normalized_phone, status, expires_at);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM expected_replies
+    WHERE status = 'active'
+    GROUP BY entity_type, entity_id, expected_intent
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'Cannot create expected_replies_active_entity_idx: duplicate active expected replies exist for the same entity and intent.';
+  END IF;
+END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS expected_replies_active_entity_idx
   ON expected_replies(entity_type, entity_id, expected_intent)
   WHERE status = 'active';
@@ -231,6 +260,19 @@ CREATE TABLE IF NOT EXISTS message_entity_links (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(message_id, entity_type, entity_id)
 );
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM message_entity_links
+    GROUP BY message_id, entity_type, entity_id
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'Cannot create message_entity_links uniqueness: duplicate message/entity links exist.';
+  END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS message_entity_links_unique_idx
+  ON message_entity_links(message_id, entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS message_entity_links_entity_idx ON message_entity_links(entity_type, entity_id);
 
 -- ---------- Donation-only pickup ----------
@@ -300,6 +342,11 @@ CREATE TABLE IF NOT EXISTS donation_requests (
     'delivered_to_partner','rejected_on_site','converted_to_paid','cancelled','expired'
   )),
   status_reason text,
+  resume_token_hash text,
+  last_completed_step text,
+  last_activity_at timestamptz,
+  photos_started_at timestamptz,
+  submitted_at timestamptz,
   policy_version_id uuid REFERENCES donation_policy_versions(id) ON DELETE SET NULL,
   ai_outcome text,
   confidence numeric,
@@ -334,6 +381,9 @@ CREATE TABLE IF NOT EXISTS donation_request_photos (
   donation_request_id uuid NOT NULL REFERENCES donation_requests(id) ON DELETE CASCADE,
   photo_type text NOT NULL,
   storage_url text NOT NULL,
+  storage_path text,
+  original_filename text,
+  mime_type text,
   upload_order integer NOT NULL DEFAULT 0,
   file_size_bytes integer,
   width integer,
@@ -350,6 +400,21 @@ CREATE TABLE IF NOT EXISTS donation_request_photos (
   retention_state text NOT NULL DEFAULT 'active',
   uploaded_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE donation_requests
+  ADD COLUMN IF NOT EXISTS resume_token_hash text,
+  ADD COLUMN IF NOT EXISTS last_completed_step text,
+  ADD COLUMN IF NOT EXISTS last_activity_at timestamptz,
+  ADD COLUMN IF NOT EXISTS photos_started_at timestamptz,
+  ADD COLUMN IF NOT EXISTS submitted_at timestamptz;
+
+ALTER TABLE donation_request_photos
+  ADD COLUMN IF NOT EXISTS storage_path text,
+  ADD COLUMN IF NOT EXISTS original_filename text,
+  ADD COLUMN IF NOT EXISTS mime_type text;
+
+CREATE INDEX IF NOT EXISTS donation_requests_resume_token_hash_idx ON donation_requests(resume_token_hash);
+CREATE INDEX IF NOT EXISTS donation_request_photos_request_idx ON donation_request_photos(donation_request_id, uploaded_at);
 
 CREATE TABLE IF NOT EXISTS donation_ai_analyses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -422,6 +487,18 @@ CREATE TABLE IF NOT EXISTS quote_price_ledger (
   customer_notification_status text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM quote_price_ledger
+    WHERE ledger_type = 'initial_quote' AND booking_id IS NOT NULL
+    GROUP BY booking_id
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'Cannot create quote_price_ledger_one_initial_booking: duplicate initial quotes exist for at least one booking.';
+  END IF;
+END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS quote_price_ledger_one_initial_booking
   ON quote_price_ledger(booking_id) WHERE ledger_type = 'initial_quote';
 
@@ -561,6 +638,21 @@ CREATE TABLE IF NOT EXISTS service_requests (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE service_requests
+  ADD COLUMN IF NOT EXISTS name text,
+  ADD COLUMN IF NOT EXISTS phone text,
+  ADD COLUMN IF NOT EXISTS normalized_phone text,
+  ADD COLUMN IF NOT EXISTS email text,
+  ADD COLUMN IF NOT EXISTS booking_ref text,
+  ADD COLUMN IF NOT EXISTS booking_id uuid,
+  ADD COLUMN IF NOT EXISTS request_type text,
+  ADD COLUMN IF NOT EXISTS details text,
+  ADD COLUMN IF NOT EXISTS status text DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS assigned_to uuid,
+  ADD COLUMN IF NOT EXISTS resolved_at timestamptz,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
 CREATE TABLE IF NOT EXISTS refund_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
@@ -579,6 +671,22 @@ CREATE TABLE IF NOT EXISTS refund_requests (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE refund_requests
+  ADD COLUMN IF NOT EXISTS name text,
+  ADD COLUMN IF NOT EXISTS phone text,
+  ADD COLUMN IF NOT EXISTS normalized_phone text,
+  ADD COLUMN IF NOT EXISTS email text,
+  ADD COLUMN IF NOT EXISTS booking_ref text,
+  ADD COLUMN IF NOT EXISTS booking_id uuid,
+  ADD COLUMN IF NOT EXISTS reason text,
+  ADD COLUMN IF NOT EXISTS amount_requested numeric,
+  ADD COLUMN IF NOT EXISTS status text DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS reviewed_by uuid,
+  ADD COLUMN IF NOT EXISTS outcome text,
+  ADD COLUMN IF NOT EXISTS resolved_at timestamptz,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
 CREATE TABLE IF NOT EXISTS escalations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   reason text NOT NULL,
@@ -589,6 +697,14 @@ CREATE TABLE IF NOT EXISTS escalations (
   created_at timestamptz DEFAULT now()
 );
 
+ALTER TABLE escalations
+  ADD COLUMN IF NOT EXISTS reason text,
+  ADD COLUMN IF NOT EXISTS caller_phone text,
+  ADD COLUMN IF NOT EXISTS booking_ref text,
+  ADD COLUMN IF NOT EXISTS priority text DEFAULT 'normal',
+  ADD COLUMN IF NOT EXISTS status text DEFAULT 'open',
+  ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+
 CREATE TABLE IF NOT EXISTS compensation_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_ref text,
@@ -597,6 +713,41 @@ CREATE TABLE IF NOT EXISTS compensation_log (
   caller_phone text,
   created_at timestamptz DEFAULT now()
 );
+
+ALTER TABLE compensation_log
+  ADD COLUMN IF NOT EXISTS booking_ref text,
+  ADD COLUMN IF NOT EXISTS compensation_type text,
+  ADD COLUMN IF NOT EXISTS reason text,
+  ADD COLUMN IF NOT EXISTS caller_phone text,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+
+DO $$
+DECLARE
+  mismatch text;
+BEGIN
+  SELECT string_agg(table_name || '.' || column_name || ' is ' || data_type || ', expected ' || expected_type, '; ')
+  INTO mismatch
+  FROM (
+    VALUES
+      ('service_requests','id','uuid'),
+      ('service_requests','booking_id','uuid'),
+      ('service_requests','assigned_to','uuid'),
+      ('refund_requests','id','uuid'),
+      ('refund_requests','booking_id','uuid'),
+      ('refund_requests','reviewed_by','uuid'),
+      ('escalations','id','uuid'),
+      ('compensation_log','id','uuid')
+  ) AS expected(table_name, column_name, expected_type)
+  JOIN information_schema.columns c
+    ON c.table_schema = 'public'
+   AND c.table_name = expected.table_name
+   AND c.column_name = expected.column_name
+  WHERE c.data_type <> expected.expected_type;
+
+  IF mismatch IS NOT NULL THEN
+    RAISE EXCEPTION 'Foundation migration blocked by incompatible existing support-table column types: %', mismatch;
+  END IF;
+END $$;
 
 -- ---------- RLS ----------
 ALTER TABLE marketing_campaigns ENABLE ROW LEVEL SECURITY;
@@ -685,6 +836,18 @@ ALTER TABLE bookings
   ADD CONSTRAINT bookings_first_touch_attribution_id_fkey FOREIGN KEY (first_touch_attribution_id) REFERENCES attribution_records(id) ON DELETE SET NULL,
   DROP CONSTRAINT IF EXISTS bookings_last_touch_attribution_id_fkey,
   ADD CONSTRAINT bookings_last_touch_attribution_id_fkey FOREIGN KEY (last_touch_attribution_id) REFERENCES attribution_records(id) ON DELETE SET NULL;
+
+ALTER TABLE service_requests
+  DROP CONSTRAINT IF EXISTS service_requests_booking_id_fkey,
+  ADD CONSTRAINT service_requests_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL,
+  DROP CONSTRAINT IF EXISTS service_requests_assigned_to_fkey,
+  ADD CONSTRAINT service_requests_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES employees(id) ON DELETE SET NULL;
+
+ALTER TABLE refund_requests
+  DROP CONSTRAINT IF EXISTS refund_requests_booking_id_fkey,
+  ADD CONSTRAINT refund_requests_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL,
+  DROP CONSTRAINT IF EXISTS refund_requests_reviewed_by_fkey,
+  ADD CONSTRAINT refund_requests_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES employees(id) ON DELETE SET NULL;
 
 INSERT INTO donation_policy_versions (
   version, active, accepted_categories, prohibited_categories, minimum_condition, required_photos, route_fit_limits
