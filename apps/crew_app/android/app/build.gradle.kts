@@ -24,6 +24,9 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
+        // Google Maps API key — passed via -P or env var, defaults to empty.
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
+            project.findProperty("GOOGLE_MAPS_API_KEY") as String? ?: ""
     }
 
     val keystoreProperties = Properties()

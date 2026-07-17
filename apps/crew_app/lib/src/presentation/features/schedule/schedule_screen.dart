@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/app_theme.dart';
 import '../../../data/offline/connectivity_provider.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../domain/models/booking.dart';
 import '../../../domain/models/job.dart';
 import '../../../domain/models/job_mappers.dart';
 import '../../../domain/providers/schedule_provider.dart';
@@ -25,10 +26,11 @@ class ScheduleScreen extends ConsumerWidget {
 
     final crewFirstName = _extractFirstName(auth.employee?.name);
     final isLoading = scheduleAsync.isLoading;
-    final jobs = scheduleAsync.maybeWhen(
-      data: (schedule) => schedule.bookings.map((b) => b.toJob()).toList(),
-      orElse: () => <Job>[],
+    final bookings = scheduleAsync.maybeWhen(
+      data: (schedule) => schedule.bookings,
+      orElse: () => <Booking>[],
     );
+    final jobs = bookings.map((b) => b.toJob()).toList();
 
     final isOnline = connectivityAsync.maybeWhen(
       data: (online) => online,
@@ -43,6 +45,7 @@ class ScheduleScreen extends ConsumerWidget {
     return _ScheduleBody(
       crewFirstName: crewFirstName,
       jobs: jobs,
+      bookings: bookings,
       isLoading: isLoading,
       syncState: syncState,
       onRefresh: () async {
@@ -66,6 +69,7 @@ class _ScheduleBody extends StatefulWidget {
   const _ScheduleBody({
     required this.crewFirstName,
     required this.jobs,
+    required this.bookings,
     required this.isLoading,
     required this.syncState,
     required this.onRefresh,
@@ -75,6 +79,7 @@ class _ScheduleBody extends StatefulWidget {
 
   final String crewFirstName;
   final List<Job> jobs;
+  final List<Booking> bookings;
   final bool isLoading;
   final SyncState syncState;
   final Future<void> Function() onRefresh;
@@ -87,6 +92,13 @@ class _ScheduleBody extends StatefulWidget {
 
 class _ScheduleBodyState extends State<_ScheduleBody> {
   final _sheetController = DraggableScrollableController();
+  String? _selectedBookingId;
+
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +112,17 @@ class _ScheduleBodyState extends State<_ScheduleBody> {
             Expanded(
               child: Stack(
                 children: [
-                  const Positioned.fill(child: ScheduleMap()),
+                  Positioned.fill(
+                    child: ScheduleMap(
+                      bookings: widget.bookings,
+                      selectedBookingId: _selectedBookingId,
+                      onJobTap: (booking) {
+                        setState(() => _selectedBookingId = booking.id);
+                        final job = booking.toJob();
+                        widget.onSelectJob(job);
+                      },
+                    ),
+                  ),
                   Positioned(
                     left: 16,
                     top: 16,
