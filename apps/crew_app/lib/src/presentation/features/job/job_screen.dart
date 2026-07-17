@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/app_theme.dart';
 import '../../../data/api/employee_api.dart';
+import '../../../data/offline/connectivity_provider.dart';
+import '../../../data/offline/offline_queue_service.dart';
 import '../../../data/services/camera_service.dart';
 import '../../../data/services/photo_upload_service.dart';
 import '../../../domain/models/job.dart';
@@ -246,6 +248,17 @@ class _JobScreenState extends ConsumerState<JobScreen> {
 
   // ---- Real API wiring ----
 
+  /// Check if the device is currently online.
+  bool get _isOnline {
+    final connectivityAsync = ref.read(isOnlineProvider);
+    return connectivityAsync.maybeWhen(data: (online) => online, orElse: () => true);
+  }
+
+  /// Get the offline queue service, or null if not ready.
+  OfflineQueueService? get _queue {
+    return ref.read(offlineQueueProvider).maybeWhen(data: (q) => q, orElse: () => null);
+  }
+
   /// Upload a captured photo to the backend. Shows a snackbar on failure.
   /// Does not block the UI — runs in the background.
   Future<void> _uploadPhoto(File file, String category) async {
@@ -270,20 +283,36 @@ class _JobScreenState extends ConsumerState<JobScreen> {
 
   Future<void> _submitItemConditions() async {
     if (widget.bookingId == null) return;
-    try {
-      final api = await ref.read(employeeApiProvider.future);
-      final conditions = <String, String>{};
-      for (final item in _items) {
-        if (item.condition != null) {
-          conditions[item.id] = item.condition!.name;
-        }
+    final conditions = <String, String>{};
+    for (final item in _items) {
+      if (item.condition != null) {
+        conditions[item.id] = item.condition!.name;
       }
-      if (conditions.isNotEmpty) {
-        await api.submitItemConditions(
-          bookingId: widget.bookingId!,
-          conditions: conditions,
+    }
+    if (conditions.isEmpty) return;
+
+    if (!_isOnline) {
+      _queue?.enqueue(
+        type: 'item_conditions',
+        payload: {
+          'booking_id': widget.bookingId!,
+          'conditions': conditions,
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Saved offline — will sync when online'), duration: Duration(seconds: 2)),
         );
       }
+      return;
+    }
+
+    try {
+      final api = await ref.read(employeeApiProvider.future);
+      await api.submitItemConditions(
+        bookingId: widget.bookingId!,
+        conditions: conditions,
+      );
     } catch (e) {
       _showError('Failed to save item conditions: $e');
     }
@@ -291,6 +320,12 @@ class _JobScreenState extends ConsumerState<JobScreen> {
 
   Future<void> _resendPaymentLink() async {
     if (widget.bookingId == null) return;
+
+    if (!_isOnline) {
+      _showError('Cannot send payment link while offline');
+      return;
+    }
+
     try {
       final api = await ref.read(employeeApiProvider.future);
       await api.resendPaymentLink(bookingId: widget.bookingId!);
@@ -311,6 +346,25 @@ class _JobScreenState extends ConsumerState<JobScreen> {
     bool signedByDelegate = false,
   }) async {
     if (widget.bookingId == null) return;
+
+    final payload = {
+      'booking_id': widget.bookingId!,
+      'customer_name_typed': customerName,
+      'amount_confirmed': amount,
+      'payment_method': paymentMethod,
+      'signed_by_delegate': signedByDelegate,
+    };
+
+    if (!_isOnline) {
+      _queue?.enqueue(type: 'signature', payload: payload);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signature saved offline — will sync when online'), duration: Duration(seconds: 3)),
+        );
+      }
+      return;
+    }
+
     try {
       final api = await ref.read(employeeApiProvider.future);
       await api.submitSignature(
@@ -320,7 +374,9 @@ class _JobScreenState extends ConsumerState<JobScreen> {
         paymentMethod: paymentMethod,
       );
     } catch (e) {
-      _showError('Failed to submit signature: $e');
+      // Fallback: enqueue for retry
+      _queue?.enqueue(type: 'signature', payload: payload);
+      _showError('Failed to submit signature — queued for retry: $e');
     }
   }
 }

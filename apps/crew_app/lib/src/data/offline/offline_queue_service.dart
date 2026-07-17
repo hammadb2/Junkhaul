@@ -99,6 +99,10 @@ class OfflineQueueService {
         return '/api/employee/truck-check';
       case 'storage_drop':
         return '/api/employee/storage-drop';
+      case 'item_conditions':
+        return '/api/crew/item-conditions';
+      case 'resend_payment_link':
+        return '/api/crew/resend-payment-link';
       default:
         return null;
     }

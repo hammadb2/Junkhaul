@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/app_theme.dart';
 import '../../../data/offline/connectivity_provider.dart';
+import '../../../data/offline/offline_queue_service.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/dispatch_location_service.dart';
 import '../../../domain/models/booking.dart';
@@ -24,6 +25,7 @@ class ScheduleScreen extends ConsumerWidget {
     final auth = ref.watch(authRepositoryProvider);
     final scheduleAsync = ref.watch(todayScheduleProvider);
     final connectivityAsync = ref.watch(isOnlineProvider);
+    final queueAsync = ref.watch(offlineQueueProvider);
 
     final crewFirstName = _extractFirstName(auth.employee?.name);
     final isLoading = scheduleAsync.isLoading;
@@ -37,6 +39,10 @@ class ScheduleScreen extends ConsumerWidget {
       data: (online) => online,
       orElse: () => true,
     );
+    final queuedCount = queueAsync.maybeWhen(
+      data: (queue) => queue.pending,
+      orElse: () => 0,
+    );
     final syncState = isLoading
         ? SyncState.syncing
         : isOnline
@@ -49,6 +55,7 @@ class ScheduleScreen extends ConsumerWidget {
       bookings: bookings,
       isLoading: isLoading,
       syncState: syncState,
+      queuedActionCount: queuedCount,
       onRefresh: () async {
         ref.invalidate(todayScheduleProvider);
         await ref.read(todayScheduleProvider.future);
