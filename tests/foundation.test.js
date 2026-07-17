@@ -172,4 +172,16 @@ for (const action of ['create_manager', 'assign_role', 'assign_scope', 'change_s
 }
 assert.match(staffAccessRouteSource, /await auditAccess/);
 
+// Session security: blocked statuses must be rejected by getSessionEmployee.
+// We verify by reading the source (the module imports supabase which is
+// lazily proxied for Next.js but not importable in raw Node test context).
+const employeeAuthSource = readFileSync(new URL('../lib/employeeAuth.js', import.meta.url), 'utf8');
+assert.match(employeeAuthSource, /BLOCKED_STATUSES.*terminated.*rejected.*deletion_requested/, 'must define all three blocked statuses');
+assert.match(employeeAuthSource, /BLOCKED_STATUSES\.has\(emp\.status\)/, 'getSessionEmployee must check blocked statuses');
+assert.match(employeeAuthSource, /BLOCKED_STATUSES.*has.*emp\.status.*\n.*delete\(\)\.eq\('token', token\)/, 'getSessionEmployee must destroy session for blocked employees');
+// Ensure active/onboarded/pending_verification are NOT in the blocked set.
+assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*active/, 'active must not be blocked');
+assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*onboarded/, 'onboarded must not be blocked');
+assert.doesNotMatch(employeeAuthSource, /BLOCKED_STATUSES.*pending_verification/, 'pending_verification must not be blocked');
+
 console.log('foundation tests passed');
