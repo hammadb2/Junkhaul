@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/incident.dart';
@@ -282,6 +283,49 @@ class EmployeeApi {
     return _dio.postJson('/api/crew/resend-payment-link', body: {
       'booking_id': bookingId,
     });
+  }
+
+  // ---- Photo Upload ----
+
+  /// Upload a crew photo to Supabase storage via multipart form data.
+  ///
+  /// [bookingId] — the booking this photo belongs to.
+  /// [photoCategory] — one of: before, after, item, damage, access_path,
+  ///   truck_bed, donation_evidence, disposal_evidence, receipt, arrival,
+  ///   completion.
+  /// [filePath] — local path to the JPEG file to upload.
+  /// [lat], [lng] — optional GPS coordinates where the photo was taken.
+  /// [takenAt] — optional ISO timestamp of when the photo was taken.
+  ///
+  /// Returns the signed URL of the uploaded photo.
+  Future<String> uploadPhoto({
+    required String bookingId,
+    required String photoCategory,
+    required String filePath,
+    double? lat,
+    double? lng,
+    String? takenAt,
+  }) async {
+    final formData = FormData.fromMap({
+      'booking_id': bookingId,
+      'type': photoCategory,
+      if (lat != null) 'lat': lat.toString(),
+      if (lng != null) 'lng': lng.toString(),
+      if (takenAt != null) 'taken_at': takenAt,
+      'photo': await MultipartFile.fromFile(filePath, filename: '${photoCategory}_${DateTime.now().millisecondsSinceEpoch}.jpg', contentType: DioMediaType.parse('image/jpeg')),
+    });
+    final body = await _dio.postMultipart('/api/crew/upload-photo', formData: formData);
+    return body['url'] as String;
+  }
+
+  /// Fetch existing crew photos for a booking.
+  Future<List<Map<String, dynamic>>> fetchPhotos({required String bookingId}) async {
+    final body = await _dio.getJson('/api/crew/photos/$bookingId');
+    final photos = body['photos'];
+    if (photos is List) {
+      return photos.cast<Map<String, dynamic>>();
+    }
+    return [];
   }
 }
 

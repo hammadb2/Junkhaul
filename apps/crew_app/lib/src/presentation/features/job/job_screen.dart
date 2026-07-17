@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/app_theme.dart';
 import '../../../data/api/employee_api.dart';
 import '../../../data/services/camera_service.dart';
+import '../../../data/services/photo_upload_service.dart';
 import '../../../domain/models/job.dart';
 import '../../../domain/models/payment.dart';
 import '../../shared/jh_step_progress.dart';
@@ -148,7 +149,10 @@ class _JobScreenState extends ConsumerState<JobScreen> {
           hazmatFlag: _hazmatFlag,
           onCapture: () async {
             final file = await ref.read(cameraServiceProvider).capturePhoto();
-            if (file != null) setState(() => _beforePhoto = file);
+            if (file != null) {
+              setState(() => _beforePhoto = file);
+              _uploadPhoto(file, PhotoCategory.before);
+            }
           },
           onCallDispatch: () => _callCustomer(_dispatchPhone),
           onDismissHazmatFlag: () => setState(() => _hazmatFlag = false),
@@ -181,7 +185,10 @@ class _JobScreenState extends ConsumerState<JobScreen> {
           nextJobSummary: null,
           onCapture: () async {
             final file = await ref.read(cameraServiceProvider).capturePhoto();
-            if (file != null) setState(() => _truckBedPhoto = file);
+            if (file != null) {
+              setState(() => _truckBedPhoto = file);
+              _uploadPhoto(file, PhotoCategory.truckBed);
+            }
           },
           onNext: () => _goTo(_JobStep.route),
         );
@@ -200,7 +207,12 @@ class _JobScreenState extends ConsumerState<JobScreen> {
           capacityAfterPercent: null,
           onCapture: () async {
             final file = await ref.read(cameraServiceProvider).capturePhoto();
-            if (file != null) setState(() => _dropPhoto = file);
+            if (file != null) {
+              setState(() => _dropPhoto = file);
+              _uploadPhoto(file, _routeChoice == RouteChoice.landfillRun
+                  ? PhotoCategory.disposalEvidence
+                  : PhotoCategory.donationEvidence);
+            }
           },
           onConfirm: () => _goTo(_JobStep.signature),
         );
@@ -212,7 +224,10 @@ class _JobScreenState extends ConsumerState<JobScreen> {
           isSynced: widget.syncState == SyncState.online,
           onCapturePhoto: () async {
             final file = await ref.read(cameraServiceProvider).capturePhoto();
-            if (file != null) setState(() => _afterPhoto = file);
+            if (file != null) {
+              setState(() => _afterPhoto = file);
+              _uploadPhoto(file, PhotoCategory.after);
+            }
           },
           onComplete: ({required signedByDelegate}) {
             _submitSignature(
@@ -230,6 +245,22 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   }
 
   // ---- Real API wiring ----
+
+  /// Upload a captured photo to the backend. Shows a snackbar on failure.
+  /// Does not block the UI — runs in the background.
+  Future<void> _uploadPhoto(File file, String category) async {
+    if (widget.bookingId == null) return;
+    final uploadService = ref.read(photoUploadServiceProvider);
+    if (uploadService == null) return;
+    final result = await uploadService.uploadPhoto(
+      bookingId: widget.bookingId!,
+      category: category,
+      file: file,
+    );
+    if (!result.success && mounted) {
+      _showError('Photo upload failed: ${result.error}');
+    }
+  }
 
   Future<void> _callCustomer(String? phone) async {
     if (phone == null || phone.isEmpty) return;
