@@ -29,7 +29,7 @@ export default function DonationsView({ flash }) {
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: 18 }}>
         <div style={{ fontWeight: 800, fontSize: 16 }}>Donation requests</div>
         <div style={{ color: 'rgba(0,0,0,.5)', fontSize: 13, marginTop: 4 }}>
-          Shows customer, address, attribution-ready source fields, photos, AI outcome, route-fit status, Quo context, reviewer status and final outcome. Free pickup still requires item approval plus route-fit approval.
+          Shows customer, address, attribution-ready source fields, photos, automated pre-screen outcome, route-fit status, Quo context, reviewer status and final outcome. Free pickup still requires item approval plus route-fit approval.
         </div>
       </div>
       {rows.map((d) => (
@@ -39,7 +39,10 @@ export default function DonationsView({ flash }) {
               <div style={{ fontWeight: 800 }}>{d.request_ref} · {d.name || 'Unknown'} · {d.phone}</div>
               <div style={{ color: 'rgba(0,0,0,.55)', fontSize: 13 }}>{d.address}{d.unit ? ` #${d.unit}` : ''}</div>
               <div style={{ marginTop: 8, fontSize: 13 }}>{d.description}</div>
-              <div style={{ marginTop: 8, color: 'rgba(0,0,0,.55)', fontSize: 12 }}>AI: {d.ai_outcome || 'pending'} · confidence {d.confidence ?? '—'} · photos {d.photos?.length || 0}</div>
+              <div style={{ marginTop: 8, color: 'rgba(0,0,0,.55)', fontSize: 12 }}>Automated pre-screen: {d.ai_outcome || 'pending'} · confidence {d.confidence ?? '—'} · photos {d.photos?.length || 0}</div>
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(d.photos || []).map((p) => <a key={p.id} href={`/api/admin/donations/${d.id}/photo/${p.id}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#f97316' }}>{p.photo_type}</a>)}
+              </div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ display: 'inline-block', borderRadius: 999, padding: '4px 10px', background: '#F0F0F2', fontWeight: 700, fontSize: 12 }}>{d.status}</div>

@@ -29,6 +29,8 @@ import DispatchLogView from './DispatchLogView';
 import MarketingPanel from './MarketingPanel';
 import DonationsView from './DonationsView';
 import BookingDetailView from './BookingDetailView';
+import CommunicationsPanel from './CommunicationsPanel';
+import ManagerDashboard from './ManagerDashboard';
 
 const NAV = [
   { label: 'Overview', items: [
@@ -36,6 +38,7 @@ const NAV = [
   ]},
   { label: 'Operations', items: [
     { id: 'dispatch', label: 'Dispatch', Icon: IconTruck },
+    { id: 'manager', label: 'Manager Ops', Icon: IconBell },
     { id: 'bookingDetail', label: 'Booking Detail', Icon: IconClipboard },
     { id: 'schedule', label: 'Schedule', Icon: IconCalendar },
     { id: 'leads', label: 'Leads', Icon: IconClipboard },
@@ -52,6 +55,7 @@ const NAV = [
   { label: 'Growth', items: [
     { id: 'growth', label: 'Growth', Icon: IconTrending },
     { id: 'marketing', label: 'Marketing', Icon: IconTrending },
+    { id: 'communications', label: 'Communications', Icon: IconPhone },
     { id: 'calls', label: 'Calls', Icon: IconPhone },
     { id: 'intel', label: 'Intel', Icon: IconDiamond },
     { id: 'referrals', label: 'Referrals', Icon: IconLink },
@@ -66,6 +70,7 @@ const NAV = [
 const VIEW_META = {
   dashboard: ['Dashboard', "Today's operations at a glance"],
   dispatch: ['Dispatch', 'Route planning & job management'],
+  manager: ['Manager Ops', 'Today’s operational queues and manager-safe controls'],
   bookingDetail: ['Booking Detail', 'Customer, quote, pricing, attribution, comms, timeline'],
   schedule: ['Schedule', 'Upcoming slots across the week'],
   leads: ['Leads', 'Quoted but not yet booked'],
@@ -76,6 +81,7 @@ const VIEW_META = {
   crew: ['Crew', 'Team roster, onboarding & safety'],
   growth: ['Growth', 'Funnel health & marketing spend'],
   marketing: ['Marketing', 'Campaign, door-hanger, flyer and attribution reporting'],
+  communications: ['Communications', 'Quo messages, STOP state, expected replies and failure retry'],
   calls: ['Calls', 'AI voice agent call history'],
   intel: ['Intel', 'Profitability by service quadrant'],
   referrals: ['Referrals', 'Referral program performance'],
@@ -86,8 +92,9 @@ const VIEW_META = {
 
 const VIEWS = {
   dashboard: DashboardView, dispatch: DispatchView, bookingDetail: BookingDetailView, schedule: ScheduleView, leads: LeadsView,
+  manager: ManagerDashboard,
   waitlist: WaitlistView, donations: DonationsView, earnings: EarningsDashboard, crew: CrewView, payroll: PayrollPanel,
-  growth: GrowthPanel, marketing: MarketingPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
+  growth: GrowthPanel, marketing: MarketingPanel, communications: CommunicationsPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
   config: ConfigPanel, audit: AuditTrail, dispatchlog: DispatchLogView,
 };
 
