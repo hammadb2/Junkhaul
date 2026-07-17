@@ -628,6 +628,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64;
 			};
 			name = Debug;
 		};
