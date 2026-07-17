@@ -82,12 +82,14 @@ RouteActionResult checkRouteAction(WidgetRef ref, {String? bookingId}) {
     }
   }
 
-  return RouteActionAllowed(RouteActionContext._(
-    routeId: route.routeId,
-    routeVersion: route.routeVersion,
-    bookingId: bookingId,
-    isCurrent: true,
-  ));
+  return RouteActionAllowed(
+    RouteActionContext._(
+      routeId: route.routeId,
+      routeVersion: route.routeVersion,
+      bookingId: bookingId,
+      isCurrent: true,
+    ),
+  );
 }
 
 /// Check route action using a ProviderContainer (for tests/providers).
@@ -115,12 +117,14 @@ RouteActionResult checkRouteActionContainer(
     }
   }
 
-  return RouteActionAllowed(RouteActionContext._(
-    routeId: route.routeId,
-    routeVersion: route.routeVersion,
-    bookingId: bookingId,
-    isCurrent: true,
-  ));
+  return RouteActionAllowed(
+    RouteActionContext._(
+      routeId: route.routeId,
+      routeVersion: route.routeVersion,
+      bookingId: bookingId,
+      isCurrent: true,
+    ),
+  );
 }
 
 /// Handle a 409 conflict response from a protected endpoint.

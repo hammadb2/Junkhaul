@@ -316,7 +316,9 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       case RouteActionAllowed(:final context):
         return context;
       case RouteActionNoRoute():
-        _showError('Route information is out of date. Refresh before continuing.');
+        _showError(
+          'Route information is out of date. Refresh before continuing.',
+        );
         ref.read(routeProvider.notifier).fetchRoute();
         return null;
       case RouteActionBookingNotInRoute():
@@ -386,13 +388,10 @@ class _JobScreenState extends ConsumerState<JobScreen> {
       if (!_isOnline) {
         _queue?.enqueue(
           type: 'collect_payment',
-          payload: _payloadWithRoute(
-            {
-              'method': 'cash_crew',
-              'amount': result.amount,
-            },
-            routeCtx,
-          ),
+          payload: _payloadWithRoute({
+            'method': 'cash_crew',
+            'amount': result.amount,
+          }, routeCtx),
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -490,10 +489,7 @@ class _JobScreenState extends ConsumerState<JobScreen> {
     if (!_isOnline) {
       _queue?.enqueue(
         type: 'item_conditions',
-        payload: _payloadWithRoute(
-          {'conditions': conditions},
-          routeCtx,
-        ),
+        payload: _payloadWithRoute({'conditions': conditions}, routeCtx),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -563,15 +559,12 @@ class _JobScreenState extends ConsumerState<JobScreen> {
     final routeCtx = _requireRouteContext();
     if (routeCtx == null) return;
 
-    final payload = _payloadWithRoute(
-      {
-        'customer_name_typed': customerName,
-        'amount_confirmed': amount,
-        'payment_method': paymentMethod,
-        'signed_by_delegate': signedByDelegate,
-      },
-      routeCtx,
-    );
+    final payload = _payloadWithRoute({
+      'customer_name_typed': customerName,
+      'amount_confirmed': amount,
+      'payment_method': paymentMethod,
+      'signed_by_delegate': signedByDelegate,
+    }, routeCtx);
 
     if (!_isOnline) {
       _queue?.enqueue(type: 'signature', payload: payload);

@@ -18,12 +18,15 @@ void main() {
     // compile without them. The fact that we MUST provide them
     // to compile is the test.
 
-    test('submitItemConditions signature requires routeId and routeVersion', () {
-      // Verify the method exists and accepts these required params.
-      // This is a compile-time check, not a runtime check.
-      final fn = EmployeeApi.new;
-      expect(fn, isNotNull);
-    });
+    test(
+      'submitItemConditions signature requires routeId and routeVersion',
+      () {
+        // Verify the method exists and accepts these required params.
+        // This is a compile-time check, not a runtime check.
+        final fn = EmployeeApi.new;
+        expect(fn, isNotNull);
+      },
+    );
 
     test('resendPaymentLink signature requires routeId and routeVersion', () {
       final fn = EmployeeApi.new;
@@ -192,25 +195,28 @@ void main() {
       expect(payload.containsKey('created_at'), isTrue);
     });
 
-    test('cash payment offline payload never auto-retries on stale conflict', () {
-      // Cash payment is unsafe_retry=false. When replayed with a stale
-      // route_version, the backend returns 409 with safe_retry=false.
-      // The offline queue must NOT automatically retry — it should
-      // leave the action in the queue for human resolution.
-      final payload = {
-        'booking_id': 'bk-1',
-        'route_id': 'route-1',
-        'route_version': 2,
-        'amount': 150.0,
-        'method': 'cash_crew',
-        'created_at': '2026-07-30T10:00:00Z',
-      };
+    test(
+      'cash payment offline payload never auto-retries on stale conflict',
+      () {
+        // Cash payment is unsafe_retry=false. When replayed with a stale
+        // route_version, the backend returns 409 with safe_retry=false.
+        // The offline queue must NOT automatically retry — it should
+        // leave the action in the queue for human resolution.
+        final payload = {
+          'booking_id': 'bk-1',
+          'route_id': 'route-1',
+          'route_version': 2,
+          'amount': 150.0,
+          'method': 'cash_crew',
+          'created_at': '2026-07-30T10:00:00Z',
+        };
 
-      // The payload's route_version is the ORIGINAL version (2),
-      // not the latest. This is correct — the backend will detect
-      // the stale version and return 409 safe_retry=false.
-      expect(payload['route_version'], 2);
-    });
+        // The payload's route_version is the ORIGINAL version (2),
+        // not the latest. This is correct — the backend will detect
+        // the stale version and return 409 safe_retry=false.
+        expect(payload['route_version'], 2);
+      },
+    );
 
     test('signature offline payload preserves evidence context', () {
       // Signature data must be preserved in the offline payload

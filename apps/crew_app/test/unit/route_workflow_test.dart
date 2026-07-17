@@ -37,18 +37,20 @@ CrewRoute _buildRoute({
     orderedStops: bookingIds
         .asMap()
         .entries
-        .map((e) => RouteStop(
-              stopId: 'stop-${e.key}',
-              bookingId: e.value,
-              sequence: e.key + 1,
-              status: e.key == 0 ? 'active' : 'upcoming',
-              latitude: 51.0 + e.key * 0.1,
-              longitude: -114.0 + e.key * 0.1,
-              arrivalWindowStart: '09:00',
-              arrivalWindowEnd: '10:00',
-              name: 'Customer ${e.key + 1}',
-              address: '${e.key + 1} Test St',
-            ))
+        .map(
+          (e) => RouteStop(
+            stopId: 'stop-${e.key}',
+            bookingId: e.value,
+            sequence: e.key + 1,
+            status: e.key == 0 ? 'active' : 'upcoming',
+            latitude: 51.0 + e.key * 0.1,
+            longitude: -114.0 + e.key * 0.1,
+            arrivalWindowStart: '09:00',
+            arrivalWindowEnd: '10:00',
+            name: 'Customer ${e.key + 1}',
+            address: '${e.key + 1} Test St',
+          ),
+        )
         .toList(),
   );
 }
@@ -79,10 +81,7 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-999',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-999');
       expect(result, isA<RouteActionNoRoute>());
     });
   });
@@ -96,10 +95,7 @@ void main() {
         route: _buildRoute(bookingIds: ['bk-1', 'bk-2']),
       );
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-999',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-999');
       expect(result, isA<RouteActionBookingNotInRoute>());
     });
 
@@ -111,10 +107,7 @@ void main() {
         route: _buildRoute(bookingIds: ['bk-1', 'bk-2']),
       );
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-1',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-1');
       expect(result, isA<RouteActionAllowed>());
     });
   });
@@ -128,10 +121,7 @@ void main() {
         route: _buildRoute(routeId: 'route-abc', routeVersion: 5),
       );
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-1',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-1');
       expect(result, isA<RouteActionAllowed>());
       final allowed = result as RouteActionAllowed;
       expect(allowed.context.routeId, 'route-abc');
@@ -148,53 +138,55 @@ void main() {
         route: _buildRoute(),
       );
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-1',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-1');
       final allowed = result as RouteActionAllowed;
       expect(allowed.context.shouldBlock, isFalse);
     });
   });
 
   group('Workflow: safe conflict refreshes and permits explicit retry', () {
-    test('safe_retry=true conflict is classified as retryable after refresh', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
+    test(
+      'safe_retry=true conflict is classified as retryable after refresh',
+      () {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
 
-      final conflictBody = {
-        'error': 'Route version conflict',
-        'current_route_version': 3,
-        'submitted_route_version': 1,
-        'refresh_required': true,
-        'safe_retry': true,
-        'action_type': 'photo_upload',
-      };
+        final conflictBody = {
+          'error': 'Route version conflict',
+          'current_route_version': 3,
+          'submitted_route_version': 1,
+          'refresh_required': true,
+          'safe_retry': true,
+          'action_type': 'photo_upload',
+        };
 
-      // Parse the conflict body (same logic as handleRouteConflictContainer
-      // but without the network side-effect of fetchRoute).
-      final conflict = RouteConflict(
-        currentRouteVersion: conflictBody['current_route_version'] as int? ?? 0,
-        submittedRouteVersion: conflictBody['submitted_route_version'] as int?,
-        refreshRequired: conflictBody['refresh_required'] as bool? ?? true,
-        safeRetry: conflictBody['safe_retry'] as bool? ?? false,
-        actionType: conflictBody['action_type'] as String?,
-        message: conflictBody['error'] as String?,
-      );
+        // Parse the conflict body (same logic as handleRouteConflictContainer
+        // but without the network side-effect of fetchRoute).
+        final conflict = RouteConflict(
+          currentRouteVersion:
+              conflictBody['current_route_version'] as int? ?? 0,
+          submittedRouteVersion:
+              conflictBody['submitted_route_version'] as int?,
+          refreshRequired: conflictBody['refresh_required'] as bool? ?? true,
+          safeRetry: conflictBody['safe_retry'] as bool? ?? false,
+          actionType: conflictBody['action_type'] as String?,
+          message: conflictBody['error'] as String?,
+        );
 
-      // Set the conflict on the notifier (pure state, no network).
-      container.read(routeProvider.notifier).setConflict(conflict);
+        // Set the conflict on the notifier (pure state, no network).
+        container.read(routeProvider.notifier).setConflict(conflict);
 
-      expect(conflict.safeRetry, isTrue);
-      expect(conflict.refreshRequired, isTrue);
-      expect(conflict.currentRouteVersion, 3);
-      expect(conflict.submittedRouteVersion, 1);
+        expect(conflict.safeRetry, isTrue);
+        expect(conflict.refreshRequired, isTrue);
+        expect(conflict.currentRouteVersion, 3);
+        expect(conflict.submittedRouteVersion, 1);
 
-      // The route state should now have the conflict set.
-      final state = container.read(routeProvider);
-      expect(state.conflict, isNotNull);
-      expect(state.conflict!.safeRetry, isTrue);
-    });
+        // The route state should now have the conflict set.
+        final state = container.read(routeProvider);
+        expect(state.conflict, isNotNull);
+        expect(state.conflict!.safeRetry, isTrue);
+      },
+    );
 
     test('safe_retry=true means crew can retry after refreshing route', () {
       final conflict = RouteConflict(
@@ -284,10 +276,7 @@ void main() {
         conflict: conflict,
       );
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-1',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-1');
       expect(result, isA<RouteActionConflictExists>());
       final conflictResult = result as RouteActionConflictExists;
       expect(conflictResult.conflict.safeRetry, isFalse);
@@ -326,10 +315,7 @@ void main() {
         'created_at': '2026-07-30T10:00:00Z',
         'idempotency_key': 'cash_bk-1_2026-07-30T10:00:00Z',
         'action_type': 'collect_payment',
-        'payload': {
-          'method': 'cash_crew',
-          'amount': 150.0,
-        },
+        'payload': {'method': 'cash_crew', 'amount': 150.0},
       };
 
       expect(payload.containsKey('route_id'), isTrue);
@@ -578,23 +564,26 @@ void main() {
   });
 
   group('Workflow: route acknowledgment includes idempotency fields', () {
-    test('acknowledgment request body includes idempotency_key and created_at', () {
-      // The acknowledgeRoute API method now accepts idempotencyKey
-      // and createdAt. The RouteNotifier generates them automatically.
-      // Verify the body shape that would be sent.
-      final body = {
-        'route_id': 'route-abc',
-        'route_version': 3,
-        'device_id': 'device-xyz',
-        'idempotency_key': 'ack_route-abc_v3_1234567890',
-        'created_at': '2026-07-30T10:00:00Z',
-      };
+    test(
+      'acknowledgment request body includes idempotency_key and created_at',
+      () {
+        // The acknowledgeRoute API method now accepts idempotencyKey
+        // and createdAt. The RouteNotifier generates them automatically.
+        // Verify the body shape that would be sent.
+        final body = {
+          'route_id': 'route-abc',
+          'route_version': 3,
+          'device_id': 'device-xyz',
+          'idempotency_key': 'ack_route-abc_v3_1234567890',
+          'created_at': '2026-07-30T10:00:00Z',
+        };
 
-      expect(body.containsKey('route_id'), isTrue);
-      expect(body.containsKey('route_version'), isTrue);
-      expect(body.containsKey('device_id'), isTrue);
-      expect(body.containsKey('idempotency_key'), isTrue);
-      expect(body.containsKey('created_at'), isTrue);
-    });
+        expect(body.containsKey('route_id'), isTrue);
+        expect(body.containsKey('route_version'), isTrue);
+        expect(body.containsKey('device_id'), isTrue);
+        expect(body.containsKey('idempotency_key'), isTrue);
+        expect(body.containsKey('created_at'), isTrue);
+      },
+    );
   });
 }

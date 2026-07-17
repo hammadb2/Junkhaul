@@ -37,7 +37,11 @@ class RouteUpdateSheet extends StatelessWidget {
             // Header
             Row(
               children: [
-                Icon(Icons.alt_route_rounded, size: 28, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.alt_route_rounded,
+                  size: 28,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -45,18 +49,25 @@ class RouteUpdateSheet extends StatelessWidget {
                     children: [
                       Text(
                         'Route Updated',
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         'Version ${summary.oldVersion} → ${summary.newVersion}',
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ],
                   ),
                 ),
                 if (requiresAck)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.orange[100],
                       borderRadius: BorderRadius.circular(12),
@@ -79,7 +90,9 @@ class RouteUpdateSheet extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   'Route refreshed. No structural changes detected.',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
                 ),
               )
             else
@@ -107,12 +120,18 @@ class RouteUpdateSheet extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.red[700], size: 24),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.red[700],
+                      size: 24,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Your active job was removed or reassigned. Contact dispatch before continuing.',
-                        style: theme.textTheme.bodyMedium?.copyWith(color: Colors.red[900]),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.red[900],
+                        ),
                       ),
                     ),
                   ],
@@ -232,15 +251,19 @@ class RouteUpdateBanner extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              Icon(Icons.alt_route_rounded, size: 20, color: Colors.orange[700]),
+              Icon(
+                Icons.alt_route_rounded,
+                size: 20,
+                color: Colors.orange[700],
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Route v${route.routeVersion} requires acknowledgment',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.orange[900],
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: Colors.orange[900],
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               Icon(Icons.chevron_right, color: Colors.orange[700], size: 20),
@@ -280,9 +303,9 @@ class ActiveJobRemovedScreen extends StatelessWidget {
                 Text(
                   'Active Job Changed',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red[900],
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red[900],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -290,19 +313,25 @@ class ActiveJobRemovedScreen extends StatelessWidget {
                       ? 'Your active job "$removedJobName" was removed or reassigned by dispatch.'
                       : 'Your active job was removed or reassigned by dispatch.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.red[800]),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.red[800]),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Do not navigate to another customer. Contact dispatch to resolve.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.red[700]),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.red[700]),
                 ),
                 const SizedBox(height: 24),
                 Text(
                   'Your photos, signatures, and queued actions are preserved.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
                 ),
                 const SizedBox(height: 32),
                 FilledButton.icon(

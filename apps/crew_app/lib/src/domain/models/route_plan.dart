@@ -13,15 +13,20 @@ abstract class CrewRoute with _$CrewRoute {
     @JsonKey(name: 'route_updated_at') String? routeUpdatedAt,
     @JsonKey(name: 'crew_assignment_id') String? crewAssignmentId,
     @JsonKey(name: 'truck_id') String? truckId,
-    @JsonKey(name: 'ordered_stops') @Default(<RouteStop>[]) List<RouteStop> orderedStops,
+    @JsonKey(name: 'ordered_stops')
+    @Default(<RouteStop>[])
+    List<RouteStop> orderedStops,
     @JsonKey(name: 'active_stop_id') String? activeStopId,
     @JsonKey(name: 'route_lock') @Default(false) bool routeLock,
     @JsonKey(name: 'route_change_reason') String? routeChangeReason,
-    @JsonKey(name: 'requires_acknowledgment') @Default(false) bool requiresAcknowledgment,
+    @JsonKey(name: 'requires_acknowledgment')
+    @Default(false)
+    bool requiresAcknowledgment,
     @JsonKey(name: 'acknowledged') @Default(false) bool acknowledged,
   }) = _CrewRoute;
 
-  factory CrewRoute.fromJson(Map<String, dynamic> json) => _$CrewRouteFromJson(json);
+  factory CrewRoute.fromJson(Map<String, dynamic> json) =>
+      _$CrewRouteFromJson(json);
 }
 
 /// A single ordered stop in a route.
@@ -50,7 +55,8 @@ abstract class RouteStop with _$RouteStop {
     @JsonKey(name: 'donation_request_id') String? donationRequestId,
   }) = _RouteStop;
 
-  factory RouteStop.fromJson(Map<String, dynamic> json) => _$RouteStopFromJson(json);
+  factory RouteStop.fromJson(Map<String, dynamic> json) =>
+      _$RouteStopFromJson(json);
 }
 
 /// Describes what changed between two route versions.
@@ -58,7 +64,9 @@ abstract class RouteStop with _$RouteStop {
 abstract class RouteChangeSummary with _$RouteChangeSummary {
   const factory RouteChangeSummary({
     @Default(<RouteChange>[]) List<RouteChange> changes,
-    @JsonKey(name: 'destination_changed') @Default(false) bool destinationChanged,
+    @JsonKey(name: 'destination_changed')
+    @Default(false)
+    bool destinationChanged,
     @JsonKey(name: 'active_job_removed') @Default(false) bool activeJobRemoved,
     @JsonKey(name: 'new_version') required int newVersion,
     @JsonKey(name: 'old_version') required int oldVersion,
@@ -69,14 +77,16 @@ abstract class RouteChangeSummary with _$RouteChangeSummary {
 @freezed
 abstract class RouteChange with _$RouteChange {
   const factory RouteChange({
-    required String type, // job_added, job_removed, job_moved, window_changed, destination_changed, truck_changed, donation_inserted
+    required String
+    type, // job_added, job_removed, job_moved, window_changed, destination_changed, truck_changed, donation_inserted
     String? stopId,
     String? description,
     int? oldSequence,
     int? newSequence,
   }) = _RouteChange;
 
-  factory RouteChange.fromJson(Map<String, dynamic> json) => _$RouteChangeFromJson(json);
+  factory RouteChange.fromJson(Map<String, dynamic> json) =>
+      _$RouteChangeFromJson(json);
 }
 
 /// Conflict state for stale writes.
@@ -91,5 +101,6 @@ abstract class RouteConflict with _$RouteConflict {
     String? message,
   }) = _RouteConflict;
 
-  factory RouteConflict.fromJson(Map<String, dynamic> json) => _$RouteConflictFromJson(json);
+  factory RouteConflict.fromJson(Map<String, dynamic> json) =>
+      _$RouteConflictFromJson(json);
 }

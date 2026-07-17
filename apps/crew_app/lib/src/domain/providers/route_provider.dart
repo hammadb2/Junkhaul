@@ -47,7 +47,8 @@ class RouteState {
       route: route ?? this.route,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
       pendingUpdate: pendingUpdate ?? this.pendingUpdate,
-      acknowledgmentRequired: acknowledgmentRequired ?? this.acknowledgmentRequired,
+      acknowledgmentRequired:
+          acknowledgmentRequired ?? this.acknowledgmentRequired,
       conflict: clearConflict ? null : (conflict ?? this.conflict),
       isLoading: isLoading ?? this.isLoading,
       error: error,
@@ -103,7 +104,8 @@ class RouteNotifier extends Notifier<RouteState> {
         return;
       }
 
-      final isUpdate = localVersion != null && route.routeVersion > localVersion;
+      final isUpdate =
+          localVersion != null && route.routeVersion > localVersion;
       final needsAck = route.requiresAcknowledgment && !route.acknowledged;
 
       state = state.copyWith(
@@ -306,7 +308,10 @@ class RouteNotifier extends Notifier<RouteState> {
         newVersion: newRoute.routeVersion,
         oldVersion: 0,
         changes: [
-          const RouteChange(type: 'initial_load', description: 'Initial route loaded'),
+          const RouteChange(
+            type: 'initial_load',
+            description: 'Initial route loaded',
+          ),
         ],
       );
     }
@@ -319,19 +324,24 @@ class RouteNotifier extends Notifier<RouteState> {
     for (final newStop in newRoute.orderedStops) {
       if (!oldStops.containsKey(newStop.stopId)) {
         if (newStop.stopType == 'donation_pickup') {
-          changes.add(RouteChange(
-            type: 'donation_inserted',
-            stopId: newStop.stopId,
-            description: 'Donation stop inserted after stop ${newStop.sequence - 1}',
-            newSequence: newStop.sequence,
-          ));
+          changes.add(
+            RouteChange(
+              type: 'donation_inserted',
+              stopId: newStop.stopId,
+              description:
+                  'Donation stop inserted after stop ${newStop.sequence - 1}',
+              newSequence: newStop.sequence,
+            ),
+          );
         } else {
-          changes.add(RouteChange(
-            type: 'job_added',
-            stopId: newStop.stopId,
-            description: 'New job added: ${newStop.name ?? newStop.stopId}',
-            newSequence: newStop.sequence,
-          ));
+          changes.add(
+            RouteChange(
+              type: 'job_added',
+              stopId: newStop.stopId,
+              description: 'New job added: ${newStop.name ?? newStop.stopId}',
+              newSequence: newStop.sequence,
+            ),
+          );
         }
       }
     }
@@ -339,12 +349,14 @@ class RouteNotifier extends Notifier<RouteState> {
     // Detect removed stops.
     for (final oldStop in oldRoute.orderedStops) {
       if (!newStops.containsKey(oldStop.stopId)) {
-        changes.add(RouteChange(
-          type: 'job_removed',
-          stopId: oldStop.stopId,
-          description: 'Job removed: ${oldStop.name ?? oldStop.stopId}',
-          oldSequence: oldStop.sequence,
-        ));
+        changes.add(
+          RouteChange(
+            type: 'job_removed',
+            stopId: oldStop.stopId,
+            description: 'Job removed: ${oldStop.name ?? oldStop.stopId}',
+            oldSequence: oldStop.sequence,
+          ),
+        );
       }
     }
 
@@ -352,51 +364,63 @@ class RouteNotifier extends Notifier<RouteState> {
     for (final newStop in newRoute.orderedStops) {
       final oldStop = oldStops[newStop.stopId];
       if (oldStop != null && oldStop.sequence != newStop.sequence) {
-        changes.add(RouteChange(
-          type: 'job_moved',
-          stopId: newStop.stopId,
-          description:
-              '${newStop.name ?? newStop.stopId} moved from position ${oldStop.sequence} to ${newStop.sequence}',
-          oldSequence: oldStop.sequence,
-          newSequence: newStop.sequence,
-        ));
+        changes.add(
+          RouteChange(
+            type: 'job_moved',
+            stopId: newStop.stopId,
+            description:
+                '${newStop.name ?? newStop.stopId} moved from position ${oldStop.sequence} to ${newStop.sequence}',
+            oldSequence: oldStop.sequence,
+            newSequence: newStop.sequence,
+          ),
+        );
       }
     }
 
     // Detect arrival window changes.
     for (final newStop in newRoute.orderedStops) {
       final oldStop = oldStops[newStop.stopId];
-      if (oldStop != null && oldStop.arrivalWindowStart != newStop.arrivalWindowStart) {
-        changes.add(RouteChange(
-          type: 'window_changed',
-          stopId: newStop.stopId,
-          description: 'Arrival window changed for ${newStop.name ?? newStop.stopId}',
-        ));
+      if (oldStop != null &&
+          oldStop.arrivalWindowStart != newStop.arrivalWindowStart) {
+        changes.add(
+          RouteChange(
+            type: 'window_changed',
+            stopId: newStop.stopId,
+            description:
+                'Arrival window changed for ${newStop.name ?? newStop.stopId}',
+          ),
+        );
       }
     }
 
     // Detect destination change (active stop changed).
     final destinationChanged =
-        oldRoute.activeStopId != newRoute.activeStopId && oldRoute.activeStopId != null;
+        oldRoute.activeStopId != newRoute.activeStopId &&
+        oldRoute.activeStopId != null;
 
     // Detect if active job was removed.
     final activeJobRemoved =
-        oldRoute.activeStopId != null && !newStops.containsKey(oldRoute.activeStopId);
+        oldRoute.activeStopId != null &&
+        !newStops.containsKey(oldRoute.activeStopId);
 
     // Detect truck change.
     if (oldRoute.truckId != newRoute.truckId) {
-      changes.add(RouteChange(
-        type: 'truck_changed',
-        description:
-            'Truck changed from ${oldRoute.truckId ?? 'none'} to ${newRoute.truckId ?? 'none'}',
-      ));
+      changes.add(
+        RouteChange(
+          type: 'truck_changed',
+          description:
+              'Truck changed from ${oldRoute.truckId ?? 'none'} to ${newRoute.truckId ?? 'none'}',
+        ),
+      );
     }
 
     if (destinationChanged) {
-      changes.add(const RouteChange(
-        type: 'destination_changed',
-        description: 'Next destination changed',
-      ));
+      changes.add(
+        const RouteChange(
+          type: 'destination_changed',
+          description: 'Next destination changed',
+        ),
+      );
     }
 
     return RouteChangeSummary(
@@ -425,10 +449,14 @@ class RouteNotifier extends Notifier<RouteState> {
     final activeId = route.activeStopId;
     if (activeId == null) {
       // Find the first upcoming stop.
-      final upcoming = route.orderedStops.where((s) => s.status == 'upcoming').toList();
+      final upcoming = route.orderedStops
+          .where((s) => s.status == 'upcoming')
+          .toList();
       return upcoming.isEmpty ? null : upcoming.first;
     }
-    final matching = route.orderedStops.where((s) => s.stopId == activeId).toList();
+    final matching = route.orderedStops
+        .where((s) => s.stopId == activeId)
+        .toList();
     return matching.isEmpty ? null : matching.first;
   }
 

@@ -19,18 +19,20 @@ CrewRoute _buildRoute({
     orderedStops: bookingIds
         .asMap()
         .entries
-        .map((e) => RouteStop(
-              stopId: 'stop-${e.key}',
-              bookingId: e.value,
-              sequence: e.key + 1,
-              status: e.key == 0 ? 'active' : 'upcoming',
-              latitude: 51.0 + e.key * 0.1,
-              longitude: -114.0 + e.key * 0.1,
-              arrivalWindowStart: '09:00',
-              arrivalWindowEnd: '10:00',
-              name: 'Customer ${e.key + 1}',
-              address: '${e.key + 1} Test St',
-            ))
+        .map(
+          (e) => RouteStop(
+            stopId: 'stop-${e.key}',
+            bookingId: e.value,
+            sequence: e.key + 1,
+            status: e.key == 0 ? 'active' : 'upcoming',
+            latitude: 51.0 + e.key * 0.1,
+            longitude: -114.0 + e.key * 0.1,
+            arrivalWindowStart: '09:00',
+            arrivalWindowEnd: '10:00',
+            name: 'Customer ${e.key + 1}',
+            address: '${e.key + 1} Test St',
+          ),
+        )
         .toList(),
   );
 }
@@ -98,10 +100,7 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-1',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-1');
       expect(result, isA<RouteActionNoRoute>());
     });
 
@@ -113,10 +112,7 @@ void main() {
         route: _buildRoute(bookingIds: ['bk-1']),
       );
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-1',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-1');
       expect(result, isA<RouteActionAllowed>());
       final allowed = result as RouteActionAllowed;
       expect(allowed.context.routeId, 'route-1');
@@ -131,10 +127,7 @@ void main() {
         route: _buildRoute(bookingIds: ['bk-1']),
       );
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-999',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-999');
       expect(result, isA<RouteActionBookingNotInRoute>());
     });
 
@@ -152,10 +145,7 @@ void main() {
         ),
       );
 
-      final result = checkRouteActionContainer(
-        container,
-        bookingId: 'bk-1',
-      );
+      final result = checkRouteActionContainer(container, bookingId: 'bk-1');
       expect(result, isA<RouteActionConflictExists>());
       final conflictResult = result as RouteActionConflictExists;
       expect(conflictResult.conflict.currentRouteVersion, 2);
@@ -240,4 +230,3 @@ void main() {
     });
   });
 }
-

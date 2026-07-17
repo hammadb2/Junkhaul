@@ -134,7 +134,8 @@ class _ScheduleBody extends ConsumerStatefulWidget {
   ConsumerState<_ScheduleBody> createState() => _ScheduleBodyState();
 }
 
-class _ScheduleBodyState extends ConsumerState<_ScheduleBody> with WidgetsBindingObserver {
+class _ScheduleBodyState extends ConsumerState<_ScheduleBody>
+    with WidgetsBindingObserver {
   final _sheetController = DraggableScrollableController();
   String? _selectedBookingId;
   String? _lastWatchedAssignmentId;
@@ -200,10 +201,11 @@ class _ScheduleBodyState extends ConsumerState<_ScheduleBody> with WidgetsBindin
   Widget build(BuildContext context) {
     final routeState = widget.routeState;
     final route = routeState?.route;
-    final showAckBanner = route != null &&
-        route.requiresAcknowledgment &&
-        !route.acknowledged;
-    final showPendingBanner = routeState?.pendingUpdate == true && !(route?.requiresAcknowledgment ?? false);
+    final showAckBanner =
+        route != null && route.requiresAcknowledgment && !route.acknowledged;
+    final showPendingBanner =
+        routeState?.pendingUpdate == true &&
+        !(route?.requiresAcknowledgment ?? false);
     final hasConflict = routeState?.conflict != null;
 
     return Scaffold(
@@ -221,15 +223,23 @@ class _ScheduleBodyState extends ConsumerState<_ScheduleBody> with WidgetsBindin
               Material(
                 color: Colors.red[50],
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, size: 20, color: Colors.red[700]),
+                      Icon(
+                        Icons.error_outline,
+                        size: 20,
+                        color: Colors.red[700],
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Route conflict: v${routeState!.conflict!.submittedRouteVersion} submitted, v${routeState.conflict!.currentRouteVersion} current. Refresh required.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
                                 color: Colors.red[900],
                                 fontWeight: FontWeight.w600,
                               ),
@@ -257,16 +267,23 @@ class _ScheduleBodyState extends ConsumerState<_ScheduleBody> with WidgetsBindin
               Material(
                 color: Colors.blue[50],
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.sync_rounded, size: 18, color: Colors.blue[700]),
+                      Icon(
+                        Icons.sync_rounded,
+                        size: 18,
+                        color: Colors.blue[700],
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Route updated to v${route?.routeVersion}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.blue[900],
-                            ),
+                          color: Colors.blue[900],
+                        ),
                       ),
                     ],
                   ),

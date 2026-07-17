@@ -159,7 +159,7 @@ class EmployeeApi {
         'booking_id': ?bookingId,
         'item_photos': ?itemPhotos,
         'capacity_photo_url': ?capacityPhotoUrl,
-        'capacity_estimate_pct': ?capacityEstimatePct
+        'capacity_estimate_pct': ?capacityEstimatePct,
       },
     );
   }
@@ -447,13 +447,16 @@ class EmployeeApi {
     String? idempotencyKey,
     String? createdAt,
   }) async {
-    return _dio.postJson('/api/employee/route-plan', body: {
-      'route_id': routeId,
-      'route_version': routeVersion,
-      if (deviceId != null) 'device_id': deviceId,
-      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
-      if (createdAt != null) 'created_at': createdAt,
-    });
+    return _dio.postJson(
+      '/api/employee/route-plan',
+      body: {
+        'route_id': routeId,
+        'route_version': routeVersion,
+        if (deviceId != null) 'device_id': deviceId,
+        if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+        if (createdAt != null) 'created_at': createdAt,
+      },
+    );
   }
 
   /// Open an SSE connection to /api/employee/route-stream.

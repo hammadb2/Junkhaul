@@ -80,11 +80,17 @@ void main() {
       );
       final newRoute = _createRoute(
         version: 2,
-        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2), _createStop('stop3', seq: 3)],
+        stops: [
+          _createStop('stop1', seq: 1),
+          _createStop('stop2', seq: 2),
+          _createStop('stop3', seq: 3),
+        ],
       );
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
-      final added = summary.changes.where((c) => c.type == 'job_added').toList();
+      final added = summary.changes
+          .where((c) => c.type == 'job_added')
+          .toList();
       expect(added, hasLength(1));
       expect(added.first.stopId, 'stop3');
     });
@@ -104,7 +110,9 @@ void main() {
       );
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
-      final inserted = summary.changes.where((c) => c.type == 'donation_inserted').toList();
+      final inserted = summary.changes
+          .where((c) => c.type == 'donation_inserted')
+          .toList();
       expect(inserted, hasLength(1));
       expect(inserted.first.stopId, 'don1');
     });
@@ -120,7 +128,9 @@ void main() {
       );
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
-      final removed = summary.changes.where((c) => c.type == 'job_removed').toList();
+      final removed = summary.changes
+          .where((c) => c.type == 'job_removed')
+          .toList();
       expect(removed, hasLength(1));
       expect(removed.first.stopId, 'stop2');
     });
@@ -136,7 +146,9 @@ void main() {
       );
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
-      final moved = summary.changes.where((c) => c.type == 'job_moved').toList();
+      final moved = summary.changes
+          .where((c) => c.type == 'job_moved')
+          .toList();
       expect(moved, hasLength(2)); // both stops moved
     });
 
@@ -151,7 +163,9 @@ void main() {
       );
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
-      final windowChange = summary.changes.where((c) => c.type == 'window_changed').toList();
+      final windowChange = summary.changes
+          .where((c) => c.type == 'window_changed')
+          .toList();
       expect(windowChange, hasLength(1));
     });
 
@@ -169,7 +183,9 @@ void main() {
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
       expect(summary.destinationChanged, isTrue);
-      final destChange = summary.changes.where((c) => c.type == 'destination_changed').toList();
+      final destChange = summary.changes
+          .where((c) => c.type == 'destination_changed')
+          .toList();
       expect(destChange, hasLength(1));
     });
 
@@ -193,13 +209,21 @@ void main() {
       final newRoute = _createRoute(version: 2, truckId: 'truck_B');
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
-      final truckChange = summary.changes.where((c) => c.type == 'truck_changed').toList();
+      final truckChange = summary.changes
+          .where((c) => c.type == 'truck_changed')
+          .toList();
       expect(truckChange, hasLength(1));
     });
 
     test('no changes produces empty change list', () {
-      final oldRoute = _createRoute(version: 1, stops: [_createStop('stop1', seq: 1)]);
-      final newRoute = _createRoute(version: 2, stops: [_createStop('stop1', seq: 1)]);
+      final oldRoute = _createRoute(
+        version: 1,
+        stops: [_createStop('stop1', seq: 1)],
+      );
+      final newRoute = _createRoute(
+        version: 2,
+        stops: [_createStop('stop1', seq: 1)],
+      );
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
       expect(summary.changes, isEmpty);
@@ -240,18 +264,21 @@ void main() {
       expect(notifier.navigationDestination, isNull);
     });
 
-    test('navigation destination deduplication — same active stop returns same destination', () {
-      final route = _createRoute(
-        version: 1,
-        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
-        activeStopId: 'stop1',
-      );
-      final notifier = _RouteNotifierForTest()..setStateRoute(route);
-      final dest1 = notifier.navigationDestination;
-      final dest2 = notifier.navigationDestination;
-      expect(dest1?.stopId, dest2?.stopId);
-      expect(dest1?.stopId, 'stop1');
-    });
+    test(
+      'navigation destination deduplication — same active stop returns same destination',
+      () {
+        final route = _createRoute(
+          version: 1,
+          stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+          activeStopId: 'stop1',
+        );
+        final notifier = _RouteNotifierForTest()..setStateRoute(route);
+        final dest1 = notifier.navigationDestination;
+        final dest2 = notifier.navigationDestination;
+        expect(dest1?.stopId, dest2?.stopId);
+        expect(dest1?.stopId, 'stop1');
+      },
+    );
   });
 
   group('Route update with unchanged destination', () {
@@ -263,14 +290,20 @@ void main() {
       );
       final newRoute = _createRoute(
         version: 2,
-        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2), _createStop('stop3', seq: 3)],
+        stops: [
+          _createStop('stop1', seq: 1),
+          _createStop('stop2', seq: 2),
+          _createStop('stop3', seq: 3),
+        ],
         activeStopId: 'stop1',
       );
       final notifier = _RouteNotifierForTest()..setStateRoute(oldRoute);
       final summary = notifier.computeChangeSummary(newRoute);
       expect(summary.destinationChanged, isFalse);
       // A job was added but destination didn't change.
-      final added = summary.changes.where((c) => c.type == 'job_added').toList();
+      final added = summary.changes
+          .where((c) => c.type == 'job_added')
+          .toList();
       expect(added, hasLength(1));
     });
   });
@@ -345,7 +378,7 @@ void main() {
             'latitude': 51.04,
             'longitude': -114.07,
             'paid_priority': true,
-          }
+          },
         ],
         'active_stop_id': 'stop1',
         'route_lock': false,
@@ -420,19 +453,22 @@ void main() {
       expect(routeStop.paidPriority, isFalse);
     });
 
-    test('crew cannot locally reorder stops — sequence is server-determined', () {
-      final route = _createRoute(
-        version: 1,
-        stops: [
-          _createStop('paid1', seq: 1, type: 'customer'),
-          _createStop('paid2', seq: 2, type: 'customer'),
-        ],
-      );
-      // The ordered_stops list is read-only from the server.
-      // The crew app does not provide a reordering API.
-      expect(route.orderedStops.first.sequence, 1);
-      expect(route.orderedStops.last.sequence, 2);
-    });
+    test(
+      'crew cannot locally reorder stops — sequence is server-determined',
+      () {
+        final route = _createRoute(
+          version: 1,
+          stops: [
+            _createStop('paid1', seq: 1, type: 'customer'),
+            _createStop('paid2', seq: 2, type: 'customer'),
+          ],
+        );
+        // The ordered_stops list is read-only from the server.
+        // The crew app does not provide a reordering API.
+        expect(route.orderedStops.first.sequence, 1);
+        expect(route.orderedStops.last.sequence, 2);
+      },
+    );
   });
 
   // ============================================================
@@ -442,34 +478,38 @@ void main() {
   group('Navigation uses route destination', () {
     test('navigation destination returns active stop from route state', () {
       final notifier = _RouteNotifierForTest();
-      notifier.setStateRoute(_createRoute(
-        version: 1,
-        activeStopId: 'stop2',
-        stops: [
-          _createStop('stop1', seq: 1),
-          _createStop('stop2', seq: 2, status: 'in_progress'),
-        ],
-      ));
+      notifier.setStateRoute(
+        _createRoute(
+          version: 1,
+          activeStopId: 'stop2',
+          stops: [
+            _createStop('stop1', seq: 1),
+            _createStop('stop2', seq: 2, status: 'in_progress'),
+          ],
+        ),
+      );
 
       final dest = notifier.navigationDestination;
       expect(dest, isNotNull);
       expect(dest!.stopId, 'stop2');
     });
 
-    test('navigation destination returns first upcoming when no active stop', () {
-      final notifier = _RouteNotifierForTest();
-      notifier.setStateRoute(_createRoute(
-        version: 1,
-        stops: [
-          _createStop('stop1', seq: 1),
-          _createStop('stop2', seq: 2),
-        ],
-      ));
+    test(
+      'navigation destination returns first upcoming when no active stop',
+      () {
+        final notifier = _RouteNotifierForTest();
+        notifier.setStateRoute(
+          _createRoute(
+            version: 1,
+            stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+          ),
+        );
 
-      final dest = notifier.navigationDestination;
-      expect(dest, isNotNull);
-      expect(dest!.stopId, 'stop1');
-    });
+        final dest = notifier.navigationDestination;
+        expect(dest, isNotNull);
+        expect(dest!.stopId, 'stop1');
+      },
+    );
 
     test('navigation destination returns null when no route', () {
       final notifier = _RouteNotifierForTest();
@@ -480,16 +520,18 @@ void main() {
   group('Same destination does not restart', () {
     test('destinationChanged is false when active stop is the same', () {
       final notifier = _RouteNotifierForTest();
-      final route1 = _createRoute(version: 1, activeStopId: 'stop1', stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
+      final route1 = _createRoute(
+        version: 1,
+        activeStopId: 'stop1',
+        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+      );
       notifier.setStateRoute(route1);
 
-      final route2 = _createRoute(version: 2, activeStopId: 'stop1', stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
+      final route2 = _createRoute(
+        version: 2,
+        activeStopId: 'stop1',
+        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+      );
       final summary = notifier.computeChangeSummary(route2);
 
       expect(summary.destinationChanged, isFalse);
@@ -497,54 +539,68 @@ void main() {
 
     test('same destination — no destination_changed change in list', () {
       final notifier = _RouteNotifierForTest();
-      final route1 = _createRoute(version: 1, activeStopId: 'stop1', stops: [
-        _createStop('stop1', seq: 1),
-      ]);
+      final route1 = _createRoute(
+        version: 1,
+        activeStopId: 'stop1',
+        stops: [_createStop('stop1', seq: 1)],
+      );
       notifier.setStateRoute(route1);
 
-      final route2 = _createRoute(version: 2, activeStopId: 'stop1', stops: [
-        _createStop('stop1', seq: 1),
-      ]);
+      final route2 = _createRoute(
+        version: 2,
+        activeStopId: 'stop1',
+        stops: [_createStop('stop1', seq: 1)],
+      );
       final summary = notifier.computeChangeSummary(route2);
 
-      expect(summary.changes.where((c) => c.type == 'destination_changed'), isEmpty);
+      expect(
+        summary.changes.where((c) => c.type == 'destination_changed'),
+        isEmpty,
+      );
     });
   });
 
   group('Changed destination waits for acknowledgment', () {
     test('destinationChanged is true when active stop changes', () {
       final notifier = _RouteNotifierForTest();
-      final route1 = _createRoute(version: 1, activeStopId: 'stop1', stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
+      final route1 = _createRoute(
+        version: 1,
+        activeStopId: 'stop1',
+        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+      );
       notifier.setStateRoute(route1);
 
-      final route2 = _createRoute(version: 2, activeStopId: 'stop2', stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
+      final route2 = _createRoute(
+        version: 2,
+        activeStopId: 'stop2',
+        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+      );
       final summary = notifier.computeChangeSummary(route2);
 
       expect(summary.destinationChanged, isTrue);
     });
 
-    test('changed destination — requiresAcknowledgment is true for new version', () {
-      final route2 = _createRoute(version: 2, activeStopId: 'stop2', stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
-      expect(route2.requiresAcknowledgment, isTrue);
-      expect(route2.acknowledged, isFalse);
-    });
+    test(
+      'changed destination — requiresAcknowledgment is true for new version',
+      () {
+        final route2 = _createRoute(
+          version: 2,
+          activeStopId: 'stop2',
+          stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+        );
+        expect(route2.requiresAcknowledgment, isTrue);
+        expect(route2.acknowledged, isFalse);
+      },
+    );
   });
 
   group('Acknowledgment updates navigation once', () {
     test('after acknowledgment, acknowledged flag is true', () {
-      final route = _createRoute(version: 2, activeStopId: 'stop2', stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
+      final route = _createRoute(
+        version: 2,
+        activeStopId: 'stop2',
+        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+      );
       final acknowledged = route.copyWith(acknowledged: true);
       expect(acknowledged.acknowledged, isTrue);
       expect(acknowledged.routeVersion, 2);
@@ -552,27 +608,35 @@ void main() {
   });
 
   group('Active job removal blocks navigation', () {
-    test('activeJobRemoved is true when active stop disappears from new route', () {
-      final notifier = _RouteNotifierForTest();
-      final route1 = _createRoute(version: 1, activeStopId: 'stop1', stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
-      notifier.setStateRoute(route1);
+    test(
+      'activeJobRemoved is true when active stop disappears from new route',
+      () {
+        final notifier = _RouteNotifierForTest();
+        final route1 = _createRoute(
+          version: 1,
+          activeStopId: 'stop1',
+          stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+        );
+        notifier.setStateRoute(route1);
 
-      final route2 = _createRoute(version: 2, activeStopId: 'stop2', stops: [
-        _createStop('stop2', seq: 1),
-      ]);
-      final summary = notifier.computeChangeSummary(route2);
+        final route2 = _createRoute(
+          version: 2,
+          activeStopId: 'stop2',
+          stops: [_createStop('stop2', seq: 1)],
+        );
+        final summary = notifier.computeChangeSummary(route2);
 
-      expect(summary.activeJobRemoved, isTrue);
-    });
+        expect(summary.activeJobRemoved, isTrue);
+      },
+    );
 
     test('active job removal — job_removed change is in the list', () {
       final notifier = _RouteNotifierForTest();
-      final route1 = _createRoute(version: 1, activeStopId: 'stop1', stops: [
-        _createStop('stop1', seq: 1),
-      ]);
+      final route1 = _createRoute(
+        version: 1,
+        activeStopId: 'stop1',
+        stops: [_createStop('stop1', seq: 1)],
+      );
       notifier.setStateRoute(route1);
 
       final route2 = _createRoute(version: 2, stops: []);
@@ -583,20 +647,23 @@ void main() {
   });
 
   group('Provider starts from actual schedule screen', () {
-    test('RouteState.initial has no route — schedule screen triggers fetch', () {
-      final state = RouteState.initial();
-      expect(state.route, isNull);
-      expect(state.isLoading, isFalse);
-      // The schedule screen's initState calls fetchRoute() which transitions
-      // to loading then to data. This test verifies the initial state is
-      // empty so the fetch is necessary.
-    });
+    test(
+      'RouteState.initial has no route — schedule screen triggers fetch',
+      () {
+        final state = RouteState.initial();
+        expect(state.route, isNull);
+        expect(state.isLoading, isFalse);
+        // The schedule screen's initState calls fetchRoute() which transitions
+        // to loading then to data. This test verifies the initial state is
+        // empty so the fetch is necessary.
+      },
+    );
 
     test('RouteState with route has data — schedule screen displays stops', () {
-      final route = _createRoute(version: 1, stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
+      final route = _createRoute(
+        version: 1,
+        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+      );
       final state = RouteState.initial().copyWith(
         route: route,
         isLoading: false,
@@ -608,9 +675,7 @@ void main() {
 
   group('Provider subscription disposal', () {
     test('stopRealtimeWatch resets subscription state', () {
-      final state = RouteState.initial().copyWith(
-        isWatchingRealtime: true,
-      );
+      final state = RouteState.initial().copyWith(isWatchingRealtime: true);
       expect(state.isWatchingRealtime, isTrue);
 
       final stopped = state.copyWith(isWatchingRealtime: false);
@@ -621,9 +686,7 @@ void main() {
       // When assignment changes, _lastWatchedAssignmentId differs from
       // the new assignment ID, so the schedule screen stops the old
       // watch and starts a new one.
-      final oldState = RouteState.initial().copyWith(
-        isWatchingRealtime: true,
-      );
+      final oldState = RouteState.initial().copyWith(isWatchingRealtime: true);
       // Simulate stop + restart
       final stopped = oldState.copyWith(isWatchingRealtime: false);
       final restarted = stopped.copyWith(isWatchingRealtime: true);
@@ -657,9 +720,10 @@ void main() {
       // The GET endpoint only generates a route if none exists.
       // Repeated GETs return the same plan. This test verifies
       // that the state correctly handles receiving the same version.
-      final route = _createRoute(version: 3, stops: [
-        _createStop('stop1', seq: 1),
-      ]);
+      final route = _createRoute(
+        version: 3,
+        stops: [_createStop('stop1', seq: 1)],
+      );
       final state1 = RouteState.initial().copyWith(route: route);
 
       // Simulate receiving the same version again.
@@ -670,15 +734,16 @@ void main() {
     });
 
     test('receiving a newer version updates the route', () {
-      final route1 = _createRoute(version: 1, stops: [
-        _createStop('stop1', seq: 1),
-      ]);
+      final route1 = _createRoute(
+        version: 1,
+        stops: [_createStop('stop1', seq: 1)],
+      );
       final state1 = RouteState.initial().copyWith(route: route1);
 
-      final route2 = _createRoute(version: 2, stops: [
-        _createStop('stop1', seq: 1),
-        _createStop('stop2', seq: 2),
-      ]);
+      final route2 = _createRoute(
+        version: 2,
+        stops: [_createStop('stop1', seq: 1), _createStop('stop2', seq: 2)],
+      );
       final state2 = state1.copyWith(route: route2, pendingUpdate: true);
 
       expect(state2.route!.routeVersion, 2);
@@ -778,7 +843,10 @@ class _RouteNotifierForTest {
         newVersion: newRoute.routeVersion,
         oldVersion: 0,
         changes: [
-          const RouteChange(type: 'initial_load', description: 'Initial route loaded'),
+          const RouteChange(
+            type: 'initial_load',
+            description: 'Initial route loaded',
+          ),
         ],
       );
     }
@@ -790,77 +858,96 @@ class _RouteNotifierForTest {
     for (final newStop in newRoute.orderedStops) {
       if (!oldStops.containsKey(newStop.stopId)) {
         if (newStop.stopType == 'donation_pickup') {
-          changes.add(RouteChange(
-            type: 'donation_inserted',
-            stopId: newStop.stopId,
-            description: 'Donation stop inserted after stop ${newStop.sequence - 1}',
-            newSequence: newStop.sequence,
-          ));
+          changes.add(
+            RouteChange(
+              type: 'donation_inserted',
+              stopId: newStop.stopId,
+              description:
+                  'Donation stop inserted after stop ${newStop.sequence - 1}',
+              newSequence: newStop.sequence,
+            ),
+          );
         } else {
-          changes.add(RouteChange(
-            type: 'job_added',
-            stopId: newStop.stopId,
-            description: 'New job added: ${newStop.name ?? newStop.stopId}',
-            newSequence: newStop.sequence,
-          ));
+          changes.add(
+            RouteChange(
+              type: 'job_added',
+              stopId: newStop.stopId,
+              description: 'New job added: ${newStop.name ?? newStop.stopId}',
+              newSequence: newStop.sequence,
+            ),
+          );
         }
       }
     }
 
     for (final oldStop in oldRoute.orderedStops) {
       if (!newStops.containsKey(oldStop.stopId)) {
-        changes.add(RouteChange(
-          type: 'job_removed',
-          stopId: oldStop.stopId,
-          description: 'Job removed: ${oldStop.name ?? oldStop.stopId}',
-          oldSequence: oldStop.sequence,
-        ));
+        changes.add(
+          RouteChange(
+            type: 'job_removed',
+            stopId: oldStop.stopId,
+            description: 'Job removed: ${oldStop.name ?? oldStop.stopId}',
+            oldSequence: oldStop.sequence,
+          ),
+        );
       }
     }
 
     for (final newStop in newRoute.orderedStops) {
       final oldStop = oldStops[newStop.stopId];
       if (oldStop != null && oldStop.sequence != newStop.sequence) {
-        changes.add(RouteChange(
-          type: 'job_moved',
-          stopId: newStop.stopId,
-          description:
-              '${newStop.name ?? newStop.stopId} moved from position ${oldStop.sequence} to ${newStop.sequence}',
-          oldSequence: oldStop.sequence,
-          newSequence: newStop.sequence,
-        ));
+        changes.add(
+          RouteChange(
+            type: 'job_moved',
+            stopId: newStop.stopId,
+            description:
+                '${newStop.name ?? newStop.stopId} moved from position ${oldStop.sequence} to ${newStop.sequence}',
+            oldSequence: oldStop.sequence,
+            newSequence: newStop.sequence,
+          ),
+        );
       }
     }
 
     for (final newStop in newRoute.orderedStops) {
       final oldStop = oldStops[newStop.stopId];
-      if (oldStop != null && oldStop.arrivalWindowStart != newStop.arrivalWindowStart) {
-        changes.add(RouteChange(
-          type: 'window_changed',
-          stopId: newStop.stopId,
-          description: 'Arrival window changed for ${newStop.name ?? newStop.stopId}',
-        ));
+      if (oldStop != null &&
+          oldStop.arrivalWindowStart != newStop.arrivalWindowStart) {
+        changes.add(
+          RouteChange(
+            type: 'window_changed',
+            stopId: newStop.stopId,
+            description:
+                'Arrival window changed for ${newStop.name ?? newStop.stopId}',
+          ),
+        );
       }
     }
 
     final destinationChanged =
-        oldRoute.activeStopId != newRoute.activeStopId && oldRoute.activeStopId != null;
+        oldRoute.activeStopId != newRoute.activeStopId &&
+        oldRoute.activeStopId != null;
     final activeJobRemoved =
-        oldRoute.activeStopId != null && !newStops.containsKey(oldRoute.activeStopId);
+        oldRoute.activeStopId != null &&
+        !newStops.containsKey(oldRoute.activeStopId);
 
     if (oldRoute.truckId != newRoute.truckId) {
-      changes.add(RouteChange(
-        type: 'truck_changed',
-        description:
-            'Truck changed from ${oldRoute.truckId ?? 'none'} to ${newRoute.truckId ?? 'none'}',
-      ));
+      changes.add(
+        RouteChange(
+          type: 'truck_changed',
+          description:
+              'Truck changed from ${oldRoute.truckId ?? 'none'} to ${newRoute.truckId ?? 'none'}',
+        ),
+      );
     }
 
     if (destinationChanged) {
-      changes.add(const RouteChange(
-        type: 'destination_changed',
-        description: 'Next destination changed',
-      ));
+      changes.add(
+        const RouteChange(
+          type: 'destination_changed',
+          description: 'Next destination changed',
+        ),
+      );
     }
 
     return RouteChangeSummary(
@@ -877,10 +964,14 @@ class _RouteNotifierForTest {
     if (route == null) return null;
     final activeId = route.activeStopId;
     if (activeId == null) {
-      final upcoming = route.orderedStops.where((s) => s.status == 'upcoming').toList();
+      final upcoming = route.orderedStops
+          .where((s) => s.status == 'upcoming')
+          .toList();
       return upcoming.isEmpty ? null : upcoming.first;
     }
-    final matching = route.orderedStops.where((s) => s.stopId == activeId).toList();
+    final matching = route.orderedStops
+        .where((s) => s.stopId == activeId)
+        .toList();
     return matching.isEmpty ? null : matching.first;
   }
 }

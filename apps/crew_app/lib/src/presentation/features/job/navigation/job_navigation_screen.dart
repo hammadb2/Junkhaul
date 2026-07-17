@@ -257,7 +257,9 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
 
     // Check if the active job was removed by dispatch.
     if (route != null && _currentNavStopId != null) {
-      final stopExists = route.orderedStops.any((s) => s.stopId == _currentNavStopId);
+      final stopExists = route.orderedStops.any(
+        (s) => s.stopId == _currentNavStopId,
+      );
       if (!stopExists && !_activeJobRemoved) {
         _activeJobRemoved = true;
       }
@@ -512,7 +514,9 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
   /// Stops old guidance safely, sets the new destination once, starts
   /// guidance once. Prevents duplicate requests.
   Future<void> _applyNewDestination(RouteStop? newDest) async {
-    if (newDest == null || newDest.latitude == null || newDest.longitude == null) {
+    if (newDest == null ||
+        newDest.latitude == null ||
+        newDest.longitude == null) {
       return;
     }
 
@@ -534,10 +538,15 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
           waypoints: [
             NavigationWaypoint(
               title: newDest.stopType,
-              target: LatLng(latitude: newDest.latitude!, longitude: newDest.longitude!),
+              target: LatLng(
+                latitude: newDest.latitude!,
+                longitude: newDest.longitude!,
+              ),
             ),
           ],
-          displayOptions: NavigationDisplayOptions(showDestinationMarkers: true),
+          displayOptions: NavigationDisplayOptions(
+            showDestinationMarkers: true,
+          ),
           routingOptions: RoutingOptions(
             travelMode: NavigationTravelMode.driving,
             avoidTolls: false,
