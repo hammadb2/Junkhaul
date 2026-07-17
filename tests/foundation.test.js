@@ -150,4 +150,8 @@ assert.match(adminLoginSource, /createSession\(employee\.id\)/);
 assert.match(adminLoginSource, /sessionCookieHeader\(session\.token, session\.expiresAt\)/);
 assert.doesNotMatch(adminLoginSource, /if \(!password \|\| password !== process\.env\.ADMIN_PASSWORD\) \{\s+if \(!email/);
 
+const commandCenterSource = readFileSync(new URL('../app/api/admin/command-center/route.js', import.meta.url), 'utf8');
+assert.match(commandCenterSource, /\.from\('nearby_offers'\)[\s\S]*\.order\('offered_at'/);
+assert.doesNotMatch(commandCenterSource, /\.from\('nearby_offers'\)[\s\S]*\.order\('created_at'/);
+
 console.log('foundation tests passed');
