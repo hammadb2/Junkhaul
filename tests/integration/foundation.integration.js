@@ -182,7 +182,7 @@ async function cleanup() {
     () => supabase.from('sms_suppression').delete().eq('normalized_phone', phone),
     () => supabase.from('sms_consent').delete().eq('normalized_phone', phone),
     () => supabase.from('donation_requests').delete().eq('session_id', sessionId),
-    () => supabase.from('leads').delete().eq('session_id', sessionId),
+    () => supabase.from('leads').delete().like('session_id', `${sessionId}%`),
     () => supabase.from('bookings').delete().like('booking_ref', `${runId}%`),
     () => supabase.from('employee_sessions').delete().in('token', [ownerSession, adminSession, managerSession, employeeSession]),
     () => supabase.from('employees').delete().like('email', `${runId}%@example.test`),
@@ -204,7 +204,7 @@ try {
     'funnel_events', 'message_entity_links', 'quo_webhook_events', 'sms_consent', 'sms_suppression',
     'expected_replies', 'donation_requests', 'donation_request_photos', 'donation_policy_versions',
     'quote_price_ledger', 'timeline_events', 'audit_events', 'staff_roles', 'permissions',
-    'manager_scopes',
+    'manager_scopes', 'staff_user_permissions', 'manager_daily_closeouts',
   ];
   for (const table of requiredTables) {
     const exists = psql(['-Atc', `select exists (select 1 from information_schema.tables where table_schema='public' and table_name='${table}')`]).trim();
@@ -217,6 +217,11 @@ try {
     ['donation_requests', 'resume_token_hash'],
     ['donation_request_photos', 'storage_path'],
     ['donation_request_photos', 'mime_type'],
+    ['manager_scopes', 'effect'],
+    ['manager_scopes', 'expires_at'],
+    ['bookings', 'schedule_history'],
+    ['leads', 'merged_into_lead_id'],
+    ['waitlist', 'lead_id'],
   ];
   for (const [table, column] of requiredColumns) {
     const exists = psql(['-Atc', `select exists (select 1 from information_schema.columns where table_schema='public' and table_name='${table}' and column_name='${column}')`]).trim();
@@ -494,6 +499,37 @@ try {
   const { count: deniedAuditCount } = await supabase.from('audit_events').select('id', { count: 'exact', head: true }).eq('event_type', 'sensitive_action_denied').eq('actor_id', admin.id);
   assert.ok(deniedAuditCount >= 1, 'Denied sensitive attempt must be audited.');
 
+  const migrationEndpoint = await appFetch('/api/admin/run-migration', { method: 'POST', headers: { ...headers, ...cookieFor(ownerSession) }, body: JSON.stringify({ sql: 'select 1' }) });
+  assert.equal(migrationEndpoint.res.status, 410, 'Runtime migration endpoint must remain disabled even for owner.');
+
+  const staffAccessOwner = await appFetch('/api/admin/staff-access', { headers: cookieFor(ownerSession) });
+  assert.equal(staffAccessOwner.res.status, 200, staffAccessOwner.text);
+  const staffAccessAdmin = await appFetch('/api/admin/staff-access', { headers: cookieFor(adminSession) });
+  assert.equal(staffAccessAdmin.res.status, 403, 'Admin must not manage staff access.');
+  const staffAccessManager = await appFetch('/api/admin/staff-access', { headers: cookieFor(managerSession) });
+  assert.equal(staffAccessManager.res.status, 403, 'Manager must not manage staff access.');
+
+  const grantDirect = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(ownerSession) },
+    body: JSON.stringify({ action: 'assign_permission', employee_id: employee.id, permission_key: 'admin.read', reason: `${runId} direct permission grant` }),
+  });
+  assert.equal(grantDirect.res.status, 200, grantDirect.text);
+  const directAllowed = await appFetch('/api/admin/bookings', { headers: cookieFor(employeeSession) });
+  assert.equal(directAllowed.res.status, 200, 'Direct staff permission should authorize employee route access.');
+  const revokeDirect = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(ownerSession) },
+    body: JSON.stringify({ action: 'remove_permission', employee_id: employee.id, permission_key: 'admin.read', reason: `${runId} direct permission revoke` }),
+  });
+  assert.equal(revokeDirect.res.status, 200, revokeDirect.text);
+  const directRevoked = await appFetch('/api/admin/bookings', { headers: cookieFor(employeeSession) });
+  assert.equal(directRevoked.res.status, 403, 'Revoked direct permission should remove route access.');
+
+  const auditViewer = await appFetch('/api/admin/audit-events?limit=20', { headers: cookieFor(ownerSession) });
+  assert.equal(auditViewer.res.status, 200, auditViewer.text);
+  assert.ok(Array.isArray(auditViewer.json.events), 'Audit viewer route should return redacted events.');
+
   const { data: booking } = await supabase.from('bookings').insert({
     booking_ref: `${runId}-BOOK`,
     name: 'Integration Booking',
@@ -517,12 +553,65 @@ try {
   assert.equal(noteAction.res.status, 200, noteAction.text);
   const { count: bookingTimelineCount } = await supabase.from('timeline_events').select('id', { count: 'exact', head: true }).eq('entity_type', 'booking').eq('entity_id', booking.id).eq('event_type', 'add_internal_note');
   assert.equal(bookingTimelineCount, 1, 'Booking action must create timeline event.');
+  await supabase.from('manager_scopes').insert({ employee_id: manager.id, scope_type: 'booking', scope_value: booking.id, effect: 'deny', priority: 100, reason: 'integration deny override' }).throwOnError();
+  const deniedByScope = await appFetch(`/api/admin/bookings/${booking.id}/actions`, {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(managerSession) },
+    body: JSON.stringify({ action: 'add_internal_note', payload: { note: 'blocked by deny scope' } }),
+  });
+  assert.equal(deniedByScope.res.status, 403, 'Active deny manager scope must override allow scope.');
+  await supabase.from('manager_scopes').update({ revoked_at: new Date().toISOString() }).eq('employee_id', manager.id).eq('scope_type', 'booking').eq('scope_value', booking.id).eq('effect', 'deny');
+  await supabase.from('manager_scopes').insert({ employee_id: manager.id, scope_type: 'booking', scope_value: booking.id, effect: 'deny', priority: 200, expires_at: new Date(Date.now() - 60_000).toISOString(), reason: 'integration expired deny' }).throwOnError();
+  const allowedAfterExpiredDeny = await appFetch(`/api/admin/bookings/${booking.id}/actions`, {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(managerSession) },
+    body: JSON.stringify({ action: 'add_internal_note', payload: { note: 'allowed after expired deny' } }),
+  });
+  assert.equal(allowedAfterExpiredDeny.res.status, 200, 'Expired deny manager scope must not block active allow scope.');
+  const managerDashboard = await appFetch('/api/admin/manager-dashboard', { headers: cookieFor(managerSession) });
+  assert.equal(managerDashboard.res.status, 200, managerDashboard.text);
+  assert.equal(managerDashboard.json.role_context.scoped, true, 'Manager dashboard should report scoped context for manager.');
+  const managerCloseout = await appFetch('/api/admin/manager-dashboard', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(managerSession) },
+    body: JSON.stringify({ checklist: { crew_confirmed: true, trucks_confirmed: true }, notes: `${runId} closeout`, submit: true, reason: 'integration closeout' }),
+  });
+  assert.equal(managerCloseout.res.status, 200, managerCloseout.text);
+  assert.equal(managerCloseout.json.closeout.status, 'submitted');
   const outOfScope = await appFetch(`/api/admin/bookings/${booking.id}/actions`, {
     method: 'POST',
     headers: { ...headers, ...cookieFor(employeeSession) },
     body: JSON.stringify({ action: 'add_internal_note', payload: { note: 'blocked' } }),
   });
   assert.equal(outOfScope.res.status, 403, 'Employee must be blocked from booking action.');
+
+  const waitlistLeadAction = await appFetch(`/api/admin/leads/${leadId}`, {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'add_to_waitlist', reason: 'integration waitlist conversion', payload: { preferred_date: booking.job_date } }),
+  });
+  assert.equal(waitlistLeadAction.res.status, 200, waitlistLeadAction.text);
+  assert.ok(waitlistLeadAction.json.result.waitlist.id, 'Lead waitlist action should create linked waitlist row.');
+
+  const { data: duplicateLead } = await supabase.from('leads').insert({
+    phone,
+    normalized_phone: phone,
+    session_id: `${sessionId}_duplicate`,
+    source: 'integration_duplicate',
+    status: 'open',
+  }).select().single();
+  await supabase.from('messages').insert({ direction: 'inbound', from_number: phone, to_number: '+15870000000', body: `${runId} duplicate lead message`, lead_id: duplicateLead.id }).throwOnError();
+  const mergeLeadAction = await appFetch(`/api/admin/leads/${leadId}`, {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'merge_duplicate', reason: 'integration duplicate merge', payload: { duplicate_lead_id: duplicateLead.id } }),
+  });
+  assert.equal(mergeLeadAction.res.status, 200, mergeLeadAction.text);
+  const { data: mergedDuplicate } = await supabase.from('leads').select('status, merged_into_lead_id').eq('id', duplicateLead.id).single();
+  assert.equal(mergedDuplicate.status, 'merged');
+  assert.equal(mergedDuplicate.merged_into_lead_id, leadId);
+  const { count: reassignedMessages } = await supabase.from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', leadId).like('body', `%${runId} duplicate lead message%`);
+  assert.equal(reassignedMessages, 1, 'Lead merge must preserve and relink messages.');
 
   const campaignCreate = await appFetch('/api/admin/campaigns', {
     method: 'POST',
@@ -573,9 +662,14 @@ try {
       quo_signed_stop_start_expected_reply_delivery: 'PASSED',
       rls: 'PASSED',
       staff_permissions: 'PASSED',
+      staff_access_admin: 'PASSED',
+      manager_scope_deny_expiry: 'PASSED',
+      audit_viewer: 'PASSED',
       booking_actions: 'PASSED',
+      lead_actions: 'PASSED',
       campaign_crud: 'PASSED',
       communications_visibility: 'PASSED',
+      manager_dashboard_closeout: 'PASSED',
     },
   }, null, 2));
 } finally {
