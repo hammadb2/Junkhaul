@@ -9,6 +9,8 @@ const REQUIRED_PHOTOS = [
   ['condition_close_up', 'Condition close-up'],
   ['damage_photo', 'Damage or “no damage” photo'],
   ['total_quantity_context', 'Total quantity/context photo'],
+  ['label_or_model', 'Label/model photo where relevant'],
+  ['additional_angle', 'Additional angle'],
 ];
 
 export default function DonationBookingPage() {
@@ -41,35 +43,90 @@ export default function DonationBookingPage() {
     confirmation_no_hazmat: false,
   });
   const [photos, setPhotos] = useState({});
+  const [draft, setDraft] = useState(null);
+  const [uploading, setUploading] = useState(null);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
+  const ensureDraft = async () => {
+    if (draft?.donation_request_id && draft?.token) return draft;
+    if (!form.phone) throw new Error('Enter your phone before uploading photos.');
+    const res = await fetch('/api/donation-request/draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sessionId,
+        name: form.name || null,
+        phone: form.phone,
+        email: form.email || null,
+        address: form.address || null,
+        attribution: {
+          landing_path: window.location.pathname,
+          referrer: document.referrer || null,
+          tracking_code: new URLSearchParams(window.location.search).get('code') || null,
+          utm_source: new URLSearchParams(window.location.search).get('utm_source') || null,
+          utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || null,
+          utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || null,
+        },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not start donation request.');
+    setDraft(data);
+    return data;
+  };
+
+  const uploadPhoto = async (type, file) => {
+    if (!file) return;
+    setError(null);
+    setUploading(type);
+    try {
+      const d = await ensureDraft();
+      const formData = new FormData();
+      formData.append('donation_request_id', d.donation_request_id);
+      formData.append('token', d.token);
+      formData.append('photo_type', type);
+      formData.append('file', file);
+      if (photos[type]?.id) formData.append('replace_photo_id', photos[type].id);
+      const res = await fetch('/api/donation-request/photos', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed.');
+      setPhotos((p) => ({ ...p, [type]: data.photo }));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const missing = REQUIRED_PHOTOS.filter(([type]) => !photos[type]);
+    const requiredOnly = REQUIRED_PHOTOS.slice(0, 4);
+    const missing = requiredOnly.filter(([type]) => !photos[type]);
     if (missing.length) {
       setError(`Missing photos: ${missing.map(([, label]) => label).join(', ')}`);
       setLoading(false);
       return;
     }
-    const photoPayload = REQUIRED_PHOTOS.map(([type]) => ({
-      photo_type: type,
-      storage_url: photos[type],
-      source_step: 'donation_form',
-    }));
+    if (!draft?.donation_request_id || !draft?.token) {
+      setError('Upload the required photos before submitting.');
+      setLoading(false);
+      return;
+    }
     const res = await fetch('/api/donation-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
+        donation_request_id: draft.donation_request_id,
+        token: draft.token,
         session_id: sessionId,
         availability: { note: form.availability },
-        photos: photoPayload,
         confirmations: {
           confirmation_photos_accurate: form.confirmation_photos_accurate,
           confirmation_items_clean: form.confirmation_items_clean,
@@ -131,10 +188,12 @@ export default function DonationBookingPage() {
         <textarea value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Describe the donation items, condition, quantity, and any damage" className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm" rows={4} />
 
         <div className="grid gap-3">
-          {REQUIRED_PHOTOS.map(([type, label]) => (
+          {REQUIRED_PHOTOS.map(([type, label], index) => (
             <label key={type} className="block text-sm">
-              <span className="font-medium text-gray-700">{label}</span>
-              <input value={photos[type] || ''} onChange={(e) => setPhotos((p) => ({ ...p, [type]: e.target.value }))} placeholder="Temporary photo URL" className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm mt-1" />
+              <span className="font-medium text-gray-700">{label}{index < 4 ? ' *' : ''}</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={(e) => uploadPhoto(type, e.target.files?.[0])} className="w-full border border-gray-300 rounded-xl px-3 py-3 text-sm mt-1" />
+              {uploading === type && <span className="text-xs text-gray-500">Uploading…</span>}
+              {photos[type] && <span className="text-xs text-green-700">Uploaded: {photos[type].original_filename || photos[type].photo_type}</span>}
             </label>
           ))}
         </div>

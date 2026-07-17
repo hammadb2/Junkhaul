@@ -4,6 +4,7 @@ import { normalizePhone } from '@/lib/phone';
 import { upsertSmsConsent, sendSMS } from '@/lib/sms';
 import { captureAttribution } from '@/lib/attribution';
 import { validateDonationPhotos, analyzeDonationSubmission } from '@/lib/donation';
+import { assertDonationUploadAllowed, REQUIRED_DONATION_PHOTO_TYPES } from '@/lib/donationPhotos';
 import { recordTimelineEvent } from '@/lib/timeline';
 
 export const runtime = 'nodejs';
@@ -13,6 +14,8 @@ export async function POST(req) {
     const body = await req.json();
     const {
       session_id,
+      donation_request_id = null,
+      token = null,
       name,
       phone,
       email = null,
@@ -26,14 +29,23 @@ export async function POST(req) {
       elevator = null,
       parking = null,
       description = '',
-      photos = [],
       confirmations = {},
       attribution = {},
       sms_consent_source = 'donation_form',
     } = body;
 
     if (!phone || !address) return NextResponse.json({ error: 'Phone and address are required.' }, { status: 400 });
-    const photoCheck = validateDonationPhotos(photos);
+    if (!donation_request_id || !token) {
+      return NextResponse.json({ error: 'Start a donation draft and upload photos before submitting.' }, { status: 400 });
+    }
+    await assertDonationUploadAllowed({ donationRequestId: donation_request_id, token });
+    const { data: storedPhotos } = await supabaseAdmin
+      .from('donation_request_photos')
+      .select('*')
+      .eq('donation_request_id', donation_request_id)
+      .is('removed_at', null)
+      .order('upload_order', { ascending: true });
+    const photoCheck = validateDonationPhotos(storedPhotos || [], REQUIRED_DONATION_PHOTO_TYPES);
     if (!photoCheck.ok) {
       return NextResponse.json({ error: 'Missing required donation photos.', missing_photos: photoCheck.missing }, { status: 400 });
     }
@@ -63,8 +75,7 @@ export async function POST(req) {
 
     const { data: request, error } = await supabaseAdmin
       .from('donation_requests')
-      .insert({
-        session_id,
+      .update({
         name,
         phone: normalizedPhone || phone,
         normalized_phone: normalizedPhone,
@@ -88,27 +99,17 @@ export async function POST(req) {
         sms_consent_at: new Date().toISOString(),
         policy_version_id: policy?.id || null,
         status: 'submitted',
+        last_completed_step: 'submitted',
+        last_activity_at: new Date().toISOString(),
+        submitted_at: new Date().toISOString(),
       })
+      .eq('id', donation_request_id)
       .select()
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const photoRows = photos.map((p, index) => ({
-      donation_request_id: request.id,
-      photo_type: p.photo_type || p.type,
-      storage_url: p.storage_url || p.url,
-      upload_order: index,
-      file_size_bytes: p.file_size_bytes || null,
-      width: p.width || null,
-      height: p.height || null,
-      sha256: p.sha256 || null,
-      perceptual_hash: p.perceptual_hash || null,
-      source_step: p.source_step || 'donation_form',
-    }));
-    await supabaseAdmin.from('donation_request_photos').insert(photoRows);
-
-    const analysis = analyzeDonationSubmission({ description, photos, confirmations });
+    const analysis = analyzeDonationSubmission({ description, photos: storedPhotos || [], confirmations });
     const nextStatus = analysis.outcome === 'NEED_MORE_PHOTOS'
       ? 'needs_more_photos'
       : analysis.outcome === 'OFFER_PAID_JUNK_REMOVAL'
@@ -151,7 +152,7 @@ export async function POST(req) {
       event_type: 'donation_submitted',
       actor_type: 'customer',
       source: 'donation_form',
-      metadata: { photo_count: photoRows.length, ai_outcome: analysis.outcome, first_touch_id: attr?.first?.id || null },
+      metadata: { photo_count: storedPhotos?.length || 0, ai_outcome: analysis.outcome, first_touch_id: attr?.first?.id || null },
     });
     await recordTimelineEvent({
       entity_type: 'donation_request',
