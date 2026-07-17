@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/app_theme.dart';
 import '../../../data/offline/connectivity_provider.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/services/dispatch_location_service.dart';
 import '../../../domain/models/booking.dart';
 import '../../../domain/models/job.dart';
 import '../../../domain/models/job_mappers.dart';
@@ -65,7 +66,7 @@ class ScheduleScreen extends ConsumerWidget {
   }
 }
 
-class _ScheduleBody extends StatefulWidget {
+class _ScheduleBody extends ConsumerStatefulWidget {
   const _ScheduleBody({
     required this.crewFirstName,
     required this.jobs,
@@ -87,15 +88,32 @@ class _ScheduleBody extends StatefulWidget {
   final VoidCallback onSignOut;
 
   @override
-  State<_ScheduleBody> createState() => _ScheduleBodyState();
+  ConsumerState<_ScheduleBody> createState() => _ScheduleBodyState();
 }
 
-class _ScheduleBodyState extends State<_ScheduleBody> {
+class _ScheduleBodyState extends ConsumerState<_ScheduleBody> {
   final _sheetController = DraggableScrollableController();
   String? _selectedBookingId;
 
   @override
+  void initState() {
+    super.initState();
+    // Start dispatch telemetry when the crew is on the schedule screen
+    // (i.e., on shift). This sends sampled GPS to the backend for dispatch.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(dispatchLocationProvider.notifier).start();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    // Stop dispatch telemetry when leaving the schedule screen.
+    // In a real app this would be tied to clock-out, not just navigation.
+    if (mounted) {
+      ref.read(dispatchLocationProvider.notifier).stop();
+    }
     _sheetController.dispose();
     super.dispose();
   }
