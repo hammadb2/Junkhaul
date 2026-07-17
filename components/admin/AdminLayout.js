@@ -26,6 +26,9 @@ import ReferralsPanel from './ReferralsPanel';
 import ConfigPanel from './ConfigPanel';
 import AuditTrail from './AuditTrail';
 import DispatchLogView from './DispatchLogView';
+import MarketingPanel from './MarketingPanel';
+import DonationsView from './DonationsView';
+import BookingDetailView from './BookingDetailView';
 
 const NAV = [
   { label: 'Overview', items: [
@@ -33,9 +36,11 @@ const NAV = [
   ]},
   { label: 'Operations', items: [
     { id: 'dispatch', label: 'Dispatch', Icon: IconTruck },
+    { id: 'bookingDetail', label: 'Booking Detail', Icon: IconClipboard },
     { id: 'schedule', label: 'Schedule', Icon: IconCalendar },
     { id: 'leads', label: 'Leads', Icon: IconClipboard },
     { id: 'waitlist', label: 'Waitlist', Icon: IconHourglass },
+    { id: 'donations', label: 'Donations', Icon: IconDiamond },
   ]},
   { label: 'Finance', items: [
     { id: 'earnings', label: 'Earnings', Icon: IconDollar },
@@ -46,6 +51,7 @@ const NAV = [
   ]},
   { label: 'Growth', items: [
     { id: 'growth', label: 'Growth', Icon: IconTrending },
+    { id: 'marketing', label: 'Marketing', Icon: IconTrending },
     { id: 'calls', label: 'Calls', Icon: IconPhone },
     { id: 'intel', label: 'Intel', Icon: IconDiamond },
     { id: 'referrals', label: 'Referrals', Icon: IconLink },
@@ -60,13 +66,16 @@ const NAV = [
 const VIEW_META = {
   dashboard: ['Dashboard', "Today's operations at a glance"],
   dispatch: ['Dispatch', 'Route planning & job management'],
+  bookingDetail: ['Booking Detail', 'Customer, quote, pricing, attribution, comms, timeline'],
   schedule: ['Schedule', 'Upcoming slots across the week'],
   leads: ['Leads', 'Quoted but not yet booked'],
   waitlist: ['Waitlist', 'Customers waiting for an open slot'],
+  donations: ['Donations', 'Donation-only pickup review and route-fit queue'],
   earnings: ['Earnings', 'Revenue performance & sources'],
   payroll: ['Payroll', 'Pay runs, remittances & T4s'],
   crew: ['Crew', 'Team roster, onboarding & safety'],
   growth: ['Growth', 'Funnel health & marketing spend'],
+  marketing: ['Marketing', 'Campaign, door-hanger, flyer and attribution reporting'],
   calls: ['Calls', 'AI voice agent call history'],
   intel: ['Intel', 'Profitability by service quadrant'],
   referrals: ['Referrals', 'Referral program performance'],
@@ -76,9 +85,9 @@ const VIEW_META = {
 };
 
 const VIEWS = {
-  dashboard: DashboardView, dispatch: DispatchView, schedule: ScheduleView, leads: LeadsView,
-  waitlist: WaitlistView, earnings: EarningsDashboard, crew: CrewView, payroll: PayrollPanel,
-  growth: GrowthPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
+  dashboard: DashboardView, dispatch: DispatchView, bookingDetail: BookingDetailView, schedule: ScheduleView, leads: LeadsView,
+  waitlist: WaitlistView, donations: DonationsView, earnings: EarningsDashboard, crew: CrewView, payroll: PayrollPanel,
+  growth: GrowthPanel, marketing: MarketingPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
   config: ConfigPanel, audit: AuditTrail, dispatchlog: DispatchLogView,
 };
 
