@@ -330,7 +330,12 @@ export async function POST(req, { params }) {
   } else if (['request_photos', 'send_quo_template', 'resend_payment_link', 'send_photo_upload_link', 'send_reschedule_confirmation', 'send_cancellation_notice'].includes(action)) {
     const bodyText = action === 'send_quo_template' ? renderTemplate(payload.template_key, payload, booking) : renderTemplate(action, payload, booking);
     if (!bodyText) return NextResponse.json({ error: 'approved template not found' }, { status: 422 });
-    const sms = await sendSMS(booking.phone, bodyText, booking.id, payload.message_type || action, { booking_id: booking.id, workflow_action: action, correlation_id: correlationId });
+    const sms = await sendSMS(booking.phone, bodyText, {
+      booking_id: booking.id,
+      message_type: payload.message_type || action,
+      workflow_action: action,
+      correlation_id: correlationId,
+    });
     after = booking;
     result.message = sms;
   }

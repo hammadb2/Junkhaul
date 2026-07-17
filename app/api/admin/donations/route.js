@@ -99,8 +99,9 @@ export async function POST(req) {
       approve: 'Your donation items passed review and are now waiting for route availability. This does not confirm pickup yet; we will text if a route-fit window opens.',
     }[action];
     try {
-      message = await sendSMS(current.phone, text, null, `donation_${action}`, {
+      message = await sendSMS(current.phone, text, {
         donation_request_id,
+        message_type: `donation_${action}`,
         workflow_action: `donation_${action}`,
       });
     } catch (e) {

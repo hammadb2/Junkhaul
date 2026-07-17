@@ -21,8 +21,9 @@ export async function POST(req) {
     if (!lead.phone) continue;
     try {
       const message = `Hi ${lead.name || 'there'}, this is Junkhaul following up on your junk removal quote. Ready to book? Call us or reply to this message. - Junkhaul Calgary`;
-      const sms = await sendSMS(lead.phone, message, null, 'lead_follow_up', {
+      const sms = await sendSMS(lead.phone, message, {
         lead_id: lead.id,
+        message_type: 'lead_follow_up',
         workflow_action: 'lead_follow_up',
       });
 

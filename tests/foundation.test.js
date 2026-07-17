@@ -18,6 +18,7 @@ assert.deepEqual(
 
 assert.throws(() => assertDonationTransition('draft', 'picked_up'), /Invalid donation transition/);
 assert.equal(assertDonationTransition('draft', 'submitted'), true);
+assert.equal(assertDonationTransition('manual_review', 'needs_more_photos'), true);
 
 const unclear = analyzeDonationSubmission({
   description: 'clean table',
@@ -157,5 +158,15 @@ assert.doesNotMatch(commandCenterSource, /\.from\('nearby_offers'\)[\s\S]*\.orde
 const attributionSource = readFileSync(new URL('../lib/attribution.js', import.meta.url), 'utf8');
 assert.match(attributionSource, /const normalizedCode = String\(code\)\.trim\(\)\.toUpperCase\(\)/);
 assert.match(attributionSource, /\.eq\('code', normalizedCode\)/);
+
+for (const route of [
+  '../app/api/admin/bookings/[id]/actions/route.js',
+  '../app/api/admin/donations/route.js',
+  '../app/api/admin/leads/[id]/route.js',
+  '../app/api/admin/leads/send-sms/route.js',
+]) {
+  const source = readFileSync(new URL(route, import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /sendSMS\([^;]+?,\s*null,\s*[^,]+,\s*\{/s);
+}
 
 console.log('foundation tests passed');
