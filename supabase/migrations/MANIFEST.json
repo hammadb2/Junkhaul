@@ -45,6 +45,7 @@
     "20260727000003_operational_completion.sql": "1abdfdc7090d63647fe71c407c79869b29b8071edc8396956f1018cd6f7e5292",
     "20260728000001_donation_intelligence_dispatch.sql": "b422fad60624c0659e164208758e1c80136488bb3b9cc326311eacc680d1345b",
     "20260729000001_admin_manager_management.sql": "d91c31bd6feb497572bb22cca6793ce62abd46e6c72bdb6aac09310257b4c2f3",
-    "20260730000001_route_rls_and_audit.sql": "8119ca3ba9b35e5a51e7ae8b3283fcf7c3d68d0420d4f2482d7d80de30a9ef76"
+    "20260730000001_route_rls_and_audit.sql": "8119ca3ba9b35e5a51e7ae8b3283fcf7c3d68d0420d4f2482d7d80de30a9ef76",
+    "20260730000002_fix_route_rls_for_custom_auth.sql": "6b4672152dbc426ec730e24f6d403c7aa498e74b9560cdb0210a3c314300ac91"
   }
 }

@@ -198,18 +198,41 @@ assert.match(migrationSource, /current_route_version/, 'migration must add curre
 assert.match(migrationSource, /UNIQUE INDEX.*route_ack_emp_version/, 'migration must add unique index for idempotent acks');
 console.log('✓ Migration verified');
 
-// 16. RLS migration adds policies for realtime security.
-assert.match(rlsMigrationSource, /employee_own_route_plans/, 'RLS policy for employee route_plans SELECT');
-assert.match(rlsMigrationSource, /employee_own_route_acks/, 'RLS policy for employee route_acknowledgements');
-assert.match(rlsMigrationSource, /employee_insert_own_route_acks/, 'RLS policy for employee route_acknowledgements INSERT');
-assert.match(rlsMigrationSource, /ENABLE ROW LEVEL SECURITY/, 'RLS must be enabled');
-assert.match(rlsMigrationSource, /crew_assignments/, 'RLS migration must reference crew_assignments');
-assert.match(rlsMigrationSource, /employee_own_crew_assignments/, 'RLS policy for employee crew_assignments');
+// 16. RLS migration adds audit helper (employee policies were later dropped
+//     by corrective migration because the app uses custom auth, not Supabase Auth).
 assert.match(rlsMigrationSource, /log_route_acknowledgment/, 'audit helper function must exist');
 assert.match(rlsMigrationSource, /audit_events/, 'audit helper must write to audit_events');
 assert.match(rlsMigrationSource, /route_version/, 'audit helper must include route_version');
 assert.match(rlsMigrationSource, /device_id/, 'audit helper must include device_id');
-console.log('✓ RLS migration verified — realtime security policies in place');
+console.log('✓ RLS migration verified — audit helper function in place');
+
+// 16b. Corrective migration drops broken auth.uid() policies.
+const rlsFixSource = readFileSync(
+  new URL('../supabase/migrations/20260730000002_fix_route_rls_for_custom_auth.sql', import.meta.url),
+  'utf8'
+);
+assert.match(rlsFixSource, /DROP POLICY.*employee_own_route_plans/, 'must drop broken employee_own_route_plans');
+assert.match(rlsFixSource, /DROP POLICY.*employee_own_route_acks/, 'must drop broken employee_own_route_acks');
+assert.match(rlsFixSource, /DROP POLICY.*employee_insert_own_route_acks/, 'must drop broken employee_insert_own_route_acks');
+assert.match(rlsFixSource, /auth\.uid\(\).*NULL/, 'must document why policies are broken');
+console.log('✓ Corrective RLS migration verified — broken auth.uid() policies dropped');
+
+// 16c. SSE route-stream endpoint uses custom auth, not Supabase Auth.
+const routeStreamSource = readFileSync(
+  new URL('../app/api/employee/route-stream/route.js', import.meta.url),
+  'utf8'
+);
+assert.match(routeStreamSource, /getAuthedEmployee/, 'route-stream must use custom employee session auth');
+assert.match(routeStreamSource, /Unauthorized/, 'route-stream must reject unauthenticated');
+assert.match(routeStreamSource, /status: 401/, 'route-stream must return 401 for unauthenticated');
+assert.match(routeStreamSource, /text\/event-stream/, 'route-stream must return SSE content type');
+assert.match(routeStreamSource, /crew_assignment_id/, 'route-stream must resolve crew assignment server-side');
+assert.match(routeStreamSource, /Never accept a client-provided assignment ID/, 'must document no client assignment ID');
+assert.match(routeStreamSource, /route_update/, 'route-stream must send route_update events');
+assert.match(routeStreamSource, /session_terminated/, 'route-stream must detect session termination');
+assert.doesNotMatch(routeStreamSource, /auth\.uid\(\)/, 'route-stream must not use Supabase Auth');
+assert.doesNotMatch(routeStreamSource, /anonKey|anon_key/, 'route-stream must not use anon key');
+console.log('✓ SSE route-stream endpoint verified — uses custom auth, not Supabase Auth');
 
 // 17. Donation insertion preserves paid priority.
 assert.match(routeOptimizerSource, /window_start.*time_slot/, 'route optimizer sorts by time window');

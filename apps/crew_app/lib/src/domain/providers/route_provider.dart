@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../data/api/employee_api.dart';
-import '../../data/supabase/supabase_realtime_service.dart';
 import '../models/route_plan.dart';
 
 /// Route state held by the provider.
@@ -60,10 +59,14 @@ class RouteState {
   static RouteState initial() => RouteState();
 }
 
-/// Provider that manages the crew route state, realtime updates,
+/// Provider that manages the crew route state, SSE route-stream updates,
 /// acknowledgment, and persistence.
 class RouteNotifier extends Notifier<RouteState> {
-  StreamSubscription<RealtimePayload>? _realtimeSub;
+  // SSE connection for route-stream updates.
+  // Uses the custom jh_employee_session cookie via DioClient — no
+  // Supabase anon key or Supabase Auth involved.
+  StreamSubscription<List<int>>? _sseByteSub;
+  bool _sseConnected = false;
   static const _storageKey = 'jh_last_acknowledged_route';
   static const _storage = FlutterSecureStorage();
 
@@ -113,30 +116,101 @@ class RouteNotifier extends Notifier<RouteState> {
     }
   }
 
-  /// Start listening for realtime route_plans changes.
+  /// Start listening for route changes via the backend SSE endpoint.
+  ///
+  /// This uses /api/employee/route-stream which authenticates with the
+  /// custom jh_employee_session cookie. The server resolves the crew
+  /// assignment — the client never provides an assignment ID.
+  ///
+  /// The crewAssignmentId parameter is used only for state tracking,
+  /// not for authorization.
   void startRealtimeWatch(String crewAssignmentId) {
-    _realtimeSub?.cancel();
-    final realtime = ref.read(supabaseRealtimeProvider);
-    _realtimeSub = realtime
-        .watchTable(
-          table: 'route_plans',
-          filterColumn: 'crew_assignment_id',
-          filterValue: crewAssignmentId,
-        )
-        .listen((payload) {
-          // On any route_plans change, re-fetch the authoritative route.
-          fetchRoute();
-        });
+    // Cancel any existing connection to avoid duplicate listeners.
+    _cancelSse();
+
     state = state.copyWith(
       isWatchingRealtime: true,
       crewAssignmentId: crewAssignmentId,
     );
+
+    // Open the SSE connection asynchronously.
+    _connectSse();
   }
 
-  /// Stop realtime listening.
+  Future<void> _connectSse() async {
+    if (_sseConnected) return;
+    _sseConnected = true;
+
+    try {
+      final api = await ref.read(employeeApiProvider.future);
+      final response = await api.openRouteStream();
+
+      final stream = response.data.stream as Stream<List<int>>;
+      _sseByteSub = stream.listen(
+        (bytes) {
+          final text = utf8.decode(bytes);
+          _parseSseEvents(text);
+        },
+        onError: (error) {
+          // Connection lost — mark as disconnected and allow reconnect.
+          _sseConnected = false;
+          state = state.copyWith(isWatchingRealtime: false);
+        },
+        onDone: () {
+          // Stream closed by server or network — allow reconnect.
+          _sseConnected = false;
+          state = state.copyWith(isWatchingRealtime: false);
+        },
+        cancelOnError: true,
+      );
+    } catch (e) {
+      _sseConnected = false;
+      // SSE connection failed — fall back to foreground refresh.
+      // The schedule screen's WidgetsBindingObserver will refresh
+      // on resume, and pull-to-refresh is always available.
+    }
+  }
+
+  void _parseSseEvents(String text) {
+    // SSE events are separated by double newlines.
+    // Each event has "event: <type>" and "data: <json>" lines.
+    final events = text.split('\n\n');
+    for (final eventBlock in events) {
+      if (eventBlock.trim().isEmpty) continue;
+
+      String? eventType;
+      String? dataLine;
+
+      for (final line in eventBlock.split('\n')) {
+        if (line.startsWith('event: ')) {
+          eventType = line.substring(7).trim();
+        } else if (line.startsWith('data: ')) {
+          dataLine = line.substring(6).trim();
+        }
+      }
+
+      if (eventType == 'route_update' && dataLine != null) {
+        // Route changed — fetch the authoritative route.
+        fetchRoute();
+      } else if (eventType == 'session_terminated') {
+        // Server says session is invalid — disconnect.
+        _cancelSse();
+        state = state.copyWith(isWatchingRealtime: false);
+      }
+      // 'route_state' and 'no_assignment' events don't require action
+      // — the initial fetchRoute() call handles those cases.
+    }
+  }
+
+  void _cancelSse() {
+    _sseByteSub?.cancel();
+    _sseByteSub = null;
+    _sseConnected = false;
+  }
+
+  /// Stop SSE route-stream listening.
   void stopRealtimeWatch() {
-    _realtimeSub?.cancel();
-    _realtimeSub = null;
+    _cancelSse();
     state = state.copyWith(isWatchingRealtime: false);
   }
 

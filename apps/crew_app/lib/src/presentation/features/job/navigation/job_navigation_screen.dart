@@ -76,51 +76,62 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
   /// Whether the active job was removed by dispatch.
   bool _activeJobRemoved = false;
 
-  /// Destination coordinates — resolved from the authoritative route state
-  /// first, falling back to the booking's customer coordinates.
-  double? get _destLat {
-    // If we have a current nav destination from a route update, use it.
-    if (_currentNavLat != null) return _currentNavLat;
-    // Prefer route state's active stop coordinates.
-    final routeDest = ref.read(routeProvider.notifier).navigationDestination;
-    if (routeDest != null && routeDest.latitude != null && routeDest.longitude != null) {
-      // Verify it matches the current booking where appropriate.
-      if (routeDest.bookingId == widget.job.id ||
-          routeDest.stopId == widget.job.id ||
-          _currentNavStopId == routeDest.stopId) {
-        return routeDest.latitude;
+  /// Destination coordinates — resolved from the watched route state
+  /// in build(), falling back to the booking's customer coordinates.
+  /// These are set during build() from the reactive RouteState, not
+  /// from ref.read() which could return stale values.
+  double? _resolvedDestLat;
+  double? _resolvedDestLng;
+
+  /// Resolve destination from the watched route state.
+  /// Called once during build() so the values are reactive.
+  void _resolveDestinationFromRoute(CrewRoute? route) {
+    // If we have a current nav destination from a route update, keep it.
+    if (_currentNavLat != null && _currentNavLng != null) {
+      _resolvedDestLat = _currentNavLat;
+      _resolvedDestLng = _currentNavLng;
+      return;
+    }
+
+    // Try to resolve from the watched route state.
+    if (route != null) {
+      final activeId = route.activeStopId;
+      RouteStop? dest;
+      if (activeId != null) {
+        dest = route.orderedStops
+            .where((s) => s.stopId == activeId)
+            .firstOrNull;
+      }
+      dest ??= route.orderedStops
+          .where((s) => s.status == 'upcoming')
+          .firstOrNull;
+
+      if (dest != null && dest.latitude != null && dest.longitude != null) {
+        // Verify it matches the current booking where appropriate.
+        if (dest.bookingId == widget.job.id ||
+            dest.stopId == widget.job.id ||
+            _currentNavStopId == dest.stopId) {
+          _resolvedDestLat = dest.latitude;
+          _resolvedDestLng = dest.longitude;
+          _currentNavStopId ??= dest.stopId;
+          return;
+        }
       }
     }
-    return widget.job.customer.lat;
+
+    // Fall back to booking coordinates.
+    _resolvedDestLat = widget.job.customer.lat;
+    _resolvedDestLng = widget.job.customer.lng;
   }
 
-  double? get _destLng {
-    if (_currentNavLng != null) return _currentNavLng;
-    final routeDest = ref.read(routeProvider.notifier).navigationDestination;
-    if (routeDest != null && routeDest.latitude != null && routeDest.longitude != null) {
-      if (routeDest.bookingId == widget.job.id ||
-          routeDest.stopId == widget.job.id ||
-          _currentNavStopId == routeDest.stopId) {
-        return routeDest.longitude;
-      }
-    }
-    return widget.job.customer.lng;
-  }
+  double? get _destLat => _resolvedDestLat ?? widget.job.customer.lat;
+  double? get _destLng => _resolvedDestLng ?? widget.job.customer.lng;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the current nav stop ID from the route state.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final routeDest = ref.read(routeProvider.notifier).navigationDestination;
-        if (routeDest != null) {
-          _currentNavStopId = routeDest.stopId;
-          _currentNavLat = routeDest.latitude;
-          _currentNavLng = routeDest.longitude;
-        }
-      }
-    });
+    // Destination is resolved in build() from the watched route state.
+    // No ref.read() here — that would return a stale value.
   }
 
   @override
@@ -235,6 +246,9 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
   Widget build(BuildContext context) {
     final routeState = ref.watch(routeProvider);
     final route = routeState.route;
+
+    // Resolve destination from the watched route state (reactive).
+    _resolveDestinationFromRoute(route);
 
     // Check if the active job was removed by dispatch.
     if (route != null && _currentNavStopId != null) {

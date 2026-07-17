@@ -59,6 +59,8 @@ class EmployeeApi {
     required String bookingId,
     required String assignmentId,
     required String action, // 'in' or 'out'
+    String? routeId,
+    int? routeVersion,
   }) async {
     return _dio.postJson(
       '/api/employee/job-clock',
@@ -66,6 +68,8 @@ class EmployeeApi {
         'booking_id': bookingId,
         'assignment_id': assignmentId,
         'action': action,
+        if (routeId != null) 'route_id': routeId,
+        if (routeVersion != null) 'route_version': routeVersion,
       },
     );
   }
@@ -142,6 +146,8 @@ class EmployeeApi {
     List<String>? itemPhotos,
     String? capacityPhotoUrl,
     double? capacityEstimatePct,
+    String? routeId,
+    int? routeVersion,
   }) async {
     return _dio.postJson(
       '/api/employee/storage-drop',
@@ -153,6 +159,8 @@ class EmployeeApi {
         if (capacityPhotoUrl != null) 'capacity_photo_url': capacityPhotoUrl,
         if (capacityEstimatePct != null)
           'capacity_estimate_pct': capacityEstimatePct,
+        if (routeId != null) 'route_id': routeId,
+        if (routeVersion != null) 'route_version': routeVersion,
       },
     );
   }
@@ -253,6 +261,8 @@ class EmployeeApi {
     String? customerSignatureUrl,
     required double amountConfirmed,
     required String paymentMethod,
+    String? routeId,
+    int? routeVersion,
   }) async {
     return _dio.postJson(
       '/api/employee/signature',
@@ -263,6 +273,8 @@ class EmployeeApi {
           'customer_signature_url': customerSignatureUrl,
         'amount_confirmed': amountConfirmed,
         'payment_method': paymentMethod,
+        if (routeId != null) 'route_id': routeId,
+        if (routeVersion != null) 'route_version': routeVersion,
       },
     );
   }
@@ -312,19 +324,32 @@ class EmployeeApi {
   Future<Map<String, dynamic>> submitItemConditions({
     required String bookingId,
     required Map<String, String> conditions,
+    String? routeId,
+    int? routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/item-conditions',
-      body: {'booking_id': bookingId, 'conditions': conditions},
+      body: {
+        'booking_id': bookingId,
+        'conditions': conditions,
+        if (routeId != null) 'route_id': routeId,
+        if (routeVersion != null) 'route_version': routeVersion,
+      },
     );
   }
 
   Future<Map<String, dynamic>> resendPaymentLink({
     required String bookingId,
+    String? routeId,
+    int? routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/resend-payment-link',
-      body: {'booking_id': bookingId},
+      body: {
+        'booking_id': bookingId,
+        if (routeId != null) 'route_id': routeId,
+        if (routeVersion != null) 'route_version': routeVersion,
+      },
     );
   }
 
@@ -333,10 +358,18 @@ class EmployeeApi {
   Future<Map<String, dynamic>> collectCashPayment({
     required String bookingId,
     required double amount,
+    String? routeId,
+    int? routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/collect-payment',
-      body: {'booking_id': bookingId, 'method': 'cash_crew', 'amount': amount},
+      body: {
+        'booking_id': bookingId,
+        'method': 'cash_crew',
+        'amount': amount,
+        if (routeId != null) 'route_id': routeId,
+        if (routeVersion != null) 'route_version': routeVersion,
+      },
     );
   }
 
@@ -369,6 +402,8 @@ class EmployeeApi {
     double? lat,
     double? lng,
     String? takenAt,
+    String? routeId,
+    int? routeVersion,
   }) async {
     final formData = FormData.fromMap({
       'booking_id': bookingId,
@@ -383,6 +418,9 @@ class EmployeeApi {
         contentType: DioMediaType.parse('image/jpeg'),
       ),
     });
+    if (routeId != null) formData.fields.add(MapEntry('route_id', routeId));
+    if (routeVersion != null)
+      formData.fields.add(MapEntry('route_version', routeVersion.toString()));
     final body = await _dio.postMultipart(
       '/api/crew/upload-photo',
       formData: formData,
@@ -420,6 +458,25 @@ class EmployeeApi {
       'route_version': routeVersion,
       if (deviceId != null) 'device_id': deviceId,
     });
+  }
+
+  /// Open an SSE connection to /api/employee/route-stream.
+  ///
+  /// Returns a stream of bytes from the server. The caller parses SSE
+  /// events (event: ... / data: ...). The connection carries the
+  /// jh_employee_session cookie via DioClient's cookie jar.
+  ///
+  /// The server resolves the employee's crew assignment — the client
+  /// never provides an assignment ID as authorization.
+  Future<Response<dynamic>> openRouteStream() async {
+    return _dio.raw.get(
+      '/api/employee/route-stream',
+      options: Options(
+        responseType: ResponseType.stream,
+        headers: {'Accept': 'text/event-stream'},
+        receiveTimeout: const Duration(minutes: 60),
+      ),
+    );
   }
 }
 
