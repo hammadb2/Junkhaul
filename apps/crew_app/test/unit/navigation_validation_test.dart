@@ -76,6 +76,7 @@ void main() {
 
       // Second call — should be blocked
       final secondCall = !guidanceStarted;
+      // ignore: dead_code
       if (secondCall) {
         guidanceStarted = true;
       }

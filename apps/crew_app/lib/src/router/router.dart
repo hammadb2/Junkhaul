@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -157,7 +156,7 @@ Widget _jobScreenBuilder(String bookingId) {
       return scheduleAsync.when(
         loading: () =>
             const Scaffold(body: Center(child: CircularProgressIndicator())),
-        error: (_, __) => Scaffold(
+        error: (_, _) => Scaffold(
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,

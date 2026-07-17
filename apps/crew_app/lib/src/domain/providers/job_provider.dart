@@ -158,7 +158,7 @@ final jobStepProvider = Provider.family<JobStepController, String>((
 /// Lightweight state holder for the current job step. Uses [ValueNotifier]
 /// so widgets can watch it with [ValueListenableBuilder].
 class JobStepController extends ValueNotifier<JobStep> {
-  JobStepController(JobStep initial) : super(initial);
+  JobStepController(super.initial);
 
   void goTo(JobStep step) {
     value = step;
