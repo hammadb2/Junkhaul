@@ -504,9 +504,107 @@ try {
   const staffAccessOwner = await appFetch('/api/admin/staff-access', { headers: cookieFor(ownerSession) });
   assert.equal(staffAccessOwner.res.status, 200, staffAccessOwner.text);
   const staffAccessAdmin = await appFetch('/api/admin/staff-access', { headers: cookieFor(adminSession) });
-  assert.equal(staffAccessAdmin.res.status, 403, 'Admin must not manage staff access.');
+  assert.equal(staffAccessAdmin.res.status, 200, 'Admin must be able to open manager management staff access.');
   const staffAccessManager = await appFetch('/api/admin/staff-access', { headers: cookieFor(managerSession) });
   assert.equal(staffAccessManager.res.status, 403, 'Manager must not manage staff access.');
+
+  const anonymousStaffAccess = await appFetch('/api/admin/staff-access');
+  assert.equal(anonymousStaffAccess.res.status, 401, 'Anonymous staff access request must return 401.');
+  const createManagedManager = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({
+      action: 'create_manager',
+      name: 'Managed Manager Integration',
+      email: `${runId}_managed_manager@example.test`,
+      phone,
+      temporary_password: 'integration-temp-password',
+      reason: `${runId} create manager`,
+    }),
+  });
+  assert.equal(createManagedManager.res.status, 200, createManagedManager.text);
+  const managedManagerId = createManagedManager.json.result.employee.id;
+  const adminAssignManager = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'assign_role', employee_id: managedManagerId, role: 'manager', reason: `${runId} assign manager` }),
+  });
+  assert.equal(adminAssignManager.res.status, 200, adminAssignManager.text);
+  const adminAddScope = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'assign_scope', employee_id: managedManagerId, scope_type: 'date', scope_value: new Date().toISOString().slice(0, 10), reason: `${runId} add scope` }),
+  });
+  assert.equal(adminAddScope.res.status, 200, adminAddScope.text);
+  const managedScopeId = adminAddScope.json.result.scope.id;
+  const adminChangeScope = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'change_scope', employee_id: managedManagerId, scope_id: managedScopeId, scope_type: 'quadrant', scope_value: 'NW', priority: 5, effect: 'allow', reason: `${runId} change scope` }),
+  });
+  assert.equal(adminChangeScope.res.status, 200, adminChangeScope.text);
+  const adminRemoveScope = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'remove_scope', employee_id: managedManagerId, scope_id: managedScopeId, reason: `${runId} remove scope` }),
+  });
+  assert.equal(adminRemoveScope.res.status, 200, adminRemoveScope.text);
+  const adminDisableManager = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'disable_access', employee_id: managedManagerId, reason: `${runId} disable manager` }),
+  });
+  assert.equal(adminDisableManager.res.status, 200, adminDisableManager.text);
+  const adminReactivateManager = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'reactivate_access', employee_id: managedManagerId, reason: `${runId} reactivate manager` }),
+  });
+  assert.equal(adminReactivateManager.res.status, 200, adminReactivateManager.text);
+  const adminRemoveManagerRole = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'remove_role', employee_id: managedManagerId, role: 'manager', reason: `${runId} remove manager role` }),
+  });
+  assert.equal(adminRemoveManagerRole.res.status, 200, adminRemoveManagerRole.text);
+  const adminCreateOwner = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'assign_role', employee_id: managedManagerId, role: 'owner', reason: `${runId} blocked owner role` }),
+  });
+  assert.equal(adminCreateOwner.res.status, 403, 'Admin must not create owner.');
+  const adminAssignAdmin = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'assign_role', employee_id: managedManagerId, role: 'admin', reason: `${runId} blocked admin role` }),
+  });
+  assert.equal(adminAssignAdmin.res.status, 403, 'Admin must not assign admin role.');
+  const adminSelfChange = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'assign_role', employee_id: admin.id, role: 'manager', reason: `${runId} blocked self role` }),
+  });
+  assert.equal(adminSelfChange.res.status, 403, 'Admin must not change their own role.');
+  const adminFinalOwner = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ action: 'remove_role', employee_id: owner.id, role: 'owner', reason: `${runId} blocked final owner` }),
+  });
+  assert.equal(adminFinalOwner.res.status, 403, 'Admin must not remove final owner.');
+  const managerRoleChange = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(managerSession) },
+    body: JSON.stringify({ action: 'assign_role', employee_id: managedManagerId, role: 'manager', reason: `${runId} manager blocked` }),
+  });
+  assert.equal(managerRoleChange.res.status, 403, 'Manager must not manage roles.');
+  const employeeRoleChange = await appFetch('/api/admin/staff-access', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(employeeSession) },
+    body: JSON.stringify({ action: 'assign_role', employee_id: managedManagerId, role: 'manager', reason: `${runId} employee blocked` }),
+  });
+  assert.equal(employeeRoleChange.res.status, 403, 'Employee must not manage roles.');
+  const { count: staffAccessAuditCount } = await supabase.from('audit_events').select('id', { count: 'exact', head: true }).eq('entity_type', 'staff_access').eq('entity_id', managedManagerId);
+  assert.ok(staffAccessAuditCount >= 7, 'Manager lifecycle changes must create audit events.');
 
   const grantDirect = await appFetch('/api/admin/staff-access', {
     method: 'POST',

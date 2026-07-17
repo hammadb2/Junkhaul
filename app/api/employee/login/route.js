@@ -22,6 +22,15 @@ export async function POST(req) {
   if (emp.status === 'terminated') {
     return NextResponse.json({ error: 'Account inactive. Contact your manager.' }, { status: 403 });
   }
+  if (emp.status === 'deletion_requested') {
+    return NextResponse.json(
+      {
+        error:
+          'We are currently working on your request to delete your info. To regain access, please contact dispatch at (587) 325-0751.',
+      },
+      { status: 403 },
+    );
+  }
   if (emp.status === 'rejected') {
     return NextResponse.json({
       error: emp.verification_notes
