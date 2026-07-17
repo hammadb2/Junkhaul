@@ -4,6 +4,10 @@
   "private": true,
   "description": "Junk Haul Calgary — same-day junk removal booking platform",
   "type": "module",
+  "engines": {
+    "node": ">=22.13.0 <23",
+    "npm": ">=10 <11"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

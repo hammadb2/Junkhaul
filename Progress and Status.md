@@ -30,18 +30,18 @@ This section supersedes broad claims below such as “everything built.” Statu
 ### Verification phase status
 
 - Status: `PARTIAL`
-- Repository path: `tests/integration/foundation.integration.js`, `tests/foundation.test.js`, `package.json`, `package-lock.json`
+- Repository path: `tests/integration/foundation.integration.js`, `tests/foundation.test.js`, `.env.integration.example`, `docs/STAGING_VERIFICATION.md`, `.nvmrc`, `package.json`, `package-lock.json`
 - API: no production API added by the harness.
 - Database table: validates foundation tables when an isolated test DB is provided.
 - Admin visibility: `NO_APP_IMPACT`
 - Manager visibility: `NO_APP_IMPACT`
-- Quo integration: parser fixtures cover current expected payload shape; live Quo payload/auth verification remains `NOT_BUILT`.
+- Quo integration: parser fixtures, signed-webhook unit tests, delivery-event helper coverage and route-level integration cases exist; live Quo payload/auth verification against a real Quo webhook remains `NOT_BUILT`.
 - Vapi integration: `NO_APP_IMPACT`
 - App impact: `NO_APP_IMPACT`
-- Tests: `COMPLETE_AND_VERIFIED` for pure helper/unit tests; `BUILT_NOT_VERIFIED` for the integration harness itself; database integration execution is `NOT_BUILT` in this environment because no isolated staging DB URL is configured and local Supabase cannot start without Docker socket access.
-- Manual verification: `COMPLETE_AND_VERIFIED` for `npm test`, `npm run lint`, and `npm run build`; `npm run test:integration` correctly exits `NOT_RUN` without `TEST_SUPABASE_DB_URL`/`TEST_DATABASE_URL`.
+- Tests: `COMPLETE_AND_VERIFIED` for pure helper/unit tests; `BUILT_NOT_VERIFIED` for the guarded route/database/storage integration harness itself; database integration execution remains `NOT_BUILT` in this environment because no isolated staging DB URL is configured and local Supabase cannot start without Docker socket access.
+- Manual verification: `COMPLETE_AND_VERIFIED` for `npm test`, `npm run lint`, and `npm run build` under local Node 21.6.0; `npm run test:integration` correctly exits `NOT_RUN` without approved staging/local Supabase variables. Node 22.13.0 is declared in `.nvmrc`/`engines`, but this shell does not have Node 22 installed.
 - Production status: `PARTIAL`; do not apply the migration to production until a staging/disposable database has run the full chain and second-run/idempotency validation.
-- Known gaps: no staging project was available in this environment; route-level DB integration tests still need credentials and seed data.
+- Known gaps: no staging project was available in this environment; route-level DB integration tests still need a disposable Supabase project or working local Supabase Docker environment.
 
 ### Door-hanger and flyer attribution
 
@@ -88,24 +88,24 @@ This section supersedes broad claims below such as “everything built.” Statu
 - App impact: `APP_REQUIRES_NEW_WORKFLOW`, `APP_WRITES_THIS`, `APP_RECEIVES_REALTIME_UPDATE`; backlog documented.
 - Tests: `PARTIAL`; validation/state-machine pure tests and image-inspection helper tests added. Route/database upload tests still require isolated Supabase credentials.
 - Manual verification: `BUILT_NOT_VERIFIED`; build/lint/unit tests pass, but storage upload has not been exercised against staging.
-- Production status: `PARTIAL`; storage bucket and metadata schema are in the migration, but staging migration/upload verification is still required.
-- Known gaps: route-fit algorithm foundation exists as table only; actual route matching is not implemented. Donation “AI” remains rule-based pre-screening and must not be represented as real image AI.
+- Production status: `PARTIAL`; storage bucket and metadata schema are in the migration, the bucket must be private, and staging migration/upload verification is still required.
+- Known gaps: route-fit algorithm foundation exists as table only; actual route matching is not implemented. Donation “AI” remains rule-based pre-screening and must not be represented as real image AI. Abandoned-draft cleanup is documented but not built.
 
 ### Quo SMS infrastructure
 
 - Status: `PARTIAL`
 - Repository path: `lib/sms.js`, `lib/quoInbound.js`, `lib/quoPayload.js`, `lib/quoRules.js`, `app/api/quo/inbound/route.js`, `app/api/sms-webhook/route.js`, `supabase/functions/_shared/clients.ts`
 - API: `/api/quo/inbound`, legacy `/api/sms-webhook`, `/api/sms/inbound`
-- Database table: `messages`, `message_entity_links`, `sms_consent`, `sms_suppression`, `expected_replies`
+- Database table: `messages`, `message_entity_links`, `sms_consent`, `sms_suppression`, `expected_replies`, `quo_webhook_events`
 - Admin visibility: `PARTIAL`; messages visible through Booking Detail, but full retry/failure dashboard is not built.
 - Manager visibility: `NOT_BUILT`
-- Quo integration: `PARTIAL`; central Next.js outbound suppression exists, the edge-function sender now checks suppression, and canonical inbound helper exists.
+- Quo integration: `PARTIAL`; central Next.js outbound suppression exists, the edge-function sender now checks suppression, canonical inbound helper exists, signed-webhook verification has unit coverage, and delivery status updates are implemented.
 - Vapi integration: `PARTIAL`; Vapi-triggered SMS uses central sender where existing callers use `sendSMS`.
 - App impact: `APP_RECEIVES_REALTIME_UPDATE` later for message-triggered assignments.
-- Tests: `PARTIAL`; pure expected reply/STOP/START classification tests and parser fixture tests added.
+- Tests: `PARTIAL`; pure expected reply/STOP/START classification tests, signature tests, delivery-event tests and parser fixture tests added. Route-level Quo integration tests are built but not run against staging.
 - Manual verification: `BUILT_NOT_VERIFIED`
 - Production status: `PARTIAL`; Quo webhook should be pointed to canonical route after payload verification.
-- Known gaps: existing conversational SMS route still contains legacy booking logic; full migration to canonical router remains. Actual Quo payload examples and webhook authentication must be verified before production webhook cutover.
+- Known gaps: existing conversational SMS route still contains legacy booking logic; full migration to canonical router remains. Actual Quo payload examples and webhook authentication must be verified with Quo before production webhook cutover.
 
 ### Booking Detail workspace
 
