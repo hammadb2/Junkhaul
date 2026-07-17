@@ -42,6 +42,7 @@
     "20260727000001_reconcile_legacy_schema.sql": "b7d9be74b3fef9ce918a86901db01bed6ad398651b73aca8cce73bc97565f091",
     "20260727000002_operational_permissions.sql": "c81f06e44ca7f346a5362e39f705c8d4483b26babbbba8009912f13bfdeffe8a",
     "20260727000003_operational_completion.sql": "1abdfdc7090d63647fe71c407c79869b29b8071edc8396956f1018cd6f7e5292",
+    "20260728000001_donation_intelligence_dispatch.sql": "b422fad60624c0659e164208758e1c80136488bb3b9cc326311eacc680d1345b",
     "20260729000001_admin_manager_management.sql": "d91c31bd6feb497572bb22cca6793ce62abd46e6c72bdb6aac09310257b4c2f3"
   }
 }
