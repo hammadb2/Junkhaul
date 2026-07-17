@@ -43,7 +43,7 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- Google Maps API key (read from secrets.dart via --dart-define).
+        <!-- Google Maps API key (read from secrets.dart via dart-define).
              Replace YOUR_GOOGLE_MAPS_API_KEY with your restricted Android key. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
