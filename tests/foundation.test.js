@@ -144,4 +144,10 @@ assert.match(migrationRouteSource, /Runtime migrations are permanently disabled/
 assert.match(migrationRouteSource, /status:\s*410/);
 assert.doesNotMatch(migrationRouteSource, /exec_sql/);
 
+const adminLoginSource = readFileSync(new URL('../app/api/admin/login/route.js', import.meta.url), 'utf8');
+assert.match(adminLoginSource, /if \(email\) \{/);
+assert.match(adminLoginSource, /createSession\(employee\.id\)/);
+assert.match(adminLoginSource, /sessionCookieHeader\(session\.token, session\.expiresAt\)/);
+assert.doesNotMatch(adminLoginSource, /if \(!password \|\| password !== process\.env\.ADMIN_PASSWORD\) \{\s+if \(!email/);
+
 console.log('foundation tests passed');

@@ -9,8 +9,8 @@ export const runtime = 'nodejs';
 
 export async function POST(req) {
   const { email, password } = await req.json();
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
-    if (!email || !password) return NextResponse.json({ error: 'Email and password required.' }, { status: 400 });
+  if (email) {
+    if (!password) return NextResponse.json({ error: 'Email and password required.' }, { status: 400 });
     const { data: employee } = await supabaseAdmin
       .from('employees')
       .select('id, email, name, password_hash, status')
@@ -39,6 +39,9 @@ export async function POST(req) {
     });
     res.headers.append('Set-Cookie', sessionCookieHeader(session.token, session.expiresAt));
     return res;
+  }
+  if (!password || password !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ error: 'Email and password required.' }, { status: 400 });
   }
   const token = await adminToken();
   const store = await cookies();
