@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -15,6 +16,20 @@ for (const [file, expectedHash] of Object.entries(manifest.files || {})) {
     console.error(`${file}: hash mismatch`);
     console.error(`  expected ${expectedHash}`);
     console.error(`  actual   ${actualHash}`);
+  }
+}
+
+const manifestFiles = new Set(Object.keys(manifest.files || {}));
+const migrationFiles = execFileSync('git', ['ls-files', 'supabase/migrations/*.sql'], { encoding: 'utf8' })
+  .trim()
+  .split('\n')
+  .filter(Boolean)
+  .map((file) => file.replace(/^supabase\/migrations\//, ''))
+  .sort();
+for (const file of migrationFiles) {
+  if (!manifestFiles.has(file)) {
+    failed = true;
+    console.error(`${file}: missing from migration manifest`);
   }
 }
 

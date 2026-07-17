@@ -31,6 +31,7 @@ import DonationsView from './DonationsView';
 import BookingDetailView from './BookingDetailView';
 import CommunicationsPanel from './CommunicationsPanel';
 import ManagerDashboard from './ManagerDashboard';
+import StaffAccessPanel from './StaffAccessPanel';
 
 const NAV = [
   { label: 'Overview', items: [
@@ -51,6 +52,7 @@ const NAV = [
   ]},
   { label: 'People', items: [
     { id: 'crew', label: 'Crew', Icon: IconUsers },
+    { id: 'staffAccess', label: 'Staff Access', Icon: IconUsers },
   ]},
   { label: 'Growth', items: [
     { id: 'growth', label: 'Growth', Icon: IconTrending },
@@ -79,6 +81,7 @@ const VIEW_META = {
   earnings: ['Earnings', 'Revenue performance & sources'],
   payroll: ['Payroll', 'Pay runs, remittances & T4s'],
   crew: ['Crew', 'Team roster, onboarding & safety'],
+  staffAccess: ['Staff Access', 'Owner-only roles, permissions and manager scopes'],
   growth: ['Growth', 'Funnel health & marketing spend'],
   marketing: ['Marketing', 'Campaign, door-hanger, flyer and attribution reporting'],
   communications: ['Communications', 'Quo messages, STOP state, expected replies and failure retry'],
@@ -94,6 +97,7 @@ const VIEWS = {
   dashboard: DashboardView, dispatch: DispatchView, bookingDetail: BookingDetailView, schedule: ScheduleView, leads: LeadsView,
   manager: ManagerDashboard,
   waitlist: WaitlistView, donations: DonationsView, earnings: EarningsDashboard, crew: CrewView, payroll: PayrollPanel,
+  staffAccess: StaffAccessPanel,
   growth: GrowthPanel, marketing: MarketingPanel, communications: CommunicationsPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
   config: ConfigPanel, audit: AuditTrail, dispatchlog: DispatchLogView,
 };

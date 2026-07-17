@@ -40,6 +40,7 @@
     "20260725_geofence_events_region.sql": "3dd41a2e507960564904a66de802b8f17a9dda415b20817283e995127b66c170",
     "20260726000001_customer_admin_foundation.sql": "911968d347ae949b225d5448c3bca88769a80098c515d7b2f810a03916a6f800",
     "20260727000001_reconcile_legacy_schema.sql": "b7d9be74b3fef9ce918a86901db01bed6ad398651b73aca8cce73bc97565f091",
-    "20260727000002_operational_permissions.sql": "c81f06e44ca7f346a5362e39f705c8d4483b26babbbba8009912f13bfdeffe8a"
+    "20260727000002_operational_permissions.sql": "c81f06e44ca7f346a5362e39f705c8d4483b26babbbba8009912f13bfdeffe8a",
+    "20260727000003_operational_completion.sql": "1abdfdc7090d63647fe71c407c79869b29b8071edc8396956f1018cd6f7e5292"
   }
 }
