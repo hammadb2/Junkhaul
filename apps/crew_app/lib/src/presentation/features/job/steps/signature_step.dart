@@ -1,170 +1,135 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../../core/app_theme.dart';
-import '../../../../domain/models/booking.dart';
-import '../../../../domain/providers/job_provider.dart';
-import '../../../shared/jh_card.dart';
-import '../../../shared/jh_error_banner.dart';
+import '../../../shared/jh_photo_thumbnail.dart';
 import '../../../shared/jh_primary_button.dart';
+import '../../../shared/jh_signature_pad.dart';
+import '../../../shared/jh_sync_banner.dart';
 
-/// Step 9: Signature. Customer signs, types their name, and confirms the amount.
-/// Calls POST /api/employee/signature to complete the job.
-/// Also captures the "After" photo here (Section 6.6).
-class SignatureStep extends ConsumerStatefulWidget {
-  const SignatureStep({super.key, required this.booking, required this.stepController});
-  final Booking booking;
-  final JobStepController stepController;
+/// Step 9/9 — "After Photo" capture, customer signature, and confirmed
+/// amount. Handles the signature-absent branch and shows an explicit
+/// saved/synced confirmation so nothing feels like it silently vanished.
+///
+/// TODO(dev): on [onComplete], export the signature PNG (see
+/// [JhSignaturePadState.exportPng]) and submit the after-photo + signature
+/// + final amount to your job-completion endpoint / offline queue.
+class SignatureStep extends StatefulWidget {
+  const SignatureStep({
+    super.key,
+    required this.confirmedAmount,
+    required this.customerName,
+    required this.onCapturePhoto,
+    required this.onComplete,
+    this.afterPhotoFile,
+    this.isSynced = true,
+  });
+
+  final double confirmedAmount;
+  final String customerName;
+  final VoidCallback onCapturePhoto;
+  final void Function({required bool signedByDelegate}) onComplete;
+  final File? afterPhotoFile;
+  final bool isSynced;
 
   @override
-  ConsumerState<SignatureStep> createState() => _SignatureStepState();
+  State<SignatureStep> createState() => _SignatureStepState();
 }
 
-class _SignatureStepState extends ConsumerState<SignatureStep> {
-  final _nameController = TextEditingController();
-  String? _afterPhotoPath;
-  bool _isSubmitting = false;
-  String? _errorMessage;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
+class _SignatureStepState extends State<SignatureStep> {
+  bool _customerPresent = true;
+  final _sigKey = GlobalKey<JhSignaturePadState>();
+  bool _hasSignature = false;
 
   @override
   Widget build(BuildContext context) {
-    final amount = widget.booking.totalPrice ?? 0;
-
+    final canComplete = widget.afterPhotoFile != null && (!_customerPresent || _hasSignature);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // After photo capture
-        Text('After Photo', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text(
-          'Capture the space after junk has been removed.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 12),
-        GestureDetector(
-          onTap: () => setState(() => _afterPhotoPath = 'placeholder://after_${DateTime.now().millisecondsSinceEpoch}'),
-          child: JhCard(
-            child: Container(
-              height: 160,
-              alignment: Alignment.center,
-              child: _afterPhotoPath == null
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.camera_alt_rounded, size: 36, color: AppColors.textSecondary),
-                        const SizedBox(height: 8),
-                        Text('Tap to capture after photo', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
-                      ],
-                    )
-                  : const Icon(Icons.check_circle_rounded, size: 36, color: AppColors.statusGreen),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        // Signature pad
-        Text('Customer Signature', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        JhCard(
-          child: Container(
-            height: 180,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderSubtle),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.draw_rounded, size: 40, color: AppColors.textSecondary),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+            children: [
+              JhPhotoThumbnail(onCapture: widget.onCapturePhoto, imageFile: widget.afterPhotoFile, label: 'Tap to capture after photo', height: 150),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: AppColors.bgCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.borderSubtle)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Confirmed amount', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                    Text('\$${widget.confirmedAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Customer present'),
+                      selected: _customerPresent,
+                      onSelected: (_) => setState(() => _customerPresent = true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Not present'),
+                      selected: !_customerPresent,
+                      onSelected: (_) => setState(() => _customerPresent = false),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (_customerPresent) ...[
+                const Text('Sign here', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 const SizedBox(height: 8),
-                Text(
-                  'Signature pad',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                JhSignaturePad(key: _sigKey, height: 140, onChanged: (s) => setState(() => _hasSignature = s.isNotEmpty)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('${widget.customerName} — customer signature', style: const TextStyle(fontSize: 12, color: AppColors.textDisabled)),
+                    TextButton(
+                      onPressed: () {
+                        _sigKey.currentState?.clear();
+                        setState(() => _hasSignature = false);
+                      },
+                      child: const Text('Clear', style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                 ),
-                // In production, use the `signature` package for a SignaturePad widget.
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Customer name typed
-        TextField(
-          controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: 'Customer name (typed)',
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Amount confirmation
-        JhCard(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Amount confirmed:', style: Theme.of(context).textTheme.bodyMedium),
-                Text(
-                  '\$${amount.toStringAsFixed(0)}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontFeatures: const [FontFeature.tabularFigures()],
+              ] else
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: const Color(0xFFFEF6E7), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFFBE3B8))),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Proceeding without customer signature', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      SizedBox(height: 4),
+                      Text(
+                        'A note is being added to the office file. If someone else can sign on the customer\'s behalf, switch back to "Customer present."',
+                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
                       ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              const SizedBox(height: 14),
+              JhSavedChip(synced: widget.isSynced),
+            ],
           ),
         ),
-        if (_errorMessage != null) ...[
-          const SizedBox(height: 16),
-          JhErrorBanner(message: _errorMessage!),
-        ],
-        const SizedBox(height: 24),
-        JhPrimaryButton(
-          label: 'Complete Job',
-          isLoading: _isSubmitting,
-          onPressed: _handleComplete,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
+          child: JhPrimaryButton(
+            label: 'Complete Job',
+            onPressed: canComplete ? () => widget.onComplete(signedByDelegate: !_customerPresent) : null,
+          ),
         ),
       ],
     );
-  }
-
-  Future<void> _handleComplete() async {
-    if (_nameController.text.trim().isEmpty) {
-      setState(() => _errorMessage = 'Customer name is required.');
-      return;
-    }
-    if (_afterPhotoPath == null) {
-      setState(() => _errorMessage = 'After photo is required.');
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // In production:
-      // await ref.read(employeeApiProvider).submitSignature(
-      //   bookingId: widget.booking.id,
-      //   customerNameTyped: _nameController.text.trim(),
-      //   customerSignatureUrl: signatureUrl,
-      //   amountConfirmed: widget.booking.totalPrice ?? 0,
-      //   paymentMethod: 'cash', // or 'card'
-      // );
-      if (mounted) {
-        widget.stepController.advance();
-      }
-    } catch (e) {
-      if (mounted) setState(() => _errorMessage = e.toString());
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
   }
 }

@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../core/app_theme.dart';
-import 'jh_error_banner.dart';
-import 'jh_primary_button.dart';
+import 'jh_secondary_button.dart';
 
-/// Generic error screen shown when a Riverpod provider returns [AsyncError].
-/// Used by screens that need a full-page error state with retry.
+/// Full-screen error/empty state — failed loads, no connectivity on first
+/// launch, etc. For inline errors within a screen use [JhErrorBanner].
 class AsyncErrorScreen extends StatelessWidget {
   const AsyncErrorScreen({
     super.key,
-    required this.message,
+    this.title = 'Something went wrong',
+    this.message = "We couldn't load this. Check your connection and try again.",
     required this.onRetry,
   });
 
+  final String title;
   final String message;
   final VoidCallback onRetry;
 
@@ -22,35 +21,27 @@ class AsyncErrorScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.bgBase,
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.cloud_off_rounded, size: 56, color: AppColors.textSecondary),
-                const SizedBox(height: 16),
-                Text('Connection Error', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 12),
-                JhErrorBanner(message: message),
-                const SizedBox(height: 24),
-                JhPrimaryButton(label: 'Retry', onPressed: onRetry),
-              ],
-            ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: const BoxDecoration(color: AppColors.bgInput, shape: BoxShape.circle),
+                child: const Icon(Icons.cloud_off_rounded, size: 32, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const SizedBox(height: 8),
+              Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
+              const SizedBox(height: 24),
+              JhSecondaryButton(label: 'Try Again', onPressed: onRetry),
+            ],
           ),
         ),
       ),
     );
   }
-}
-
-/// Helper that maps an [AsyncValue] error to a user-friendly message.
-String asyncErrorMessage(Object? error) {
-  final str = error.toString();
-  // Strip common exception prefixes for cleaner display.
-  if (str.startsWith('Exception: ')) return str.substring(11);
-  if (str.startsWith('NetworkException: ')) return str.substring(18);
-  if (str.startsWith('AuthException: ')) return str.substring(15);
-  if (str.startsWith('ServerException: ')) return str.substring(17);
-  return str;
 }
