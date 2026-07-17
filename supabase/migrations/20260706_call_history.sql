@@ -21,5 +21,4 @@ CREATE INDEX IF NOT EXISTS idx_call_history_phone ON call_history(caller_number)
 CREATE INDEX IF NOT EXISTS idx_call_history_date ON call_history(call_date DESC);
 
 ALTER TABLE call_history ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role can access call_history" ON call_history;
 CREATE POLICY "Service role can access call_history" ON call_history FOR ALL USING (true);

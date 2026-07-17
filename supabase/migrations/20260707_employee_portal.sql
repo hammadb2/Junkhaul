@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS employees (
 );
 
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON employees;
 CREATE POLICY "Service role full access" ON employees
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -67,7 +66,6 @@ CREATE TABLE IF NOT EXISTS employee_documents (
 );
 
 ALTER TABLE employee_documents ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON employee_documents;
 CREATE POLICY "Service role full access" ON employee_documents
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -83,7 +81,6 @@ CREATE TABLE IF NOT EXISTS employee_sessions (
 );
 
 ALTER TABLE employee_sessions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON employee_sessions;
 CREATE POLICY "Service role full access" ON employee_sessions
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -113,7 +110,6 @@ CREATE TABLE IF NOT EXISTS timesheets (
 );
 
 ALTER TABLE timesheets ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON timesheets;
 CREATE POLICY "Service role full access" ON timesheets
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -164,7 +160,6 @@ CREATE TABLE IF NOT EXISTS payroll_rates (
 );
 
 ALTER TABLE payroll_rates ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON payroll_rates;
 CREATE POLICY "Service role full access" ON payroll_rates
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -203,7 +198,6 @@ CREATE TABLE IF NOT EXISTS pay_runs (
 );
 
 ALTER TABLE pay_runs ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON pay_runs;
 CREATE POLICY "Service role full access" ON pay_runs
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -255,7 +249,6 @@ CREATE TABLE IF NOT EXISTS pay_stubs (
 );
 
 ALTER TABLE pay_stubs ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON pay_stubs;
 CREATE POLICY "Service role full access" ON pay_stubs
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -281,7 +274,6 @@ CREATE TABLE IF NOT EXISTS remittances (
 );
 
 ALTER TABLE remittances ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON remittances;
 CREATE POLICY "Service role full access" ON remittances
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -307,7 +299,6 @@ CREATE TABLE IF NOT EXISTS direct_deposit_log (
 );
 
 ALTER TABLE direct_deposit_log ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON direct_deposit_log;
 CREATE POLICY "Service role full access" ON direct_deposit_log
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -347,7 +338,6 @@ CREATE TABLE IF NOT EXISTS t4_slips (
 );
 
 ALTER TABLE t4_slips ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON t4_slips;
 CREATE POLICY "Service role full access" ON t4_slips
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 

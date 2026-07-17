@@ -32,7 +32,6 @@ DROP POLICY IF EXISTS "Service role write" ON crew_location;
 DROP POLICY IF EXISTS "Crew app write with PIN" ON crew_location;
 
 -- Service role has full access (used by /api/crew/* routes)
-DROP POLICY IF EXISTS "Service role full access" ON crew_location;
 CREATE POLICY "Service role full access" ON crew_location
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -42,19 +41,12 @@ CREATE POLICY "Service role full access" ON crew_location
 -- The /track/[booking_id] page uses service role to fetch by booking_id.
 -- (Anon access is intentionally NOT granted — the tracking page uses
 --  a server-side fetch with the service role key, not the anon key.)
-DROP POLICY IF EXISTS "Anon read active sessions only" ON crew_location;
 CREATE POLICY "Anon read active sessions only" ON crew_location
   FOR SELECT USING (
     updated_at > now() - interval '24 hours'
   );
 
-DO $$
-BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE crew_location;
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-  WHEN undefined_object THEN NULL;
-END $$;
+ALTER PUBLICATION supabase_realtime ADD TABLE crew_location;
 
 -- ============================================================
 -- 2. BOOKINGS — new columns for crew app lifecycle
@@ -127,7 +119,6 @@ CREATE TABLE IF NOT EXISTS nearby_offers (
 );
 
 ALTER TABLE nearby_offers ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON nearby_offers;
 CREATE POLICY "Service role full access" ON nearby_offers
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -148,7 +139,6 @@ CREATE TABLE IF NOT EXISTS gps_overrides (
 );
 
 ALTER TABLE gps_overrides ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON gps_overrides;
 CREATE POLICY "Service role full access" ON gps_overrides
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
@@ -163,7 +153,6 @@ CREATE TABLE IF NOT EXISTS crew_pin (
 );
 
 ALTER TABLE crew_pin ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Service role full access" ON crew_pin;
 CREATE POLICY "Service role full access" ON crew_pin
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 

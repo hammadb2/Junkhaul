@@ -24,9 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_safety_alerts_booking ON safety_alerts(booking_id
 -- Row-level security: only authenticated admin/crew users can read.
 -- Customers never have direct DB access, but defence in depth.
 ALTER TABLE safety_alerts ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "safety_alerts_admin_read" ON safety_alerts;
 CREATE POLICY "safety_alerts_admin_read" ON safety_alerts
   FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "safety_alerts_admin_write" ON safety_alerts;
 CREATE POLICY "safety_alerts_admin_write" ON safety_alerts
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
