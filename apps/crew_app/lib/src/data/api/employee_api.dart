@@ -285,9 +285,16 @@ class EmployeeApi {
     });
   }
 
-  // ---- Photo Upload ----
+  // ---- Onboarding / Profile ----
 
-  /// Upload a crew photo to Supabase storage via multipart form data.
+  /// PUT /api/employee/me — update profile fields.
+  /// Accepted fields: phone, address, td1_federal_claim, td1_ab_claim,
+  /// onboarding_step, bank_institution, bank_transit, bank_account.
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> updates) async {
+    return _dio.putJson('/api/employee/me', body: updates);
+  }
+
+  // ---- Photo Upload ----  /// Upload a crew photo to Supabase storage via multipart form data.
   ///
   /// [bookingId] — the booking this photo belongs to.
   /// [photoCategory] — one of: before, after, item, damage, access_path,

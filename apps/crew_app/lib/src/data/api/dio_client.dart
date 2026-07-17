@@ -98,6 +98,20 @@ class DioClient {
     }
   }
 
+  /// Convenience PUT that encodes JSON and decodes JSON.
+  Future<Map<String, dynamic>> putJson(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      final r = await _dio.put<dynamic>(path, data: body, queryParameters: query);
+      return r.data is String ? _decodeString(r.data as String) : (r.data as Map).cast<String, dynamic>();
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    }
+  }
+
   /// Convenience multipart upload (used for documents, selfies, photos).
   Future<Map<String, dynamic>> postMultipart(
     String path, {
