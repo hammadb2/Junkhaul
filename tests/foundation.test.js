@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import sharp from 'sharp';
 import { normalizePhone } from '../lib/phone.js';
 import { validateDonationPhotos, assertDonationTransition, analyzeDonationSubmission } from '../lib/donation.js';
 import { roleAllows } from '../lib/permissionRules.js';
 import { classifyInboundText, responseMatchesExpected } from '../lib/quoRules.js';
+import { inspectDonationImage, MAX_DONATION_PHOTO_BYTES } from '../lib/donationPhotos.js';
+import { parseQuoPayload } from '../lib/quoPayload.js';
 
 assert.equal(normalizePhone('(587) 325-0751'), '+15873250751');
 
@@ -58,5 +62,61 @@ assert.equal(classifyInboundText('start'), 'START');
 assert.equal(classifyInboundText('yes'), 'AFFIRMATIVE');
 assert.equal(responseMatchesExpected('YES', { status: 'active', valid_responses: ['YES'] }), true);
 assert.equal(responseMatchesExpected('YES', { status: 'expired', valid_responses: ['YES'] }), false);
+
+const sampleImage = await sharp({
+  create: {
+    width: 400,
+    height: 400,
+    channels: 3,
+    background: '#ffffff',
+  },
+}).jpeg().toBuffer();
+const inspected = await inspectDonationImage(sampleImage, 'image/jpeg');
+assert.equal(inspected.mimeType, 'image/jpeg');
+assert.equal(inspected.width, 400);
+assert.equal(inspected.height, 400);
+assert.match(inspected.sha256, /^[a-f0-9]{64}$/);
+
+await assert.rejects(
+  () => inspectDonationImage(Buffer.alloc(MAX_DONATION_PHOTO_BYTES + 1), 'image/jpeg'),
+  /8MB/
+);
+
+const quoPayload = {
+  data: {
+    id: 'quo_msg_123',
+    from: '+15873250751',
+    to: '+15870000000',
+    content: 'STOP',
+    status: 'received',
+  },
+};
+assert.deepEqual(parseQuoPayload(quoPayload), {
+  provider_id: 'quo_msg_123',
+  direction: 'inbound',
+  from: '+15873250751',
+  to: '+15870000000',
+  body: 'STOP',
+  provider_status: 'received',
+  raw: quoPayload,
+});
+
+for (const [fixture, expectedBody, expectedStatus] of [
+  ['inbound-sms.json', 'YES', 'received'],
+  ['stop.json', 'STOP', 'received'],
+  ['start.json', 'START', 'received'],
+  ['delivery-failed.json', 'Your pickup request needs more photos.', 'failed'],
+]) {
+  const payload = JSON.parse(readFileSync(new URL(`./fixtures/quo/${fixture}`, import.meta.url), 'utf8'));
+  const parsed = parseQuoPayload(payload);
+  assert.equal(parsed.body, expectedBody);
+  assert.equal(parsed.provider_status, expectedStatus);
+  assert.ok(parsed.provider_id);
+}
+
+const migrationRouteSource = readFileSync(new URL('../app/api/admin/run-migration/route.js', import.meta.url), 'utf8');
+assert.match(migrationRouteSource, /Runtime migrations are permanently disabled/);
+assert.match(migrationRouteSource, /status:\s*410/);
+assert.doesNotMatch(migrationRouteSource, /exec_sql/);
 
 console.log('foundation tests passed');
