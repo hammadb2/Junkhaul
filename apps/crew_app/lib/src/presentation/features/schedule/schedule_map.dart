@@ -85,7 +85,7 @@ class _ScheduleMapState extends ConsumerState<ScheduleMap> {
           position: LatLng(truckPos.latitude, truckPos.longitude),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
           infoWindow: const InfoWindow(title: 'Your truck'),
-          zIndex: 1,
+          zIndexInt: 1,
         ),
       );
     }
@@ -109,7 +109,7 @@ class _ScheduleMapState extends ConsumerState<ScheduleMap> {
             snippet: b.address ?? '',
           ),
           onTap: () => widget.onJobTap?.call(b),
-          zIndex: isSelected ? 2 : 0,
+          zIndexInt: isSelected ? 2 : 0,
         ),
       );
     }

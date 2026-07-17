@@ -49,7 +49,8 @@ class JobNavigationScreen extends ConsumerStatefulWidget {
   final VoidCallback onArrive;
 
   @override
-  ConsumerState<JobNavigationScreen> createState() => _JobNavigationScreenState();
+  ConsumerState<JobNavigationScreen> createState() =>
+      _JobNavigationScreenState();
 }
 
 class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
@@ -178,9 +179,11 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
         // SDK handles rerouting automatically. No Flutter action needed.
       });
 
-      _newSessionSub = GoogleMapsNavigator.setOnNewNavigationSessionListener(() {
-        // Session refreshed after rerouting or resume.
-      });
+      _newSessionSub = GoogleMapsNavigator.setOnNewNavigationSessionListener(
+        () {
+          // Session refreshed after rerouting or resume.
+        },
+      );
 
       // 3. Enable voice guidance.
       await GoogleMapsNavigator.setAudioGuidance(
@@ -236,7 +239,9 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       return;
     }
-    final fallback = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$encoded&travelmode=driving');
+    final fallback = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$encoded&travelmode=driving',
+    );
     if (await canLaunchUrl(fallback)) {
       await launchUrl(fallback, mode: LaunchMode.externalApplication);
     }
@@ -350,13 +355,15 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
                       _ModeChip(
                         label: 'Turn-by-turn',
                         selected: widget.mode == CrewNavMode.turnByTurn,
-                        onTap: () => widget.onModeChanged(CrewNavMode.turnByTurn),
+                        onTap: () =>
+                            widget.onModeChanged(CrewNavMode.turnByTurn),
                       ),
                       const SizedBox(width: 8),
                       _ModeChip(
                         label: 'Free drive',
                         selected: widget.mode == CrewNavMode.freeDrive,
-                        onTap: () => widget.onModeChanged(CrewNavMode.freeDrive),
+                        onTap: () =>
+                            widget.onModeChanged(CrewNavMode.freeDrive),
                       ),
                     ],
                   ),
@@ -432,7 +439,10 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
                         ),
                         child: Text(
                           _arrived ? 'Arrived' : "I've Arrived",
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -576,7 +586,11 @@ class _NavigationPlaceholder extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.navigation_rounded, size: 48, color: Color(0xFFB7C2BC)),
+              const Icon(
+                Icons.navigation_rounded,
+                size: 48,
+                color: Color(0xFFB7C2BC),
+              ),
               const SizedBox(height: 12),
               Text(
                 reason,
@@ -634,7 +648,11 @@ class _CircleButton extends StatelessWidget {
 }
 
 class _ModeChip extends StatelessWidget {
-  const _ModeChip({required this.label, required this.selected, required this.onTap});
+  const _ModeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
   final String label;
   final bool selected;
   final VoidCallback onTap;

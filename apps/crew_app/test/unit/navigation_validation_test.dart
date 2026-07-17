@@ -45,15 +45,18 @@ void main() {
       expect(hasCoords, isFalse);
     });
 
-    test('job with zero lat/lng is technically valid (equator/prime meridian)', () {
-      final job = _createJob(lat: 0.0, lng: 0.0);
-      // 0.0 is not null, so navigation would attempt to use it.
-      // This is correct behavior — the coordinates are valid.
-      expect(job.customer.lat, 0.0);
-      expect(job.customer.lng, 0.0);
-      final hasCoords = job.customer.lat != null && job.customer.lng != null;
-      expect(hasCoords, isTrue);
-    });
+    test(
+      'job with zero lat/lng is technically valid (equator/prime meridian)',
+      () {
+        final job = _createJob(lat: 0.0, lng: 0.0);
+        // 0.0 is not null, so navigation would attempt to use it.
+        // This is correct behavior — the coordinates are valid.
+        expect(job.customer.lat, 0.0);
+        expect(job.customer.lng, 0.0);
+        final hasCoords = job.customer.lat != null && job.customer.lng != null;
+        expect(hasCoords, isTrue);
+      },
+    );
   });
 
   group('Duplicate-start protection', () {

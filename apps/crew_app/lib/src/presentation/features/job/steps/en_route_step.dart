@@ -47,7 +47,7 @@ class _EnRouteStepState extends State<EnRouteStep> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${widget.job.customer.address}',
+                widget.job.customer.address,
                 style: const TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,

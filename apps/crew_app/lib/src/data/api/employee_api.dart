@@ -29,7 +29,7 @@ class EmployeeApi {
   }
 
   Future<WeeklyScheduleResponse> fetchWeeklySchedule({String? date}) async {
-    final q = {'weekly': 'true', if (date != null) 'date': date};
+    final q = {'weekly': 'true', 'date': ?date};
     final body = await _dio.getJson('/api/employee/schedule', query: q);
     return WeeklyScheduleResponse.fromJson(body);
   }
@@ -44,14 +44,14 @@ class EmployeeApi {
   Future<Map<String, dynamic>> clockIn({double? lat, double? lng}) async {
     return _dio.postJson(
       '/api/employee/clock-in',
-      body: {if (lat != null) 'lat': lat, if (lng != null) 'lng': lng},
+      body: {'lat': ?lat, 'lng': ?lng},
     );
   }
 
   Future<Map<String, dynamic>> clockOut({double? lat, double? lng}) async {
     return _dio.postJson(
       '/api/employee/clock-out',
-      body: {if (lat != null) 'lat': lat, if (lng != null) 'lng': lng},
+      body: {'lat': ?lat, 'lng': ?lng},
     );
   }
 
@@ -84,7 +84,7 @@ class EmployeeApi {
   Future<void> markNotificationRead({String? id, bool markAll = false}) async {
     await _dio.postJson(
       '/api/employee/notifications',
-      body: {if (id != null) 'id': id, if (markAll) 'markAll': true},
+      body: {'id': ?id, if (markAll) 'markAll': true},
     );
   }
 
@@ -107,13 +107,13 @@ class EmployeeApi {
     return _dio.postJson(
       '/api/employee/incidents',
       body: {
-        if (bookingId != null) 'booking_id': bookingId,
+        'booking_id': ?bookingId,
         'incident_type': incidentType,
-        if (severity != null) 'severity': severity,
+        'severity': ?severity,
         'description': description,
-        if (location != null) 'location': location,
-        if (photoUrls != null) 'photo_urls': photoUrls,
-        if (reportedTo != null) 'reported_to': reportedTo,
+        'location': ?location,
+        'photo_urls': ?photoUrls,
+        'reported_to': ?reportedTo,
       },
     );
   }
@@ -156,11 +156,10 @@ class EmployeeApi {
         'facility_id': facilityId,
         'route_id': routeId,
         'route_version': routeVersion,
-        if (bookingId != null) 'booking_id': bookingId,
-        if (itemPhotos != null) 'item_photos': itemPhotos,
-        if (capacityPhotoUrl != null) 'capacity_photo_url': capacityPhotoUrl,
-        if (capacityEstimatePct != null)
-          'capacity_estimate_pct': capacityEstimatePct,
+        'booking_id': ?bookingId,
+        'item_photos': ?itemPhotos,
+        'capacity_photo_url': ?capacityPhotoUrl,
+        'capacity_estimate_pct': ?capacityEstimatePct
       },
     );
   }
@@ -171,10 +170,7 @@ class EmployeeApi {
     String? assignmentId,
     String? date,
   }) async {
-    final q = {
-      if (assignmentId != null) 'assignment_id': assignmentId,
-      if (date != null) 'date': date,
-    };
+    final q = {'assignment_id': ?assignmentId, 'date': ?date};
     final body = await _dio.getJson(
       '/api/employee/receipts',
       query: q.isEmpty ? null : q,
@@ -195,10 +191,10 @@ class EmployeeApi {
       body: {
         'assignment_id': assignmentId,
         'receipt_type': receiptType,
-        if (vendor != null) 'vendor': vendor,
+        'vendor': ?vendor,
         'amount_cad': amountCad,
-        if (receiptPhotoUrl != null) 'receipt_photo_url': receiptPhotoUrl,
-        if (notes != null) 'notes': notes,
+        'receipt_photo_url': ?receiptPhotoUrl,
+        'notes': ?notes,
       },
     );
   }
@@ -233,15 +229,15 @@ class EmployeeApi {
       body: {
         'assignment_id': assignmentId,
         'check_type': checkType,
-        if (dashboardPhotoUrl != null) 'dashboard_photo_url': dashboardPhotoUrl,
-        if (odometerKm != null) 'odometer_km': odometerKm,
-        if (fuelLevel != null) 'fuel_level': fuelLevel,
-        if (fuelPercent != null) 'fuel_percent': fuelPercent,
-        if (truckPhotos != null) 'truck_photos': truckPhotos,
-        if (damageNotes != null) 'damage_notes': damageNotes,
-        if (gasReceiptUrl != null) 'gas_receipt_url': gasReceiptUrl,
-        if (gasAmountCad != null) 'gas_amount_cad': gasAmountCad,
-        if (gasStation != null) 'gas_station': gasStation,
+        'dashboard_photo_url': ?dashboardPhotoUrl,
+        'odometer_km': ?odometerKm,
+        'fuel_level': ?fuelLevel,
+        'fuel_percent': ?fuelPercent,
+        'truck_photos': ?truckPhotos,
+        'damage_notes': ?damageNotes,
+        'gas_receipt_url': ?gasReceiptUrl,
+        'gas_amount_cad': ?gasAmountCad,
+        'gas_station': ?gasStation,
       },
     );
   }
@@ -269,8 +265,7 @@ class EmployeeApi {
       body: {
         'booking_id': bookingId,
         'customer_name_typed': customerNameTyped,
-        if (customerSignatureUrl != null)
-          'customer_signature_url': customerSignatureUrl,
+        'customer_signature_url': ?customerSignatureUrl,
         'amount_confirmed': amountConfirmed,
         'payment_method': paymentMethod,
         'route_id': routeId,
@@ -289,12 +284,7 @@ class EmployeeApi {
   }) async {
     await _dio.postJson(
       '/api/employee/location',
-      body: {
-        'lat': lat,
-        'lng': lng,
-        if (heading != null) 'heading': heading,
-        if (speed != null) 'speed': speed,
-      },
+      body: {'lat': lat, 'lng': lng, 'heading': ?heading, 'speed': ?speed},
     );
   }
 
@@ -312,9 +302,9 @@ class EmployeeApi {
       body: {
         'booking_id': bookingId,
         'issue_type': issueType,
-        if (severity != null) 'severity': severity,
-        if (description != null) 'description': description,
-        if (photoUrl != null) 'photo_url': photoUrl,
+        'severity': ?severity,
+        'description': ?description,
+        'photo_url': ?photoUrl,
       },
     );
   }
@@ -410,7 +400,7 @@ class EmployeeApi {
       'type': photoCategory,
       if (lat != null) 'lat': lat.toString(),
       if (lng != null) 'lng': lng.toString(),
-      if (takenAt != null) 'taken_at': takenAt,
+      'taken_at': ?takenAt,
       'photo': await MultipartFile.fromFile(
         filePath,
         filename:

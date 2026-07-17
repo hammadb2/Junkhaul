@@ -44,8 +44,9 @@ class LocationNotifier extends Notifier<GpsStatus> {
 
   /// Start listening to GPS updates. Call when the schedule screen mounts.
   Future<void> start() async {
-    if (state.state == GpsState.loading || state.state == GpsState.ready)
+    if (state.state == GpsState.loading || state.state == GpsState.ready) {
       return;
+    }
 
     state = const GpsStatus(state: GpsState.loading);
 

@@ -52,8 +52,23 @@ android {
             if (hasKeystore) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            // ProGuard rules for release minification (R8).
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
+}
+
+// The Google Navigation SDK (navigation:7.7.0) already bundles the Google
+// Maps SDK classes (com.google.android.gms.maps.*). When google_maps_flutter
+// is also used, play-services-maps is pulled in transitively, causing
+// duplicate class errors. Exclude play-services-maps from all configurations
+// so only the Navigation SDK's bundled copy is used.
+// See: https://developers.google.com/maps/documentation/navigation/android-sdk/android-studio-setup
+configurations.all {
+    exclude(group = "com.google.android.gms", module = "play-services-maps")
 }
 
 kotlin {
@@ -67,5 +82,8 @@ flutter {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Google Navigation SDK (navigation:7.7.0) requires the NIO desugaring
+    // flavor and desugar_jdk_libs >= 2.1.5. See:
+    // https://d.android.com/r/tools/api-desugaring-flavors
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 }
