@@ -22,6 +22,7 @@
     "20260716000001_crew_photos.sql": "306e76723c68fecc8bd949f820445366d25e648b30b4cdda3740a9966ba236a4",
     "20260716_crew_tracking.sql": "1afc4cd10e7116fe569006121eeb5a84ab1e6fadb6f3c6d52e9ca5ad6c43256c",
     "20260717_customer_tracking.sql": "65a5b41840d59c18a7feb9bb24a8cda7599549c057fd032041bdfbaeeeff55c1",
+    "20260718000001_route_versioning.sql": "461fbbb11d57a776212a68e786280141ab78ef308b65a8d700caa8f8d7ae4c97",
     "20260718_portal_features.sql": "7fa2d3197c8c980fcbcf534e67b636190e98a6b02ee8abdc4226f306bf1e6854",
     "20260719_safety_alerts.sql": "b5af91c02daba563124ea5d68172296608889f68615441bba74fe562b9434c8c",
     "20260720_ab_variant.sql": "68e7d3095cffc8f2fe50f1742a54db1f8e7b2a367dece236c509297ff5c78f0c",
@@ -43,6 +44,8 @@
     "20260727000002_operational_permissions.sql": "c81f06e44ca7f346a5362e39f705c8d4483b26babbbba8009912f13bfdeffe8a",
     "20260727000003_operational_completion.sql": "1abdfdc7090d63647fe71c407c79869b29b8071edc8396956f1018cd6f7e5292",
     "20260728000001_donation_intelligence_dispatch.sql": "b422fad60624c0659e164208758e1c80136488bb3b9cc326311eacc680d1345b",
-    "20260729000001_admin_manager_management.sql": "d91c31bd6feb497572bb22cca6793ce62abd46e6c72bdb6aac09310257b4c2f3"
+    "20260729000001_admin_manager_management.sql": "d91c31bd6feb497572bb22cca6793ce62abd46e6c72bdb6aac09310257b4c2f3",
+    "20260730000001_route_rls_and_audit.sql": "8119ca3ba9b35e5a51e7ae8b3283fcf7c3d68d0420d4f2482d7d80de30a9ef76",
+    "20260730000002_fix_route_rls_for_custom_auth.sql": "6b4672152dbc426ec730e24f6d403c7aa498e74b9560cdb0210a3c314300ac91"
   }
 }

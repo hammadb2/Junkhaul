@@ -8,6 +8,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/app_theme.dart';
 import '../../../../core/secrets.dart';
 import '../../../../domain/models/job.dart';
+import '../../../../domain/models/route_plan.dart';
+import '../../../../domain/providers/route_provider.dart';
+import '../../schedule/route_update_sheet.dart';
 
 enum CrewNavMode { turnByTurn, freeDrive }
 
@@ -59,13 +62,77 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
   StreamSubscription<void>? _newSessionSub;
   String? _initError;
 
-  /// Destination coordinates from the booking's AddressData.
-  double? get _destLat => widget.job.customer.lat;
-  double? get _destLng => widget.job.customer.lng;
+  /// The stop ID currently being navigated to. Used to detect destination
+  /// changes from route updates and prevent duplicate setDestinations calls.
+  String? _currentNavStopId;
+
+  /// The destination coordinates currently being navigated to.
+  double? _currentNavLat;
+  double? _currentNavLng;
+
+  /// Whether a route update changed the destination and we're waiting
+  /// for acknowledgment before switching.
+  bool _awaitingAckForNewDest = false;
+
+  /// Whether the active job was removed by dispatch.
+  bool _activeJobRemoved = false;
+
+  /// Destination coordinates — resolved from the watched route state
+  /// in build(), falling back to the booking's customer coordinates.
+  /// These are set during build() from the reactive RouteState, not
+  /// from ref.read() which could return stale values.
+  double? _resolvedDestLat;
+  double? _resolvedDestLng;
+
+  /// Resolve destination from the watched route state.
+  /// Called once during build() so the values are reactive.
+  void _resolveDestinationFromRoute(CrewRoute? route) {
+    // If we have a current nav destination from a route update, keep it.
+    if (_currentNavLat != null && _currentNavLng != null) {
+      _resolvedDestLat = _currentNavLat;
+      _resolvedDestLng = _currentNavLng;
+      return;
+    }
+
+    // Try to resolve from the watched route state.
+    if (route != null) {
+      final activeId = route.activeStopId;
+      RouteStop? dest;
+      if (activeId != null) {
+        dest = route.orderedStops
+            .where((s) => s.stopId == activeId)
+            .firstOrNull;
+      }
+      dest ??= route.orderedStops
+          .where((s) => s.status == 'upcoming')
+          .firstOrNull;
+
+      if (dest != null && dest.latitude != null && dest.longitude != null) {
+        // Verify it matches the current booking where appropriate.
+        if (dest.bookingId == widget.job.id ||
+            dest.stopId == widget.job.id ||
+            _currentNavStopId == dest.stopId) {
+          _resolvedDestLat = dest.latitude;
+          _resolvedDestLng = dest.longitude;
+          _currentNavStopId ??= dest.stopId;
+          return;
+        }
+      }
+    }
+
+    // Fall back to booking coordinates.
+    _resolvedDestLat = widget.job.customer.lat;
+    _resolvedDestLng = widget.job.customer.lng;
+  }
+
+  double? get _destLat => _resolvedDestLat ?? widget.job.customer.lat;
+  double? get _destLng => _resolvedDestLng ?? widget.job.customer.lng;
 
   @override
   void initState() {
     super.initState();
+    // Destination is resolved in build() from the watched route state.
+    // No ref.read() here — that would return a stale value.
   }
 
   @override
@@ -182,6 +249,51 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final routeState = ref.watch(routeProvider);
+    final route = routeState.route;
+
+    // Resolve destination from the watched route state (reactive).
+    _resolveDestinationFromRoute(route);
+
+    // Check if the active job was removed by dispatch.
+    if (route != null && _currentNavStopId != null) {
+      final stopExists = route.orderedStops.any(
+        (s) => s.stopId == _currentNavStopId,
+      );
+      if (!stopExists && !_activeJobRemoved) {
+        _activeJobRemoved = true;
+      }
+    }
+
+    // Blocking dispatch-resolution screen when active job is removed.
+    if (_activeJobRemoved) {
+      return ActiveJobRemovedScreen(
+        removedJobName: widget.job.customer.name,
+        onContactDispatch: () {
+          final uri = Uri.parse('tel:+15875550100');
+          launchUrl(uri);
+        },
+      );
+    }
+
+    // Check for destination change from route update.
+    if (route != null && _currentNavStopId != null && !_awaitingAckForNewDest) {
+      final newDest = route.orderedStops
+          .where((s) => s.stopId == route.activeStopId)
+          .firstOrNull;
+      if (newDest != null &&
+          newDest.stopId != _currentNavStopId &&
+          route.requiresAcknowledgment &&
+          !route.acknowledged) {
+        // Destination changed and acknowledgment is required.
+        // Do not change navigation before acknowledgment.
+        _awaitingAckForNewDest = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showDestinationChangedSheet(context, route);
+        });
+      }
+    }
+
     final hasApiKey = AppSecrets.googleNavigationApiKey.isNotEmpty;
     final hasCoords = _destLat != null && _destLng != null;
     final canUseNativeNav = hasApiKey && hasCoords;
@@ -191,6 +303,7 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
       body: Stack(
         children: [
           // Native navigation view — created once, stays mounted.
+          // Route updates with the same destination do NOT recreate this view.
           if (canUseNativeNav)
             GoogleMapsNavigationView(
               onViewCreated: _onViewCreated,
@@ -343,6 +456,119 @@ class _JobNavigationScreenState extends ConsumerState<JobNavigationScreen> {
         ],
       ),
     );
+  }
+
+  /// Show the destination-changed sheet when a route update changes
+  /// the active destination. Navigation is NOT changed until acknowledgment.
+  void _showDestinationChangedSheet(BuildContext context, CrewRoute route) {
+    final newDest = route.orderedStops
+        .where((s) => s.stopId == route.activeStopId)
+        .firstOrNull;
+
+    final summary = RouteChangeSummary(
+      newVersion: route.routeVersion,
+      oldVersion: route.routeVersion - 1,
+      changes: [
+        RouteChange(
+          type: 'destination_changed',
+          description: newDest != null
+              ? 'New destination: ${newDest.stopType} stop #${newDest.sequence}'
+              : 'Destination changed',
+        ),
+        if (route.routeChangeReason != null)
+          RouteChange(
+            type: 'route_updated',
+            description: route.routeChangeReason!,
+          ),
+      ],
+      destinationChanged: true,
+      activeJobRemoved: false,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      builder: (sheetContext) => RouteUpdateSheet(
+        summary: summary,
+        route: route,
+        onAcknowledge: () async {
+          Navigator.of(sheetContext).pop();
+          await ref.read(routeProvider.notifier).acknowledgeRoute();
+          // After acknowledgment, apply the new destination.
+          if (mounted) _applyNewDestination(newDest);
+        },
+        onContactDispatch: () {
+          final uri = Uri.parse('tel:+15875550100');
+          launchUrl(uri);
+        },
+        onReviewRoute: () {
+          // Keep the sheet open — just dismiss to see the route.
+          Navigator.of(sheetContext).pop();
+        },
+      ),
+    );
+  }
+
+  /// Apply a new destination after acknowledgment.
+  /// Stops old guidance safely, sets the new destination once, starts
+  /// guidance once. Prevents duplicate requests.
+  Future<void> _applyNewDestination(RouteStop? newDest) async {
+    if (newDest == null ||
+        newDest.latitude == null ||
+        newDest.longitude == null) {
+      return;
+    }
+
+    // Stop old guidance safely.
+    if (_guidanceStarted) {
+      await GoogleMapsNavigator.stopGuidance().catchError((_) {});
+      _guidanceStarted = false;
+    }
+
+    // Set the new destination once.
+    _currentNavStopId = newDest.stopId;
+    _currentNavLat = newDest.latitude;
+    _currentNavLng = newDest.longitude;
+    _awaitingAckForNewDest = false;
+
+    if (_navigationInitialized) {
+      try {
+        final destinations = Destinations(
+          waypoints: [
+            NavigationWaypoint(
+              title: newDest.stopType,
+              target: LatLng(
+                latitude: newDest.latitude!,
+                longitude: newDest.longitude!,
+              ),
+            ),
+          ],
+          displayOptions: NavigationDisplayOptions(
+            showDestinationMarkers: true,
+          ),
+          routingOptions: RoutingOptions(
+            travelMode: NavigationTravelMode.driving,
+            avoidTolls: false,
+            avoidHighways: false,
+          ),
+        );
+
+        final status = await GoogleMapsNavigator.setDestinations(destinations);
+        if (status != NavigationRouteStatus.statusOk) {
+          setState(() => _initError = 'Route calculation failed: $status');
+          return;
+        }
+
+        // Start guidance once.
+        if (!_guidanceStarted) {
+          _guidanceStarted = true;
+          await GoogleMapsNavigator.startGuidance();
+        }
+      } catch (e) {
+        setState(() => _initError = 'Navigation error: $e');
+      }
+    }
   }
 }
 

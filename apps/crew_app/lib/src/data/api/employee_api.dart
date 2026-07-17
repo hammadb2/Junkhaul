@@ -59,11 +59,15 @@ class EmployeeApi {
     required String bookingId,
     required String assignmentId,
     required String action, // 'in' or 'out'
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/employee/job-clock',
       body: {
         'booking_id': bookingId,
+        'route_id': routeId,
+        'route_version': routeVersion,
         'assignment_id': assignmentId,
         'action': action,
       },
@@ -138,6 +142,8 @@ class EmployeeApi {
   Future<Map<String, dynamic>> storageDrop({
     required String assignmentId,
     required String facilityId,
+    required String routeId,
+    required int routeVersion,
     String? bookingId,
     List<String>? itemPhotos,
     String? capacityPhotoUrl,
@@ -148,6 +154,8 @@ class EmployeeApi {
       body: {
         'assignment_id': assignmentId,
         'facility_id': facilityId,
+        'route_id': routeId,
+        'route_version': routeVersion,
         'booking_id': ?bookingId,
         'item_photos': ?itemPhotos,
         'capacity_photo_url': ?capacityPhotoUrl,
@@ -249,6 +257,8 @@ class EmployeeApi {
     String? customerSignatureUrl,
     required double amountConfirmed,
     required String paymentMethod,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/employee/signature',
@@ -258,6 +268,8 @@ class EmployeeApi {
         'customer_signature_url': ?customerSignatureUrl,
         'amount_confirmed': amountConfirmed,
         'payment_method': paymentMethod,
+        'route_id': routeId,
+        'route_version': routeVersion,
       },
     );
   }
@@ -302,19 +314,32 @@ class EmployeeApi {
   Future<Map<String, dynamic>> submitItemConditions({
     required String bookingId,
     required Map<String, String> conditions,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/item-conditions',
-      body: {'booking_id': bookingId, 'conditions': conditions},
+      body: {
+        'booking_id': bookingId,
+        'conditions': conditions,
+        'route_id': routeId,
+        'route_version': routeVersion,
+      },
     );
   }
 
   Future<Map<String, dynamic>> resendPaymentLink({
     required String bookingId,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/resend-payment-link',
-      body: {'booking_id': bookingId},
+      body: {
+        'booking_id': bookingId,
+        'route_id': routeId,
+        'route_version': routeVersion,
+      },
     );
   }
 
@@ -323,10 +348,18 @@ class EmployeeApi {
   Future<Map<String, dynamic>> collectCashPayment({
     required String bookingId,
     required double amount,
+    required String routeId,
+    required int routeVersion,
   }) async {
     return _dio.postJson(
       '/api/crew/collect-payment',
-      body: {'booking_id': bookingId, 'method': 'cash_crew', 'amount': amount},
+      body: {
+        'booking_id': bookingId,
+        'method': 'cash_crew',
+        'amount': amount,
+        'route_id': routeId,
+        'route_version': routeVersion,
+      },
     );
   }
 
@@ -359,6 +392,8 @@ class EmployeeApi {
     double? lat,
     double? lng,
     String? takenAt,
+    required String routeId,
+    required int routeVersion,
   }) async {
     final formData = FormData.fromMap({
       'booking_id': bookingId,
@@ -373,6 +408,8 @@ class EmployeeApi {
         contentType: DioMediaType.parse('image/jpeg'),
       ),
     });
+    formData.fields.add(MapEntry('route_id', routeId));
+    formData.fields.add(MapEntry('route_version', routeVersion.toString()));
     final body = await _dio.postMultipart(
       '/api/crew/upload-photo',
       formData: formData,
@@ -390,6 +427,55 @@ class EmployeeApi {
       return photos.cast<Map<String, dynamic>>();
     }
     return [];
+  }
+
+  // ---- Route Plan ----
+
+  /// Fetch the current canonical route plan.
+  Future<Map<String, dynamic>> getRoutePlan() async {
+    return _dio.getJson('/api/employee/route-plan');
+  }
+
+  /// Acknowledge receipt of a route plan version.
+  /// Includes idempotency_key and created_at for offline queue replay
+  /// and audit trail. The backend uses a unique DB index for idempotency;
+  /// these fields are sent for completeness and offline replay safety.
+  Future<Map<String, dynamic>> acknowledgeRoute({
+    required String routeId,
+    required int routeVersion,
+    String? deviceId,
+    String? idempotencyKey,
+    String? createdAt,
+  }) async {
+    return _dio.postJson(
+      '/api/employee/route-plan',
+      body: {
+        'route_id': routeId,
+        'route_version': routeVersion,
+        'device_id': ?deviceId,
+        'idempotency_key': ?idempotencyKey,
+        'created_at': ?createdAt,
+      },
+    );
+  }
+
+  /// Open an SSE connection to /api/employee/route-stream.
+  ///
+  /// Returns a stream of bytes from the server. The caller parses SSE
+  /// events (event: ... / data: ...). The connection carries the
+  /// jh_employee_session cookie via DioClient's cookie jar.
+  ///
+  /// The server resolves the employee's crew assignment — the client
+  /// never provides an assignment ID as authorization.
+  Future<Response<dynamic>> openRouteStream() async {
+    return _dio.raw.get(
+      '/api/employee/route-stream',
+      options: Options(
+        responseType: ResponseType.stream,
+        headers: {'Accept': 'text/event-stream'},
+        receiveTimeout: const Duration(minutes: 60),
+      ),
+    );
   }
 }
 

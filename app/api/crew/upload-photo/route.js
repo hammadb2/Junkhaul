@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
 import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -32,6 +33,8 @@ export async function POST(req) {
   const lng = formData.get('lng');
   const taken_at = formData.get('taken_at');
   const photo = formData.get('photo');
+  const route_id = formData.get('route_id');
+  const route_version = formData.get('route_version');
 
   if (!booking_id || !type || !photo) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
@@ -42,6 +45,18 @@ export async function POST(req) {
   // compat for the customer portal).
   if (employee && !await isEmployeeAssignedToBooking(employee.id, booking_id)) {
     return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
+  }
+
+  // Stale-write protection: reject if route_version is stale or missing.
+  const routeVersionNum = route_version ? parseInt(route_version, 10) : null;
+  const routeCheck = await checkRouteVersion(booking_id, route_id, routeVersionNum, {
+    isLegacyPinAuth: !employee && pinAuthed,
+    actionType: 'photo_upload',
+    employeeId: employee?.id,
+  });
+  if (!routeCheck.valid) {
+    if (routeCheck.status === 400) return missingVersionResponse();
+    return staleRouteResponse(routeCheck.body);
   }
 
   if (!VALID_TYPES.includes(type)) {

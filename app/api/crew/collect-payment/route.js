@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
 import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
 import { sendSMS } from '@/lib/sms';
+import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
 export const runtime = 'nodejs';
 
@@ -27,7 +28,7 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { booking_id, method, amount } = body;
+  const { booking_id, method, amount, route_id, route_version } = body;
 
   if (!booking_id || !method) {
     return NextResponse.json({ error: 'Missing booking_id or method' }, { status: 400 });
@@ -37,6 +38,17 @@ export async function POST(req) {
   // to this booking's crew. Legacy PIN auth bypasses this check.
   if (employee && !await isEmployeeAssignedToBooking(employee.id, booking_id)) {
     return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
+  }
+
+  // Stale-write protection: reject if route_version is stale or missing.
+  const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
+    isLegacyPinAuth: !employee && pinAuthed,
+    actionType: 'payment',
+    employeeId: employee?.id,
+  });
+  if (!routeCheck.valid) {
+    if (routeCheck.status === 400) return missingVersionResponse();
+    return staleRouteResponse(routeCheck.body);
   }
 
   if (method !== 'cash_crew') {
