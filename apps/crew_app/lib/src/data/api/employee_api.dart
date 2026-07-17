@@ -285,6 +285,19 @@ class EmployeeApi {
     });
   }
 
+  /// Record a cash payment collected by the crew.
+  /// Only for method='cash_crew'. Digital payments go through /pay/[booking_id].
+  Future<Map<String, dynamic>> collectCashPayment({
+    required String bookingId,
+    required double amount,
+  }) async {
+    return _dio.postJson('/api/crew/collect-payment', body: {
+      'booking_id': bookingId,
+      'method': 'cash_crew',
+      'amount': amount,
+    });
+  }
+
   // ---- Onboarding / Profile ----
 
   /// PUT /api/employee/me — update profile fields.

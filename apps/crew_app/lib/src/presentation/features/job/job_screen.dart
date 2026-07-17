@@ -166,6 +166,7 @@ class _JobScreenState extends ConsumerState<JobScreen> {
           cardLast4: null,
           onConfirm: (result) {
             setState(() => _payment = result);
+            _processPayment(result);
             _goTo(_JobStep.load);
           },
         );
@@ -257,6 +258,60 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   /// Get the offline queue service, or null if not ready.
   OfflineQueueService? get _queue {
     return ref.read(offlineQueueProvider).maybeWhen(data: (q) => q, orElse: () => null);
+  }
+
+  /// Process the payment result based on the selected method.
+  /// - Cash: record via /api/crew/collect-payment
+  /// - Card on file: no crew action (Stripe charges via /pay/[booking_id])
+  /// - SMS link: send via /api/crew/resend-payment-link
+  Future<void> _processPayment(PaymentResult result) async {
+    if (widget.bookingId == null) return;
+
+    if (result.method == PaymentMethod.cash) {
+      if (!_isOnline) {
+        _queue?.enqueue(
+          type: 'collect_payment',
+          payload: {
+            'booking_id': widget.bookingId!,
+            'method': 'cash_crew',
+            'amount': result.amount,
+          },
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cash payment saved offline — will sync when online'), duration: Duration(seconds: 3)),
+          );
+        }
+        return;
+      }
+      try {
+        final api = await ref.read(employeeApiProvider.future);
+        await api.collectCashPayment(
+          bookingId: widget.bookingId!,
+          amount: result.amount,
+        );
+      } catch (e) {
+        _showError('Failed to record cash payment: $e');
+      }
+    } else if (result.method == PaymentMethod.smsLink) {
+      // SMS link requires real-time connectivity.
+      if (!_isOnline) {
+        _showError('Cannot send payment link while offline');
+        return;
+      }
+      try {
+        final api = await ref.read(employeeApiProvider.future);
+        await api.resendPaymentLink(bookingId: widget.bookingId!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment link sent to customer'), duration: Duration(seconds: 2)),
+          );
+        }
+      } catch (e) {
+        _showError('Failed to send payment link: $e');
+      }
+    }
+    // Card on file: no crew action needed — Stripe handles via /pay/[booking_id].
   }
 
   /// Upload a captured photo to the backend. Shows a snackbar on failure.

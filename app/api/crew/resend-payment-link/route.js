@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { crewAuth } from '@/lib/crewAuth';
+import { getAuthedEmployee } from '@/lib/employeeAuth';
 import { sendSMS } from '@/lib/sms';
 
 export const runtime = 'nodejs';
 
 // POST /api/crew/resend-payment-link — sends the customer an SMS with a link
 // to the /pay/[booking_id] page where they can pay on their own device.
+//
+// Auth: accepts either the employee session cookie (jh_employee_session)
+// or the legacy x-crew-pin header.
 export async function POST(req) {
-  const authed = await crewAuth(req);
-  if (!authed) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const employee = await getAuthedEmployee(req);
+  const pinAuthed = !employee && await crewAuth(req);
+  if (!employee && !pinAuthed) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   let body;
   try {

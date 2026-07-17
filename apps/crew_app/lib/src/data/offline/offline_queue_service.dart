@@ -103,6 +103,8 @@ class OfflineQueueService {
         return '/api/crew/item-conditions';
       case 'resend_payment_link':
         return '/api/crew/resend-payment-link';
+      case 'collect_payment':
+        return '/api/crew/collect-payment';
       default:
         return null;
     }
