@@ -1,307 +1,183 @@
 import 'package:flutter/material.dart';
-
 import '../../../core/app_theme.dart';
-import '../../../domain/models/booking.dart';
-import '../../../domain/models/schedule.dart';
-import '../../shared/jh_card.dart';
+import '../../../domain/models/job.dart';
+import '../../shared/jh_bottom_sheet_handle.dart';
+import '../../shared/jh_skeleton.dart';
 import '../../shared/jh_status_pill.dart';
 
-/// Draggable bottom sheet that overlays the map showing the job list.
-/// Has three snap sizes: collapsed (just header), half (header + stats + few jobs),
-/// and expanded (full job list).
-class ScheduleBottomSheet extends StatefulWidget {
+/// Draggable sheet over the map: greeting, job count, each job as a card,
+/// and the empty-day state.
+///
+/// TODO(dev): drive [jobs] from your schedule repository/provider; this
+/// widget renders whatever list it's given (including empty) and never
+/// invents sample data itself.
+class ScheduleBottomSheet extends StatelessWidget {
   const ScheduleBottomSheet({
     super.key,
-    required this.schedule,
-    this.employeeName,
-    required this.onJobTap,
+    required this.crewFirstName,
+    required this.jobs,
+    required this.isLoading,
+    required this.onSelectJob,
+    required this.scrollController,
   });
 
-  final DailyScheduleResponse schedule;
-  final String? employeeName;
-  final ValueChanged<Booking> onJobTap;
-
-  @override
-  State<ScheduleBottomSheet> createState() => _ScheduleBottomSheetState();
-}
-
-class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
-  final _dragController = DraggableScrollableController();
-  static const _minSnap = 0.12;
-  static const _halfSnap = 0.5;
-  static const _maxSnap = 0.92;
-
-  @override
-  void dispose() {
-    _dragController.dispose();
-    super.dispose();
-  }
+  final String crewFirstName;
+  final List<Job> jobs;
+  final bool isLoading;
+  final ValueChanged<Job> onSelectJob;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
-    final bookings = widget.schedule.bookings;
-    final completed = bookings.where((b) => b.status == 'completed').length;
-    final remaining = bookings.where((b) => b.status != 'completed').length;
-
-    return NotificationListener<DraggableScrollableNotification>(
-      onNotification: (_) => true,
-      child: DraggableScrollableSheet(
-        controller: _dragController,
-        initialChildSize: _halfSnap,
-        snap: true,
-        snapSizes: const [_minSnap, _maxSnap],
-        minChildSize: _minSnap,
-        maxChildSize: _maxSnap,
-        builder: (context, scrollController) {
-          return Container(
-            decoration: const BoxDecoration(
-              color: AppColors.bgBase,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: CustomScrollView(
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, -4))],
+      ),
+      child: Column(
+        children: [
+          const JhBottomSheetHandle(),
+          Expanded(
+            child: ListView(
               controller: scrollController,
-              slivers: [
-                // Drag handle
-                SliverToBoxAdapter(
-                  child: Center(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.borderSubtle,
-                        borderRadius: BorderRadius.circular(2),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+              children: [
+                if (isLoading) ...[
+                  const JhSkeleton(width: 160, height: 18),
+                  const SizedBox(height: 14),
+                  const JhSkeletonCard(),
+                  const SizedBox(height: 12),
+                  const JhSkeletonCard(),
+                ] else if (jobs.isEmpty)
+                  const _EmptyState()
+                else ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Welcome, $crewFirstName',
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            Text('${jobs.length} job${jobs.length == 1 ? '' : 's'} today',
+                                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ),
-                // Header: assignment + stats
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: _SheetHeader(
-                      schedule: widget.schedule,
-                      employeeName: widget.employeeName,
-                      total: bookings.length,
-                      completed: completed,
-                      remaining: remaining,
-                    ),
-                  ),
-                ),
-                // Job list
-                if (bookings.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: Text('No jobs scheduled for today'),
-                      ),
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final b = bookings[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _SheetJobItem(
-                              booking: b,
-                              onTap: () => widget.onJobTap(b),
-                            ),
-                          );
-                        },
-                        childCount: bookings.length,
-                      ),
-                    ),
-                  ),
-                const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SheetHeader extends StatelessWidget {
-  const _SheetHeader({
-    required this.schedule,
-    this.employeeName,
-    required this.total,
-    required this.completed,
-    required this.remaining,
-  });
-
-  final DailyScheduleResponse schedule;
-  final String? employeeName;
-  final int total;
-  final int completed;
-  final int remaining;
-
-  @override
-  Widget build(BuildContext context) {
-    final assignment = schedule.assignment;
-    final driverName = assignment?.driver?.firstName ?? assignment?.driver?.name ?? 'Unknown';
-    final partnerName = schedule.partner?.firstName ?? schedule.partner?.name ?? 'Solo';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (employeeName != null)
-          Text('Welcome, $employeeName', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            const Icon(Icons.local_shipping_rounded, color: AppColors.accent, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Driver: $driverName · Partner: $partnerName',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _MiniStat(label: 'Total', value: '$total', color: AppColors.textPrimary),
-            const SizedBox(width: 8),
-            _MiniStat(label: 'Done', value: '$completed', color: AppColors.statusGreen),
-            const SizedBox(width: 8),
-            _MiniStat(label: 'Left', value: '$remaining', color: AppColors.statusAmber),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text('Jobs', style: Theme.of(context).textTheme.titleMedium),
-      ],
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({required this.label, required this.value, required this.color});
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 2),
-            Text(label, style: Theme.of(context).textTheme.labelSmall),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SheetJobItem extends StatelessWidget {
-  const _SheetJobItem({required this.booking, required this.onTap});
-  final Booking booking;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = _statusColor(booking.status);
-    final timeStr = booking.timeSlot ?? booking.windowLabel ?? '—';
-    final priceStr = booking.totalPrice != null ? '\$${booking.totalPrice!.toStringAsFixed(0)}' : '';
-
-    return GestureDetector(
-      onTap: onTap,
-      child: JhCard(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(10)),
-                alignment: Alignment.center,
-                child: Text(
-                  timeStr.length > 5 ? timeStr.substring(0, 5) : timeStr,
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(booking.name ?? 'Unknown customer', style: Theme.of(context).textTheme.titleMedium),
-                    if (booking.address != null)
-                      Text(
-                        booking.address!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  JhStatusPill(label: _statusLabel(booking.status), color: statusColor),
-                  if (priceStr.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      priceStr,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                    ),
+                  const SizedBox(height: 14),
+                  for (final job in jobs) ...[
+                    _JobCard(job: job, onTap: () => onSelectJob(job)),
+                    const SizedBox(height: 12),
                   ],
                 ],
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
+}
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'confirmed':
-        return 'Confirmed';
-      case 'scheduled':
-        return 'Scheduled';
-      case 'in_progress':
-        return 'In Progress';
-      case 'completed':
-        return 'Done';
-      default:
-        return status[0].toUpperCase() + status.substring(1);
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(color: AppColors.bgInput, shape: BoxShape.circle),
+            child: const Icon(Icons.checklist_rtl_rounded, color: AppColors.statusGray, size: 28),
+          ),
+          const SizedBox(height: 16),
+          const Text('No jobs scheduled today', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          const SizedBox(height: 6),
+          const Text(
+            'Enjoy the day off — dispatch will text you if anything opens up. Check back tomorrow morning.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JobCard extends StatelessWidget {
+  const _JobCard({required this.job, required this.onTap});
+
+  final Job job;
+  final VoidCallback onTap;
+
+  (String, JhPillTone) get _statusLabel {
+    switch (job.status) {
+      case JobStatus.confirmed:
+        return ('Confirmed', JhPillTone.amber);
+      case JobStatus.inProgress:
+        return ('In Progress', JhPillTone.green);
+      case JobStatus.scheduled:
+        return ('Scheduled', JhPillTone.gray);
+      case JobStatus.complete:
+        return ('Complete', JhPillTone.green);
     }
   }
 
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'completed':
-        return AppColors.statusGreen;
-      case 'in_progress':
-        return AppColors.statusAmber;
-      case 'confirmed':
-      case 'scheduled':
-      default:
-        return AppColors.statusGray;
+  String get _loadLabel {
+    switch (job.loadSize) {
+      case LoadSize.quarter:
+        return 'Quarter load';
+      case LoadSize.half:
+        return 'Half load';
+      case LoadSize.threeQuarter:
+        return 'Three-quarter load';
+      case LoadSize.full:
+        return 'Full load';
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, tone) = _statusLabel;
+    final time = TimeOfDay.fromDateTime(job.scheduledTime).format(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: job.status == JobStatus.confirmed ? AppColors.accent : AppColors.borderSubtle, width: job.status == JobStatus.confirmed ? 1.5 : 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text('$time · ${job.customer.name}',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                ),
+                JhStatusPill(label: label, tone: tone),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(job.customer.address, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(height: 2),
+            Text('$_loadLabel · \$${job.quotedAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          ],
+        ),
+      ),
+    );
   }
 }

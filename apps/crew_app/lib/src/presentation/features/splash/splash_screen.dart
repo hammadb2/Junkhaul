@@ -1,41 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../core/app_theme.dart';
-import '../../../data/repositories/auth_repository.dart';
 
-/// Brief splash shown while [AuthRepository] bootstraps the session cookie
-/// and resolves the initial auth state.
-class SplashScreen extends ConsumerWidget {
-  const SplashScreen({super.key});
+/// First screen on launch. Brief but deserves real attention — every crew
+/// member sees this daily. Auto-advances once auth/session check resolves.
+class SplashScreen extends ConsumerStatefulWidget {
+  const SplashScreen({super.key, this.onReady});
+
+  /// Optional callback once startup checks finish. The router redirect
+  /// handles actual navigation.
+  final VoidCallback? onReady;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authRepositoryProvider);
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
+}
 
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (widget.onReady != null) widget.onReady!();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgBase,
+      backgroundColor: AppColors.accent,
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.local_shipping_rounded,
-              size: 64,
-              color: AppColors.accent,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+              child: const Icon(Icons.local_shipping_outlined, color: AppColors.accent, size: 34),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Junkhaul Crew',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 32),
-            if (auth.status == AuthStatus.unknown)
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+            const SizedBox(height: 18),
+            const Text('JUNKHAUL', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+            const SizedBox(height: 4),
+            Text('CREW', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 2)),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: 120,
+              child: LinearProgressIndicator(
+                backgroundColor: Colors.white.withOpacity(0.3),
+                valueColor: const AlwaysStoppedAnimation(Colors.white),
+                minHeight: 3,
+                borderRadius: BorderRadius.circular(99),
               ),
+            ),
           ],
         ),
       ),

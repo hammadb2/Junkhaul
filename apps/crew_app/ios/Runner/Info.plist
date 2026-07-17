@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Crew App</string>
+	<string>Junkhaul Crew</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>crew_app</string>
+	<string>Junkhaul Crew</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -26,6 +26,29 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Junkhaul Crew needs camera access to capture job site photos, document scans, and driver selfies.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Junkhaul Crew needs photo library access to attach existing photos to job records.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Junkhaul Crew uses your location to show job sites on the map and provide driving directions.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Junkhaul Crew uses your location in the background to track crew location during active jobs and provide turn-by-turn navigation.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Junkhaul Crew uses your location in the background to track crew location during active jobs and provide turn-by-turn navigation.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Junkhaul Crew uses motion data to provide compass heading during navigation.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>ca.junkhaul.crewApp.sync</string>
+		<string>ca.junkhaul.crewApp.location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
