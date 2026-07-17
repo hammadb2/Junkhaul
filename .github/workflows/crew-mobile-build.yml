@@ -215,6 +215,18 @@ jobs:
         working-directory: apps/crew_app
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Disable SPM for plugins with CocoaPods fallback
+        # google_navigation_flutter has both Package.swift (SPM) and a
+        # podspec (CocoaPods). When SPM is used, it fetches GoogleMaps via
+        # SPM while google_maps_flutter_ios fetches GoogleMaps via CocoaPods,
+        # causing 2886 duplicate symbol linker errors. Removing Package.swift
+        # forces the plugin to use its CocoaPods podspec so both plugins
+        # share the same GoogleMaps pod.
+        run: |
+          PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}"
+          find "$PUB_CACHE" -path "*google_navigation_flutter*/Package.swift" -exec rm -f {} \; || true
+          echo "Removed Package.swift from google_navigation_flutter to force CocoaPods integration"
+
       - name: Verify iOS deployment target consistency
         working-directory: apps/crew_app/ios
         run: |
