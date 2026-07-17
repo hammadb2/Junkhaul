@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { sendSMS } from '@/lib/sms';
+import { sendSMS, upsertSmsConsent } from '@/lib/sms';
 import { geocodeAddress } from '@/lib/geocode';
+import { normalizePhone } from '@/lib/phone';
+import { captureAttribution } from '@/lib/attribution';
+import { recordTimelineEvent } from '@/lib/timeline';
 
 export const runtime = 'nodejs';
 
@@ -13,6 +16,7 @@ export async function POST(req) {
   // phone is fine — SMS sending is guarded internally on hasRealPhone.
   if (!session_id) return NextResponse.json({ error: 'session_id required' }, { status: 400 });
   const hasRealPhone = phone && phone !== 'pending';
+  const normalizedPhone = hasRealPhone ? normalizePhone(phone) : null;
 
   if (action === 'init') {
     // For the price_first variant, 'init' may be called with phone='pending'
@@ -20,8 +24,10 @@ export async function POST(req) {
     // In that case we skip the welcome SMS — it's sent later when the real
     // phone is captured (a second 'init' upserts by session_id).
     const leadRow = {
-      phone,
+      phone: normalizedPhone || phone,
+      normalized_phone: normalizedPhone,
       session_id,
+      booking_session_id: session_id,
       source: rest.source || 'web',
       // UTM / click-ID capture at first touch (Step 2)
       utm_source: rest.utm_source || null,
@@ -29,6 +35,8 @@ export async function POST(req) {
       utm_campaign: rest.utm_campaign || null,
       gclid: rest.gclid || null,
       fbclid: rest.fbclid || null,
+      sms_consent_source: rest.sms_consent_source || 'booking_phone_gate',
+      sms_consent_at: hasRealPhone ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     };
     // price_first: the address may already be known at init time, so attach it.
@@ -38,15 +46,69 @@ export async function POST(req) {
       leadRow.ab_variant = rest.ab_variant;
       leadRow.ab_variant_assigned_at = new Date().toISOString();
     }
+    let returningLead = null;
+    if (normalizedPhone) {
+      const { data: existingByPhone } = await supabaseAdmin
+        .from('leads')
+        .select('id, session_id, converted_to_booking_id')
+        .eq('normalized_phone', normalizedPhone)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      returningLead = existingByPhone || null;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('leads')
       .upsert(leadRow, { onConflict: 'session_id' })
       .select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const attr = await captureAttribution({
+      session_id,
+      lead_id: data.id,
+      touch: {
+        source: rest.source || 'web',
+        channel: rest.channel || null,
+        landing_path: rest.landing_path || '/book',
+        referrer: rest.referrer || null,
+        code: rest.code || rest.tracking_code || null,
+        tracking_code: rest.tracking_code || rest.code || null,
+        utm_source: rest.utm_source || null,
+        utm_medium: rest.utm_medium || null,
+        utm_campaign: rest.utm_campaign || null,
+        utm_content: rest.utm_content || null,
+        utm_term: rest.utm_term || null,
+        gclid: rest.gclid || null,
+        fbclid: rest.fbclid || null,
+      },
+    });
+
     if (hasRealPhone) {
-      await sendSMS(phone, `Junk Haul Calgary here! Upload your photos and we'll get you an instant price. Questions? Call or text (587) 325-0751`, null, 'lead_welcome');
+      await upsertSmsConsent({
+        phone: normalizedPhone,
+        consent_source: rest.sms_consent_source || 'booking_phone_gate',
+        consent_at: new Date().toISOString(),
+      });
+      await sendSMS(
+        normalizedPhone,
+        `Junk Haul Calgary here! Upload your photos and we'll get you an instant price. Questions? Call or text (587) 325-0751`,
+        {
+          lead_id: data.id,
+          campaign_id: attr?.last?.campaign_id || null,
+          message_type: 'lead_welcome',
+          workflow_action: 'booking_phone_capture',
+        }
+      );
     }
-    return NextResponse.json({ ok: true, lead_id: data.id });
+    await recordTimelineEvent({
+      entity_type: 'lead',
+      entity_id: data.id,
+      event_type: 'lead_created_or_returned',
+      source: 'booking_flow',
+      metadata: { session_id, returning_lead_id: returningLead?.id || null, ab_variant: rest.ab_variant || null },
+    });
+    return NextResponse.json({ ok: true, lead_id: data.id, returning_lead: Boolean(returningLead) });
   }
 
   if (action === 'update') {
@@ -66,7 +128,19 @@ export async function POST(req) {
       }
     }
 
+    if (rest.current_step) updateData.current_step = rest.current_step;
     await supabaseAdmin.from('leads').update(updateData).eq('session_id', session_id);
+    const { data: leadForEvent } = await supabaseAdmin.from('leads').select('id').eq('session_id', session_id).maybeSingle();
+    if (leadForEvent?.id) {
+      await recordTimelineEvent({
+        entity_type: 'lead',
+        entity_id: leadForEvent.id,
+        event_type: 'lead_updated',
+        source: 'booking_flow',
+        after: updateData,
+        metadata: { session_id },
+      });
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -103,7 +177,20 @@ export async function POST(req) {
     }
 
     if (ai_price_estimate && hasRealPhone) {
-      await sendSMS(phone, `Your Junk Haul Calgary quote: $${ai_price_estimate}. $50 deposit locks in your slot. Book here: https://junkhaul.ca/book — quote valid 48 hrs.`, null, 'lead_price_reveal');
+      await sendSMS(
+        normalizedPhone || phone,
+        `Your Junk Haul Calgary quote: $${ai_price_estimate}. $50 deposit locks in your slot. Book here: https://junkhaul.ca/book — quote valid 48 hrs.`,
+        { lead_id: leadRow?.id || null, message_type: 'lead_price_reveal', workflow_action: 'price_reveal' }
+      );
+    }
+    if (leadRow?.id) {
+      await recordTimelineEvent({
+        entity_type: 'lead',
+        entity_id: leadRow.id,
+        event_type: 'quote_revealed',
+        source: 'booking_flow',
+        metadata: { ai_price_estimate, load_size, photo_count: photos?.length || 0 },
+      });
     }
     return NextResponse.json({ ok: true });
   }
@@ -124,11 +211,38 @@ export async function POST(req) {
       stepUpdate.ab_variant_assigned_at = new Date().toISOString();
     }
     await supabaseAdmin.from('leads').update(stepUpdate).eq('session_id', session_id).catch(() => {});
+    const { data: leadForStep } = await supabaseAdmin.from('leads').select('id').eq('session_id', session_id).maybeSingle();
+    if (leadForStep?.id) {
+      await supabaseAdmin.from('funnel_events').insert({
+        session_id,
+        lead_id: leadForStep.id,
+        event_type: 'booking_step',
+        step: step_name,
+        metadata: { ab_variant: rest.ab_variant || null },
+      }).catch(() => {});
+      await recordTimelineEvent({
+        entity_type: 'lead',
+        entity_id: leadForStep.id,
+        event_type: 'booking_step',
+        source: 'booking_flow',
+        metadata: { step: step_name, session_id },
+      });
+    }
     return NextResponse.json({ ok: true });
   }
 
   if (action === 'convert') {
+    const { data: leadForConvert } = await supabaseAdmin.from('leads').select('id').eq('session_id', session_id).maybeSingle();
     await supabaseAdmin.from('leads').update({ converted_to_booking_id: rest.booking_id, updated_at: new Date().toISOString() }).eq('session_id', session_id);
+    if (leadForConvert?.id) {
+      await recordTimelineEvent({
+        entity_type: 'lead',
+        entity_id: leadForConvert.id,
+        event_type: 'converted_to_booking',
+        source: 'booking_flow',
+        metadata: { booking_id: rest.booking_id },
+      });
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -136,7 +250,8 @@ export async function POST(req) {
     // Customer is outside our service area — save their info so we can
     // reach out when we expand. Still valuable as a lead.
     const leadData = {
-      phone,
+      phone: normalizedPhone || phone,
+      normalized_phone: normalizedPhone,
       session_id,
       source: rest.source || 'web',
       name: rest.name || null,
@@ -167,8 +282,7 @@ export async function POST(req) {
       await sendSMS(
         process.env.HAMMAD_PHONE || '+18259458282',
         `Out-of-area lead: ${rest.name || 'Unknown'} at ${rest.address || 'unknown address'}. Phone: ${phone}. They want service when we expand.`,
-        null,
-        'out_of_area_lead'
+        { message_type: 'out_of_area_lead', workflow_action: 'operator_alert' }
       );
     } catch {
       // best-effort
