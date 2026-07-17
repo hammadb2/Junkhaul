@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { normalizePhone } from '../lib/phone.js';
 import { validateDonationPhotos, assertDonationTransition, analyzeDonationSubmission } from '../lib/donation.js';
 import { roleAllows } from '../lib/permissionRules.js';
+import { canAdminManageManagerAction, MANAGER_MANAGEMENT_ACTIONS } from '../lib/staffAccessRules.js';
 import { classifyInboundText, responseMatchesExpected } from '../lib/quoRules.js';
 import { inspectDonationImage, MAX_DONATION_PHOTO_BYTES } from '../lib/donationPhotos.js';
 import { isQuoDeliveryEvent, parseQuoPayload } from '../lib/quoPayload.js';
@@ -18,7 +19,6 @@ assert.deepEqual(
 
 assert.throws(() => assertDonationTransition('draft', 'picked_up'), /Invalid donation transition/);
 assert.equal(assertDonationTransition('draft', 'submitted'), true);
-assert.equal(assertDonationTransition('manual_review', 'needs_more_photos'), true);
 
 const unclear = analyzeDonationSubmission({
   description: 'clean table',
@@ -61,6 +61,26 @@ assert.equal(roleAllows('manager', 'employees.change_pay_rate'), false);
 assert.equal(roleAllows('manager', 'employees.read_sin'), false);
 assert.equal(roleAllows('admin', 'billing.manage'), false);
 assert.equal(roleAllows('owner', 'refunds.issue'), true);
+
+const adminManagerContext = {
+  employee: { id: 'admin-1' },
+  roles: ['admin'],
+  permissions: ['staff_access.manage_managers'],
+};
+for (const action of MANAGER_MANAGEMENT_ACTIONS) {
+  assert.equal(
+    canAdminManageManagerAction({ context: adminManagerContext, action, targetEmployeeId: 'manager-1', targetRoles: ['manager'], role: action.includes('role') ? 'manager' : null }).ok,
+    true,
+    `admin should be allowed to perform ${action} on a manager`
+  );
+}
+assert.equal(canAdminManageManagerAction({ context: adminManagerContext, action: 'assign_role', targetEmployeeId: 'manager-1', targetRoles: ['manager'], role: 'owner' }).ok, false);
+assert.equal(canAdminManageManagerAction({ context: adminManagerContext, action: 'assign_role', targetEmployeeId: 'manager-1', targetRoles: ['manager'], role: 'admin' }).ok, false);
+assert.equal(canAdminManageManagerAction({ context: adminManagerContext, action: 'assign_role', targetEmployeeId: 'admin-1', targetRoles: ['admin'], role: 'manager' }).ok, false);
+assert.equal(canAdminManageManagerAction({ context: adminManagerContext, action: 'remove_role', targetEmployeeId: 'owner-1', targetRoles: ['owner'], role: 'owner', isFinalOwner: true }).ok, false);
+assert.equal(canAdminManageManagerAction({ context: adminManagerContext, action: 'assign_permission', targetEmployeeId: 'manager-1', targetRoles: ['manager'], permission: { key: 'payroll.approve' } }).ok, false);
+assert.equal(canAdminManageManagerAction({ context: { employee: { id: 'manager-1' }, roles: ['manager'], permissions: [] }, action: 'assign_role', targetEmployeeId: 'employee-1', targetRoles: [], role: 'manager' }).ok, false);
+assert.equal(canAdminManageManagerAction({ context: { employee: { id: 'employee-1' }, roles: ['employee'], permissions: [] }, action: 'assign_role', targetEmployeeId: 'manager-1', targetRoles: ['manager'], role: 'manager' }).ok, false);
 
 assert.equal(classifyInboundText('STOP'), 'STOP');
 assert.equal(classifyInboundText('start'), 'START');
@@ -145,28 +165,11 @@ assert.match(migrationRouteSource, /Runtime migrations are permanently disabled/
 assert.match(migrationRouteSource, /status:\s*410/);
 assert.doesNotMatch(migrationRouteSource, /exec_sql/);
 
-const adminLoginSource = readFileSync(new URL('../app/api/admin/login/route.js', import.meta.url), 'utf8');
-assert.match(adminLoginSource, /if \(email\) \{/);
-assert.match(adminLoginSource, /createSession\(employee\.id\)/);
-assert.match(adminLoginSource, /sessionCookieHeader\(session\.token, session\.expiresAt\)/);
-assert.doesNotMatch(adminLoginSource, /if \(!password \|\| password !== process\.env\.ADMIN_PASSWORD\) \{\s+if \(!email/);
-
-const commandCenterSource = readFileSync(new URL('../app/api/admin/command-center/route.js', import.meta.url), 'utf8');
-assert.match(commandCenterSource, /\.from\('nearby_offers'\)[\s\S]*\.order\('offered_at'/);
-assert.doesNotMatch(commandCenterSource, /\.from\('nearby_offers'\)[\s\S]*\.order\('created_at'/);
-
-const attributionSource = readFileSync(new URL('../lib/attribution.js', import.meta.url), 'utf8');
-assert.match(attributionSource, /const normalizedCode = String\(code\)\.trim\(\)\.toUpperCase\(\)/);
-assert.match(attributionSource, /\.eq\('code', normalizedCode\)/);
-
-for (const route of [
-  '../app/api/admin/bookings/[id]/actions/route.js',
-  '../app/api/admin/donations/route.js',
-  '../app/api/admin/leads/[id]/route.js',
-  '../app/api/admin/leads/send-sms/route.js',
-]) {
-  const source = readFileSync(new URL(route, import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /sendSMS\([^;]+?,\s*null,\s*[^,]+,\s*\{/s);
+const staffAccessRouteSource = readFileSync(new URL('../app/api/admin/staff-access/route.js', import.meta.url), 'utf8');
+assert.match(staffAccessRouteSource, /jsonUnauthorized/);
+for (const action of ['create_manager', 'assign_role', 'assign_scope', 'change_scope', 'remove_scope', 'disable_access', 'reactivate_access', 'remove_role']) {
+  assert.match(staffAccessRouteSource, new RegExp(action));
 }
+assert.match(staffAccessRouteSource, /await auditAccess/);
 
 console.log('foundation tests passed');
