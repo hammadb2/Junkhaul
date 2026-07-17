@@ -48,6 +48,24 @@ export async function POST(req) {
     return NextResponse.json({ error: `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}` }, { status: 400 });
   }
 
+  // File size limit: 15 MB max (photos are compressed client-side to ~1920px).
+  const MAX_FILE_SIZE = 15 * 1024 * 1024;
+  if (photo.size && photo.size > MAX_FILE_SIZE) {
+    return NextResponse.json(
+      { error: `File too large: ${photo.size} bytes (max ${MAX_FILE_SIZE})` },
+      { status: 413 }
+    );
+  }
+
+  // MIME type verification: accept only image/jpeg (client compresses to JPEG).
+  // Also check the file's reported type, not just the hardcoded contentType.
+  if (photo.type && !photo.type.startsWith('image/')) {
+    return NextResponse.json(
+      { error: `Invalid file type: ${photo.type}. Only images are allowed.` },
+      { status: 400 }
+    );
+  }
+
   const fileExt = 'jpg';
   const fileName = `${type}_${Date.now()}.${fileExt}`;
   const filePath = `crew/${booking_id}/${fileName}`;

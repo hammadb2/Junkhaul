@@ -74,7 +74,14 @@ export async function POST(req) {
 
   const now = new Date().toISOString();
 
-  const { error: updateErr } = await supabaseAdmin
+  // Atomic conditional update: only update if payment_status is still
+  // pending/unpaid/null. This prevents race conditions where two requests
+  // pass the read check above simultaneously. If 0 rows are updated,
+  // another request already collected the payment.
+  //
+  // We use .in() for non-null values and .is() for null, combined via .or().
+  // Postgres IN clause does not match NULL, so we need the explicit .is() check.
+  const { data: updated, error: updateErr } = await supabaseAdmin
     .from('bookings')
     .update({
       payment_status: 'cash_crew',
@@ -86,10 +93,21 @@ export async function POST(req) {
       review_requested: true,
       review_requested_at: now,
     })
-    .eq('id', booking_id);
+    .eq('id', booking_id)
+    .or('payment_status.in.(pending,unpaid),payment_status.is.null')
+    .select('id');
 
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
+
+  // If no rows were updated, the payment was already collected by a
+  // concurrent request (race condition won the read check but lost the update).
+  if (!updated || updated.length === 0) {
+    return NextResponse.json(
+      { error: 'Booking already paid (concurrent update prevented)' },
+      { status: 409 }
+    );
   }
 
   // Send receipt email (via the existing email system)
