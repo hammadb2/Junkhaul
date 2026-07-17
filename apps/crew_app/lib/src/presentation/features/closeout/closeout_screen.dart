@@ -58,7 +58,7 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
                 loading: () => const Center(
                   child: CircularProgressIndicator(color: AppColors.accent),
                 ),
-                error: (_, __) => _buildError(context),
+                error: (_, _) => _buildError(context),
                 data: (schedule) =>
                     _buildContent(context, schedule, queuedCount),
               ),
@@ -227,7 +227,7 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
           JhPrimaryButton(
             label: _clockingOut ? 'Clocking out…' : 'Clock Out & Finish',
             icon: Icons.logout_rounded,
-            onPressed: _clockingOut ? null : () => _clockOut(context),
+            onPressed: _clockingOut ? null : _clockOut,
           )
         else
           JhPrimaryButton(
@@ -239,7 +239,7 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
     );
   }
 
-  Future<void> _clockOut(BuildContext context) async {
+  Future<void> _clockOut() async {
     setState(() => _clockingOut = true);
     try {
       final api = await ref.read(employeeApiProvider.future);

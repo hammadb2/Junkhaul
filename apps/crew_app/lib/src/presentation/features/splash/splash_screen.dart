@@ -59,7 +59,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             Text(
               'CREW',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 2,
@@ -69,7 +69,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             SizedBox(
               width: 120,
               child: LinearProgressIndicator(
-                backgroundColor: Colors.white.withOpacity(0.3),
+                backgroundColor: Colors.white.withValues(alpha: 0.3),
                 valueColor: const AlwaysStoppedAnimation(Colors.white),
                 minHeight: 3,
                 borderRadius: BorderRadius.circular(99),

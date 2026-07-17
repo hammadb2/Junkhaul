@@ -26,7 +26,7 @@ class JhPrimaryButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
-          disabledBackgroundColor: AppColors.accent.withOpacity(0.5),
+          disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
