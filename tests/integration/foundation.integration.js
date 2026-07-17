@@ -50,7 +50,6 @@ const denyFragments = [
   'mvsopvphpuucrbuqsfky',
   'aws-0-us-east-1.pooler.supabase.com',
   'supabase.com/dashboard/project/mvsopvphpuucrbuqsfky',
-  'gpyooSTnLW56DGmn',
 ];
 
 for (const value of [dbUrl, supabaseUrl, testProjectRef, approvedProjectRef].filter(Boolean)) {
