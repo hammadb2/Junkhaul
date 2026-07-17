@@ -1,0 +1,12 @@
+{
+  "type": "message.received",
+  "data": {
+    "id": "quo_stop_001",
+    "direction": "inbound",
+    "from": "+15873250751",
+    "to": "+15870000000",
+    "content": "STOP",
+    "status": "received",
+    "createdAt": "2026-07-16T18:01:00.000Z"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "message.failed",
+  "data": {
+    "id": "quo_outbound_failed_001",
+    "direction": "outbound",
+    "from": "+15870000000",
+    "to": "+15873250751",
+    "content": "Your pickup request needs more photos.",
+    "status": "failed",
+    "error": "carrier_rejected",
+    "createdAt": "2026-07-16T18:03:00.000Z"
+  }
+}
