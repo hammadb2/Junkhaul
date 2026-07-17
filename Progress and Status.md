@@ -11,6 +11,22 @@
 
 This section supersedes broad claims below such as “everything built.” Status values used here are only `COMPLETE_AND_VERIFIED`, `BUILT_NOT_VERIFIED`, `PARTIAL`, `NOT_BUILT`.
 
+### Operational admin command centre phase
+
+- Status: `PARTIAL`
+- Repository path: `lib/staffAuth.js`, `lib/permissions.js`, `lib/permissionRules.js`, `app/api/admin/payroll/*`, `app/api/admin/crew/*`, `app/api/admin/employee-docs/route.js`, `app/api/admin/remittance/route.js`, `app/api/admin/t4s/route.js`, `app/api/admin/config/route.js`, `app/api/admin/stripe-branding/route.js`, `app/api/admin/bookings/[id]/actions/route.js`, `app/api/admin/campaigns/route.js`, `app/api/admin/communications/route.js`, `app/api/admin/manager-dashboard/route.js`, `components/admin/*`
+- API: staff-session permission enforcement for selected high-risk admin routes; Booking Detail action API; campaign CRUD API; communications dashboard API; manager dashboard API; enhanced lead and donation admin APIs.
+- Database table: `permissions`, `staff_role_permissions`, `staff_role_assignments`, `manager_scopes`, `audit_events`, `timeline_events`, campaign tables, lead operational columns.
+- Admin visibility: `PARTIAL`; Booking Detail, Leads, Marketing, Communications, Donations and Manager Ops are reachable in admin.
+- Manager visibility: `PARTIAL`; manager dashboard and scoped booking action tests exist, but full manager daily-run workflow is not complete.
+- Quo integration: `PARTIAL`; Booking/Lead/Donation/Communications actions use central Quo sender where customer SMS is sent.
+- Vapi integration: `PARTIAL`; shared records are visible where linked, but no broad Vapi expansion was built.
+- App impact: `APP_READS_THIS`, `APP_WRITES_THIS`, `APP_REQUIRES_NEW_WORKFLOW`; Flutter work intentionally deferred.
+- Tests: `COMPLETE_AND_VERIFIED` for the operational integration cases added to `tests/integration/foundation.integration.js`: staff permission denial/audit, manager-scoped booking note action, campaign CRUD duplicate/reassignment rejection, and communications visibility.
+- Manual verification: `COMPLETE_AND_VERIFIED` for Node 22.23.1 / npm 10.9.8 `npm test`, `npm run test:integration`, `npm run lint`, `npm run build`, and `npm run migrations:check`.
+- Production status: `BUILT_NOT_VERIFIED`; operational migration `20260727000002_operational_permissions.sql` was applied to the approved Supabase environment for verification and added to the migration manifest. Branch is not merged.
+- Known gaps: not every legacy `/api/admin/**` route has been migrated from shared-cookie auth; Booking Detail UI exposes JSON-based controls rather than polished forms; campaign CRUD is functional but not a full bulk import/QR management suite; manager dashboard is an operational queue foundation, not full daily closeout.
+
 ### Customer website / paid booking flow
 
 - Status: `BUILT_NOT_VERIFIED`
@@ -63,17 +79,17 @@ This section supersedes broad claims below such as “everything built.” Statu
 
 - Status: `PARTIAL`
 - Repository path: `app/api/admin/marketing/route.js`, `components/admin/MarketingPanel.js`
-- API: `/api/admin/marketing`
+- API: `/api/admin/marketing`, `/api/admin/campaigns`
 - Database table: campaign and attribution tables above.
-- Admin visibility: `PARTIAL`; report metrics are visible but creation/editing and full breakdown filters are not finished.
-- Manager visibility: `NOT_BUILT`
+- Admin visibility: `PARTIAL`; report metrics and CRUD for campaigns/batches/tracking codes are visible.
+- Manager visibility: `PARTIAL`; manager-safe reporting visibility exists through admin shell, full scope filtering remains.
 - Quo integration: `PARTIAL`
 - Vapi integration: `PARTIAL`
 - App impact: `NO_APP_IMPACT`
-- Tests: `NOT_BUILT` for admin route aggregation.
-- Manual verification: `BUILT_NOT_VERIFIED`
+- Tests: `COMPLETE_AND_VERIFIED` for campaign CRUD duplicate/reassignment route behavior; admin route aggregation remains `PARTIAL`.
+- Manual verification: `COMPLETE_AND_VERIFIED` for CRUD route behavior in integration.
 - Production status: `PARTIAL`
-- Known gaps: profit per hanger uses collected revenue minus campaign cost only; full job-cost profit is not wired.
+- Known gaps: profit per hanger uses collected revenue minus campaign cost only; full job-cost profit is not wired. Bulk QR generation and distributor import workflows remain `NOT_BUILT`.
 
 ### Free donation-only pickup
 
@@ -110,34 +126,34 @@ This section supersedes broad claims below such as “everything built.” Statu
 ### Booking Detail workspace
 
 - Status: `PARTIAL`
-- Repository path: `components/admin/BookingDetailView.js`, `app/api/admin/bookings/[id]/detail/route.js`
-- API: `/api/admin/bookings/[id]/detail`
+- Repository path: `components/admin/BookingDetailView.js`, `app/api/admin/bookings/[id]/detail/route.js`, `app/api/admin/bookings/[id]/actions/route.js`
+- API: `/api/admin/bookings/[id]/detail`, `/api/admin/bookings/[id]/actions`
 - Database table: `bookings`, `leads`, `quote_price_ledger`, `timeline_events`, `audit_events`, `messages`, `attribution_records`, `phone_calls`, `service_requests`, `refund_requests`
-- Admin visibility: `PARTIAL`; read workspace exists by booking UUID.
-- Manager visibility: `NOT_BUILT`
+- Admin visibility: `PARTIAL`; read workspace and action panel exist by booking UUID.
+- Manager visibility: `PARTIAL`; scoped manager action path is implemented and integration-tested.
 - Quo integration: `PARTIAL`; communications section reads linked messages.
 - Vapi integration: `PARTIAL`; calls are included where linked.
 - App impact: `APP_READS_THIS` for future crew context.
-- Tests: `NOT_BUILT` for route response shape.
-- Manual verification: `BUILT_NOT_VERIFIED`
+- Tests: `COMPLETE_AND_VERIFIED` for scoped manager note action, employee denial, audit/timeline creation. Full matrix for every action remains `PARTIAL`.
+- Manual verification: `COMPLETE_AND_VERIFIED` for tested action path.
 - Production status: `PARTIAL`
-- Known gaps: admin action buttons/endpoints for assign/reschedule/correct/review/send/cancel/escalate are not fully implemented.
+- Known gaps: action endpoint supports assignment, truck, schedule, address/property correction, notes, customer SMS templates, flags, escalation and cancellation-without-refund, but UI is still JSON-based and not every action has an integration case.
 
 ### Manager-role foundation
 
 - Status: `PARTIAL`
-- Repository path: `lib/permissions.js`, `lib/permissionRules.js`
-- API: not fully exposed yet.
+- Repository path: `lib/permissions.js`, `lib/permissionRules.js`, `lib/staffAuth.js`, `app/api/admin/manager-dashboard/route.js`, `components/admin/ManagerDashboard.js`
+- API: `/api/admin/manager-dashboard`, selected sensitive admin routes, Booking Detail action route.
 - Database table: `staff_roles`, `permissions`, `staff_role_permissions`, `staff_role_assignments`, `manager_scopes`
-- Admin visibility: `NOT_BUILT`
-- Manager visibility: `NOT_BUILT`
+- Admin visibility: `PARTIAL`
+- Manager visibility: `PARTIAL`
 - Quo integration: `NOT_BUILT`
 - Vapi integration: `NOT_BUILT`
 - App impact: `APP_REQUIRES_NEW_WORKFLOW`
-- Tests: `PARTIAL`; manager denial rules tested.
-- Manual verification: `BUILT_NOT_VERIFIED`
+- Tests: `COMPLETE_AND_VERIFIED` for owner-only/admin/manager/employee denial behavior and manager scoped booking action. Full sensitive-route matrix remains `PARTIAL`.
+- Manual verification: `COMPLETE_AND_VERIFIED` for tested routes.
 - Production status: `PARTIAL`; owner/admin role assignment seed required.
-- Known gaps: existing admin APIs still use admin cookie only except the runtime migration endpoint, which is now permanently disabled. Permission enforcement must be rolled through high-risk action routes.
+- Known gaps: many lower-risk legacy admin routes still use shared admin cookie. Highest-risk payroll/pay-rate/employee-doc/SIN/T4/remittance/config/billing routes are migrated, but role-assignment and permission-assignment UIs are still `NOT_BUILT`.
 
 ### Timeline and audit architecture
 

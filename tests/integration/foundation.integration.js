@@ -105,6 +105,10 @@ const runId = `it_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 const sessionId = `${runId}_session`;
 const phone = `+1587${String(Date.now()).slice(-7)}`;
 const headers = { 'content-type': 'application/json' };
+const ownerSession = `${runId}_owner_session`;
+const adminSession = `${runId}_admin_session`;
+const managerSession = `${runId}_manager_session`;
+const employeeSession = `${runId}_employee_session`;
 
 async function appFetch(path, options = {}) {
   const res = await fetch(`${appBaseUrl.replace(/\/$/, '')}${path}`, {
@@ -180,7 +184,10 @@ async function cleanup() {
     () => supabase.from('donation_requests').delete().eq('session_id', sessionId),
     () => supabase.from('leads').delete().eq('session_id', sessionId),
     () => supabase.from('bookings').delete().like('booking_ref', `${runId}%`),
+    () => supabase.from('employee_sessions').delete().in('token', [ownerSession, adminSession, managerSession, employeeSession]),
+    () => supabase.from('employees').delete().like('email', `${runId}%@example.test`),
     () => supabase.from('campaign_tracking_codes').delete().eq('code', 'DH-COV-001'),
+    () => supabase.from('campaign_tracking_codes').delete().eq('code', `${runId.toUpperCase()}-CODE`),
     () => supabase.from('campaign_batches').delete().like('name', `${runId}%`),
     () => supabase.from('marketing_campaigns').delete().like('name', `${runId}%`),
   ];
@@ -451,6 +458,103 @@ try {
   assert.ok(delivered.delivered_at);
   assert.equal(delivered.provider_event_id, `${runId}_delivery_event`);
 
+  const { data: roleRows } = await supabase.from('staff_roles').select('id,name');
+  const roleByName = new Map((roleRows || []).map((r) => [r.name, r.id]));
+  const makeEmployee = async (role, token) => {
+    const { data: employee, error } = await supabase.from('employees').insert({
+      email: `${runId}_${role}@example.test`,
+      password_hash: 'integration-test',
+      name: `${role} Integration`,
+      status: 'active',
+      pay_rate: 25,
+    }).select().single();
+    assert.equal(error, null, `employee seed failed for ${role}: ${error?.message}`);
+    await supabase.from('staff_role_assignments').insert({ employee_id: employee.id, role_id: roleByName.get(role) }).throwOnError();
+    await supabase.from('employee_sessions').insert({
+      token,
+      employee_id: employee.id,
+      expires_at: new Date(Date.now() + 3600_000).toISOString(),
+    }).throwOnError();
+    return employee;
+  };
+  const owner = await makeEmployee('owner', ownerSession);
+  const admin = await makeEmployee('admin', adminSession);
+  const manager = await makeEmployee('manager', managerSession);
+  const employee = await makeEmployee('employee', employeeSession);
+  const cookieFor = (token) => ({ cookie: `jh_employee_session=${token}` });
+
+  const unauthPayroll = await appFetch('/api/admin/payroll/approve', { method: 'POST', headers, body: JSON.stringify({ pay_run_id: crypto.randomUUID() }) });
+  assert.equal(unauthPayroll.res.status, 401, 'Unauthenticated sensitive admin route must return 401.');
+  const adminPayroll = await appFetch('/api/admin/payroll/approve', { method: 'POST', headers: { ...headers, ...cookieFor(adminSession) }, body: JSON.stringify({ pay_run_id: crypto.randomUUID() }) });
+  assert.equal(adminPayroll.res.status, 403, 'Admin must be blocked from owner-only payroll approval.');
+  const managerPayroll = await appFetch('/api/admin/payroll/approve', { method: 'POST', headers: { ...headers, ...cookieFor(managerSession) }, body: JSON.stringify({ pay_run_id: crypto.randomUUID() }) });
+  assert.equal(managerPayroll.res.status, 403, 'Manager must be blocked from owner-only payroll approval.');
+  const employeePayroll = await appFetch('/api/admin/payroll/approve', { method: 'POST', headers: { ...headers, ...cookieFor(employeeSession) }, body: JSON.stringify({ pay_run_id: crypto.randomUUID() }) });
+  assert.equal(employeePayroll.res.status, 403, 'Employee must be blocked from admin payroll approval.');
+  const { count: deniedAuditCount } = await supabase.from('audit_events').select('id', { count: 'exact', head: true }).eq('event_type', 'sensitive_action_denied').eq('actor_id', admin.id);
+  assert.ok(deniedAuditCount >= 1, 'Denied sensitive attempt must be audited.');
+
+  const { data: booking } = await supabase.from('bookings').insert({
+    booking_ref: `${runId}-BOOK`,
+    name: 'Integration Booking',
+    phone,
+    address: '123 Test Ave',
+    load_size: 'quarter',
+    base_price: 150,
+    total_price: 150,
+    balance_due: 100,
+    job_date: new Date(Date.now() + 86400_000).toISOString().slice(0, 10),
+    job_time: '09:00',
+    status: 'confirmed',
+    lead_id: leadId,
+  }).select().single();
+  await supabase.from('manager_scopes').insert({ employee_id: manager.id, scope_type: 'booking', scope_value: booking.id }).throwOnError();
+  const noteAction = await appFetch(`/api/admin/bookings/${booking.id}/actions`, {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(managerSession) },
+    body: JSON.stringify({ action: 'add_internal_note', payload: { note: `${runId} manager note` } }),
+  });
+  assert.equal(noteAction.res.status, 200, noteAction.text);
+  const { count: bookingTimelineCount } = await supabase.from('timeline_events').select('id', { count: 'exact', head: true }).eq('entity_type', 'booking').eq('entity_id', booking.id).eq('event_type', 'add_internal_note');
+  assert.equal(bookingTimelineCount, 1, 'Booking action must create timeline event.');
+  const outOfScope = await appFetch(`/api/admin/bookings/${booking.id}/actions`, {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(employeeSession) },
+    body: JSON.stringify({ action: 'add_internal_note', payload: { note: 'blocked' } }),
+  });
+  assert.equal(outOfScope.res.status, 403, 'Employee must be blocked from booking action.');
+
+  const campaignCreate = await appFetch('/api/admin/campaigns', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ type: 'campaign', name: `${runId} admin campaign`, channel: 'offline', source: 'door_hanger' }),
+  });
+  assert.equal(campaignCreate.res.status, 201, campaignCreate.text);
+  const campaignId = campaignCreate.json.campaign.id;
+  const codeCreate = await appFetch('/api/admin/campaigns', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ type: 'tracking_code', campaign_id: campaignId, code: `${runId}-code`, destination_path: '/book/hanger' }),
+  });
+  assert.equal(codeCreate.res.status, 201, codeCreate.text);
+  assert.equal(codeCreate.json.tracking_code.code, `${runId.toUpperCase()}-CODE`);
+  const duplicateCode = await appFetch('/api/admin/campaigns', {
+    method: 'POST',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ type: 'tracking_code', campaign_id: campaignId, code: `${runId}-code`, destination_path: '/book/hanger' }),
+  });
+  assert.equal(duplicateCode.res.status, 409, 'Duplicate tracking code must be rejected.');
+  const renameCode = await appFetch('/api/admin/campaigns', {
+    method: 'PATCH',
+    headers: { ...headers, ...cookieFor(adminSession) },
+    body: JSON.stringify({ type: 'tracking_code', id: codeCreate.json.tracking_code.id, code: `${runId}-changed` }),
+  });
+  assert.equal(renameCode.res.status, 409, 'Tracking code reassignment/rename must be rejected.');
+
+  const comms = await appFetch('/api/admin/communications?status=delivered', { headers: cookieFor(managerSession) });
+  assert.equal(comms.res.status, 200, comms.text);
+  assert.ok(Array.isArray(comms.json.messages), 'Communications API should return messages array.');
+
   console.log(JSON.stringify({
     ok: true,
     status: 'PASSED',
@@ -468,6 +572,10 @@ try {
       donation_upload_replace_remove_submit: 'PASSED',
       quo_signed_stop_start_expected_reply_delivery: 'PASSED',
       rls: 'PASSED',
+      staff_permissions: 'PASSED',
+      booking_actions: 'PASSED',
+      campaign_crud: 'PASSED',
+      communications_visibility: 'PASSED',
     },
   }, null, 2));
 } finally {

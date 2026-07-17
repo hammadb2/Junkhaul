@@ -56,6 +56,9 @@ assert.equal(rejected.outcome, 'OFFER_PAID_JUNK_REMOVAL');
 assert.equal(roleAllows('manager', 'bookings.assign_crew'), true);
 assert.equal(roleAllows('manager', 'payroll.approve'), false);
 assert.equal(roleAllows('manager', 'refunds.issue'), false);
+assert.equal(roleAllows('manager', 'employees.change_pay_rate'), false);
+assert.equal(roleAllows('manager', 'employees.read_sin'), false);
+assert.equal(roleAllows('admin', 'billing.manage'), false);
 assert.equal(roleAllows('owner', 'refunds.issue'), true);
 
 assert.equal(classifyInboundText('STOP'), 'STOP');
