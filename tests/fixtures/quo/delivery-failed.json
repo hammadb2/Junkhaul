@@ -1,13 +1,17 @@
 {
   "type": "message.failed",
   "data": {
-    "id": "quo_outbound_failed_001",
-    "direction": "outbound",
-    "from": "+15870000000",
-    "to": "+15873250751",
-    "content": "Your pickup request needs more photos.",
-    "status": "failed",
-    "error": "carrier_rejected",
-    "createdAt": "2026-07-16T18:03:00.000Z"
+    "object": {
+      "id": "quo_outbound_failed_001",
+      "object": "message",
+      "direction": "outgoing",
+      "from": "+15870000000",
+      "to": "+15873250751",
+      "body": "Your pickup request needs more photos.",
+      "status": "failed",
+      "errorCode": "carrier_rejected",
+      "errorMessage": "Carrier rejected the message",
+      "createdAt": "2026-07-16T18:03:00.000Z"
+    }
   }
 }

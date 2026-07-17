@@ -6,7 +6,8 @@ import { validateDonationPhotos, assertDonationTransition, analyzeDonationSubmis
 import { roleAllows } from '../lib/permissionRules.js';
 import { classifyInboundText, responseMatchesExpected } from '../lib/quoRules.js';
 import { inspectDonationImage, MAX_DONATION_PHOTO_BYTES } from '../lib/donationPhotos.js';
-import { parseQuoPayload } from '../lib/quoPayload.js';
+import { isQuoDeliveryEvent, parseQuoPayload } from '../lib/quoPayload.js';
+import { signQuoWebhookBody, verifyQuoWebhookSignature } from '../lib/quoWebhookAuth.js';
 
 assert.equal(normalizePhone('(587) 325-0751'), '+15873250751');
 
@@ -83,21 +84,30 @@ await assert.rejects(
 );
 
 const quoPayload = {
+  id: 'EV_stop_123',
+  type: 'message.received',
   data: {
-    id: 'quo_msg_123',
-    from: '+15873250751',
-    to: '+15870000000',
-    content: 'STOP',
-    status: 'received',
+    object: {
+      id: 'quo_msg_123',
+      from: '+15873250751',
+      to: '+15870000000',
+      body: 'STOP',
+      status: 'received',
+    },
   },
 };
 assert.deepEqual(parseQuoPayload(quoPayload), {
+  provider_event_id: 'EV_stop_123',
+  provider_event_type: 'message.received',
+  provider_event_at: null,
   provider_id: 'quo_msg_123',
   direction: 'inbound',
   from: '+15873250751',
   to: '+15870000000',
   body: 'STOP',
   provider_status: 'received',
+  failure_code: null,
+  failure_reason: null,
   raw: quoPayload,
 });
 
@@ -113,6 +123,18 @@ for (const [fixture, expectedBody, expectedStatus] of [
   assert.equal(parsed.provider_status, expectedStatus);
   assert.ok(parsed.provider_id);
 }
+
+const deliveryPayload = JSON.parse(readFileSync(new URL('./fixtures/quo/delivery-failed.json', import.meta.url), 'utf8'));
+assert.equal(isQuoDeliveryEvent(parseQuoPayload(deliveryPayload)), true);
+
+const rawBody = JSON.stringify(quoPayload);
+const signingSecret = Buffer.from('test-signing-secret').toString('base64');
+const timestamp = Date.now();
+const validSignature = signQuoWebhookBody({ rawBody, signingSecret, timestamp });
+assert.equal(verifyQuoWebhookSignature({ rawBody, signingSecret, signatureHeader: validSignature, now: timestamp }).ok, true);
+assert.equal(verifyQuoWebhookSignature({ rawBody, signingSecret, signatureHeader: validSignature.replace(/.$/, 'A'), now: timestamp }).ok, false);
+assert.equal(verifyQuoWebhookSignature({ rawBody, signingSecret, signatureHeader: validSignature, now: timestamp + 10 * 60 * 1000 }).reason, 'expired_signature');
+assert.equal(verifyQuoWebhookSignature({ rawBody, signingSecret, signatureHeader: null, now: timestamp }).reason, 'missing_signature');
 
 const migrationRouteSource = readFileSync(new URL('../app/api/admin/run-migration/route.js', import.meta.url), 'utf8');
 assert.match(migrationRouteSource, /Runtime migrations are permanently disabled/);
