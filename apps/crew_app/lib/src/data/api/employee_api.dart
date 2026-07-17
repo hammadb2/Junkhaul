@@ -452,9 +452,9 @@ class EmployeeApi {
       body: {
         'route_id': routeId,
         'route_version': routeVersion,
-        if (deviceId != null) 'device_id': deviceId,
-        if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
-        if (createdAt != null) 'created_at': createdAt,
+        'device_id': ?deviceId,
+        'idempotency_key': ?idempotencyKey,
+        'created_at': ?createdAt,
       },
     );
   }

@@ -100,7 +100,7 @@ class RouteUpdateSheet extends StatelessWidget {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: summary.changes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final change = summary.changes[index];
                     return _ChangeTile(change: change);
