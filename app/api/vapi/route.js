@@ -2,7 +2,17 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { runVapiTool } from '@/lib/vapiTools';
 import { runDispatchTool } from '@/lib/dispatchTools';
+import { runDonationVapiTool } from '@/lib/donationVapiTools';
 import { sendSMS } from '@/lib/sms';
+
+// Customer-facing runner: donation tools first (by name), falling back to
+// the general customer-service tool set. Crew-facing (dispatch) calls never
+// reach donation tools — those are customer-status lookups, not crew tools.
+async function runCustomerTool(name, args) {
+  const donationResult = await runDonationVapiTool(name, args);
+  if (donationResult !== null) return donationResult;
+  return runVapiTool(name, args);
+}
 
 // Determine if this message is from the Dispatch (crew-facing) agent.
 function isDispatchAgent(message) {
@@ -47,7 +57,8 @@ export async function POST(req) {
   // ── Tool calls (current Vapi format) ──
   if (message.type === 'tool-calls' && Array.isArray(message.toolCallList)) {
     const useDispatch = isDispatchAgent(message);
-    const runner = useDispatch ? runDispatchTool : runVapiTool;
+    const runner = useDispatch ? runDispatchTool : runCustomerTool;
+    const callerNumber = message.call?.customer?.number || message.customer?.number || '';
     const results = [];
     for (const call of message.toolCallList) {
       const name = call.function?.name || call.name;
@@ -55,11 +66,9 @@ export async function POST(req) {
       if (typeof args === 'string') {
         try { args = JSON.parse(args); } catch { args = {}; }
       }
-      // Inject caller phone into args for dispatch tools (for audit logging)
-      if (useDispatch) {
-        const callerNumber = message.call?.customer?.number || message.customer?.number || '';
-        args._caller_phone = callerNumber;
-      }
+      // Inject caller phone into args (dispatch: audit logging; donation
+      // tools: looking up the caller's own donation request).
+      args._caller_phone = callerNumber;
       const result = await runner(name, args);
       results.push({ toolCallId: call.id, result });
     }
@@ -73,11 +82,9 @@ export async function POST(req) {
       try { args = JSON.parse(args); } catch { args = {}; }
     }
     const useDispatch = isDispatchAgent(message);
-    if (useDispatch) {
-      const callerNumber = message.call?.customer?.number || message.customer?.number || '';
-      args._caller_phone = callerNumber;
-    }
-    const runner = useDispatch ? runDispatchTool : runVapiTool;
+    const callerNumber = message.call?.customer?.number || message.customer?.number || '';
+    args._caller_phone = callerNumber;
+    const runner = useDispatch ? runDispatchTool : runCustomerTool;
     const result = await runner(message.functionCall.name, args);
     return NextResponse.json({ result });
   }
