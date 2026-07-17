@@ -31,7 +31,7 @@ export async function GET(req) {
       .from('nearby_offers')
       .select('*')
       .gt('offer_expires_at', now)
-      .order('created_at', { ascending: false })
+      .order('offered_at', { ascending: false })
       .limit(10);
 
     if (offerError) throw offerError;
