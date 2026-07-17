@@ -10,6 +10,7 @@ import '../../../data/services/camera_service.dart';
 import '../../../data/services/photo_upload_service.dart';
 import '../../../domain/models/job.dart';
 import '../../../domain/models/payment.dart';
+import '../../../domain/models/route_plan.dart';
 import '../../../domain/providers/route_action_context.dart';
 import '../../../domain/providers/route_provider.dart';
 import '../../shared/jh_step_progress.dart';
@@ -346,19 +347,29 @@ class _JobScreenState extends ConsumerState<JobScreen> {
   }
 
   /// Handle a route conflict error from a protected endpoint.
-  /// Parses the 409 body and updates RouteNotifier with the conflict.
-  void _handleRouteError(dynamic e) {
-    // DioException contains the response body in e.response?.data
-    if (e is Exception) {
-      final msg = e.toString();
-      // Check for 409 conflict indicators
-      if (msg.contains('409') || msg.contains('route_version') ||
-          msg.contains('conflict') || msg.contains('stale')) {
-        // Try to extract conflict details from the error
-        // The DioClient maps errors; we check for common patterns
-        ref.read(routeProvider.notifier).fetchRoute();
+  /// Parses the 409/400 body via the shared [parseRouteConflict] and
+  /// updates RouteNotifier with the conflict state, then fetches the
+  /// latest route so the crew sees the current version.
+  /// Returns the parsed conflict, or null if the error is not a route conflict.
+  RouteConflict? _handleRouteError(dynamic e) {
+    final conflict = parseRouteConflict(e);
+    if (conflict != null) {
+      ref.read(routeProvider.notifier).setConflict(conflict);
+      ref.read(routeProvider.notifier).fetchRoute();
+      // Show a user-facing message about the conflict.
+      if (conflict.safeRetry) {
+        _showError(
+          'Route changed (v${conflict.currentRouteVersion}). '
+          'Refresh your route, then retry.',
+        );
+      } else {
+        _showError(
+          'Route changed (v${conflict.currentRouteVersion}). '
+          'Contact dispatch before continuing.',
+        );
       }
     }
+    return conflict;
   }
 
   /// Process the payment result based on the selected method.

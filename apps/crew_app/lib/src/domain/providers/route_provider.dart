@@ -261,9 +261,15 @@ class RouteNotifier extends Notifier<RouteState> {
   }
 
   /// Acknowledge the current route version.
+  /// Generates an idempotency_key and created_at timestamp so the
+  /// request is safe to replay from the offline queue.
   Future<bool> acknowledgeRoute({String? deviceId}) async {
     final route = state.route;
     if (route == null) return false;
+
+    final idempotencyKey =
+        'ack_${route.routeId}_v${route.routeVersion}_${DateTime.now().millisecondsSinceEpoch}';
+    final createdAt = DateTime.now().toIso8601String();
 
     try {
       final api = await ref.read(employeeApiProvider.future);
@@ -271,6 +277,8 @@ class RouteNotifier extends Notifier<RouteState> {
         routeId: route.routeId,
         routeVersion: route.routeVersion,
         deviceId: deviceId,
+        idempotencyKey: idempotencyKey,
+        createdAt: createdAt,
       );
       state = state.copyWith(
         acknowledgmentRequired: false,

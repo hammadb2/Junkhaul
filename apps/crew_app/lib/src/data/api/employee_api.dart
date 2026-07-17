@@ -447,15 +447,22 @@ class EmployeeApi {
   }
 
   /// Acknowledge receipt of a route plan version.
+  /// Includes idempotency_key and created_at for offline queue replay
+  /// and audit trail. The backend uses a unique DB index for idempotency;
+  /// these fields are sent for completeness and offline replay safety.
   Future<Map<String, dynamic>> acknowledgeRoute({
     required String routeId,
     required int routeVersion,
     String? deviceId,
+    String? idempotencyKey,
+    String? createdAt,
   }) async {
     return _dio.postJson('/api/employee/route-plan', body: {
       'route_id': routeId,
       'route_version': routeVersion,
       if (deviceId != null) 'device_id': deviceId,
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (createdAt != null) 'created_at': createdAt,
     });
   }
 
