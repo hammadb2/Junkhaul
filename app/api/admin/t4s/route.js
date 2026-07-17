@@ -1,20 +1,18 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === (await adminToken());
-}
-
 // GET /api/admin/t4s?year=2026 — all T4 slips for a tax year
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, {
+    permission: 'employees.read_sin',
+    ownerOnly: true,
+    action: 't4_slips.read',
+    metadata: { route: '/api/admin/t4s' },
+  });
+  if (!auth.ok) return auth.response;
   const { searchParams } = new URL(req.url);
   const year = searchParams.get('year') || (new Date().getFullYear() - 1);
 

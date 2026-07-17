@@ -1,18 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { randomBytes } from 'crypto';
+import { auditSensitiveAttempt, hasPermission, redactEmployee, requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  const expected = await adminToken();
-  return token === expected;
-}
 
 // ------------------------------------------------------------
 // Send onboarding invite email via Resend.
@@ -118,7 +109,14 @@ ${bodyHTML}
 
 // GET /api/admin/crew — list all employees with onboarding + clock + hours status
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, {
+    permission: 'employees.read',
+    action: 'crew.list',
+    metadata: { route: '/api/admin/crew' },
+  });
+  if (!auth.ok) return auth.response;
+  const canReadCompensation = hasPermission(auth.context, 'employees.read_compensation', { ownerOnly: true });
+  const canReadSensitive = hasPermission(auth.context, 'employee_documents.read_sensitive', { ownerOnly: true });
 
   const { data: employees } = await supabaseAdmin
     .from('employees')
@@ -169,8 +167,9 @@ export async function GET(req) {
     const open = openByEmployee.get(e.id);
     const period = periodByEmployee.get(e.id) || { total_minutes: 0 };
     const totalHours = Math.round((period.total_minutes / 60) * 100) / 100;
+    const base = redactEmployee(e, { includeCompensation: canReadCompensation, includeSensitive: canReadSensitive });
     return {
-      ...e,
+      ...base,
       clocked_in: !!open,
       clock_in_at: open?.clock_in_at || null,
       clock_in_duration_min: open ? Math.round((now - new Date(open.clock_in_at).getTime()) / 60000) : null,
@@ -205,13 +204,24 @@ export async function GET(req) {
 
 // POST /api/admin/crew — invite a new crew member
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const body = await req.json().catch(() => ({}));
   const { first_name, last_name, phone, email, pay_rate } = body;
+  if (pay_rate && !body.reason) {
+    return NextResponse.json({ error: 'reason is required when setting an invite pay rate' }, { status: 422 });
+  }
+  const permission = pay_rate ? 'employees.change_pay_rate' : 'employees.create';
+  const auth = await requireStaffPermission(req, {
+    permission,
+    ownerOnly: !!pay_rate,
+    entityType: 'employee_invite',
+    action: 'employees.invite',
+    reason: body.reason || null,
+    metadata: { email_present: !!email, pay_rate_present: !!pay_rate },
+  });
+  if (!auth.ok) return auth.response;
 
   if (!first_name || !last_name || !email) {
-    return NextResponse.json({ error: 'first_name, last_name, and email are required' }, { status: 400 });
+    return NextResponse.json({ error: 'first_name, last_name, and email are required' }, { status: 422 });
   }
 
   const emailLower = email.toLowerCase().trim();
@@ -275,6 +285,17 @@ export async function POST(req) {
 
   // Send invite email
   await sendInviteEmail({ email: emailLower, first_name, last_name, token: invite.token });
+
+  await auditSensitiveAttempt({
+    context: auth.context,
+    allowed: true,
+    permission,
+    entityType: 'employee_invite',
+    entityId: invite.id,
+    action: 'employees.invite',
+    reason: body.reason || null,
+    after: { id: invite.id, email: emailLower, pay_rate: pay_rate || 18, status: invite.status },
+  });
 
   return NextResponse.json({ ok: true, invite }, { status: 201 });
 }

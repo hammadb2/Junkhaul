@@ -1,18 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { randomBytes } from 'crypto';
+import { auditSensitiveAttempt, hasPermission, redactEmployee, requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  const expected = await adminToken();
-  return token === expected;
-}
 
 function getSiteUrl() {
   const env = process.env.NEXT_PUBLIC_SITE_URL;
@@ -71,9 +62,16 @@ Junk Haul Calgary`;
 
 // GET /api/admin/crew/[id] — single employee details with all onboarding data
 export async function GET(req, { params }) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { id } = params;
+  const auth = await requireStaffPermission(req, {
+    permission: 'employees.read',
+    entityType: 'employee',
+    entityId: id,
+    action: 'employees.read_detail',
+  });
+  if (!auth.ok) return auth.response;
+  const canReadCompensation = hasPermission(auth.context, 'employees.read_compensation', { ownerOnly: true });
+  const canReadSensitive = hasPermission(auth.context, 'employee_documents.read_sensitive', { ownerOnly: true });
   const { data: employee, error } = await supabaseAdmin
     .from('employees')
     .select(`
@@ -124,8 +122,17 @@ export async function GET(req, { params }) {
     .limit(20);
 
   return NextResponse.json({
-    employee,
-    documents: documents || [],
+    employee: redactEmployee(employee, { includeCompensation: canReadCompensation, includeSensitive: canReadSensitive }),
+    documents: canReadSensitive ? (documents || []) : (documents || []).map((d) => ({
+      id: d.id,
+      employee_id: d.employee_id,
+      doc_type: d.doc_type,
+      status: d.status,
+      verified_at: d.verified_at,
+      verified_by: d.verified_by,
+      created_at: d.created_at,
+      redacted: true,
+    })),
     invite,
     recent_sessions: recentSessions || [],
     assignments: assignments || [],
@@ -134,10 +141,23 @@ export async function GET(req, { params }) {
 
 // PATCH /api/admin/crew/[id] — update employee (all fields editable by admin)
 export async function PATCH(req, { params }) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { id } = params;
   const body = await req.json().catch(() => ({}));
+  const permission = 'pay_rate' in body ? 'employees.change_pay_rate' : 'employees.update';
+  const ownerOnly = 'pay_rate' in body;
+  if (ownerOnly && !body.reason) {
+    return NextResponse.json({ error: 'reason is required for pay-rate changes' }, { status: 422 });
+  }
+  const auth = await requireStaffPermission(req, {
+    permission,
+    ownerOnly,
+    entityType: 'employee',
+    entityId: id,
+    action: 'employees.update',
+    reason: body.reason || null,
+    metadata: { fields: Object.keys(body).filter((key) => key !== 'reason') },
+  });
+  if (!auth.ok) return auth.response;
 
   const allowed = [
     'status', 'pay_rate', 'first_name', 'last_name', 'name',
@@ -160,6 +180,12 @@ export async function PATCH(req, { params }) {
     update.name = `${fn} ${ln}`.trim() || cur?.name;
   }
 
+  const { data: before } = await supabaseAdmin
+    .from('employees')
+    .select('id, email, name, first_name, last_name, phone, status, pay_rate, hire_date, updated_at, address')
+    .eq('id', id)
+    .maybeSingle();
+
   const { data: employee, error } = await supabaseAdmin
     .from('employees')
     .update(update)
@@ -167,6 +193,19 @@ export async function PATCH(req, { params }) {
     .select('id, email, name, first_name, last_name, phone, status, pay_rate, hire_date, updated_at, address')
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await auditSensitiveAttempt({
+    context: auth.context,
+    allowed: true,
+    permission,
+    entityType: 'employee',
+    entityId: id,
+    action: 'employees.update',
+    reason: body.reason || null,
+    before,
+    after: employee,
+    metadata: { fields: Object.keys(update).filter((key) => key !== 'updated_at') },
+  });
 
   // If admin changed email or other key info, send a password reset link
   const shouldSendReset = body.send_reset === true || ('email' in body && body.email);
@@ -196,9 +235,20 @@ export async function PATCH(req, { params }) {
 
 // DELETE /api/admin/crew/[id] — terminate employee
 export async function DELETE(req, { params }) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { id } = params;
+  const body = await req.json().catch(() => ({}));
+  if (!body.reason) {
+    return NextResponse.json({ error: 'reason is required for employee termination' }, { status: 422 });
+  }
+  const auth = await requireStaffPermission(req, {
+    permission: 'employees.terminate',
+    ownerOnly: true,
+    entityType: 'employee',
+    entityId: id,
+    action: 'employees.terminate',
+    reason: body.reason || null,
+  });
+  if (!auth.ok) return auth.response;
 
   // End any open job clock sessions
   const now = new Date().toISOString();
@@ -215,6 +265,12 @@ export async function DELETE(req, { params }) {
       .eq('id', s.id);
   }
 
+  const { data: before } = await supabaseAdmin
+    .from('employees')
+    .select('id, email, name, status, updated_at')
+    .eq('id', id)
+    .maybeSingle();
+
   // Mark as terminated (soft delete — keep records for payroll/history)
   const { error } = await supabaseAdmin
     .from('employees')
@@ -224,6 +280,19 @@ export async function DELETE(req, { params }) {
 
   // Revoke all sessions
   await supabaseAdmin.from('employee_sessions').delete().eq('employee_id', id);
+
+  await auditSensitiveAttempt({
+    context: auth.context,
+    allowed: true,
+    permission: 'employees.terminate',
+    entityType: 'employee',
+    entityId: id,
+    action: 'employees.terminate',
+    reason: body.reason || null,
+    before,
+    after: { status: 'terminated' },
+    metadata: { open_sessions_closed: (openSessions || []).length },
+  });
 
   return NextResponse.json({ ok: true });
 }

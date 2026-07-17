@@ -1,17 +1,8 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { hasPermission, redactEmployee, requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  const expected = await adminToken();
-  return token === expected;
-}
 
 // GET /api/admin/employees — full admin overview:
 //   - who's onboarded
@@ -19,7 +10,13 @@ async function checkAuth() {
 //   - hours worked this pay period per employee (incl. overtime)
 //   - onboarding doc status per employee
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, {
+    permission: 'employees.read',
+    action: 'employees.list',
+    metadata: { route: '/api/admin/employees' },
+  });
+  if (!auth.ok) return auth.response;
+  const canReadCompensation = hasPermission(auth.context, 'employees.read_compensation', { ownerOnly: true });
 
   const { data: employees } = await supabaseAdmin
     .from('employees')
@@ -73,8 +70,9 @@ export async function GET(req) {
     const docs = docsByEmployee.get(e.id) || [];
     const uploaded = docs.filter((d) => d.status === 'uploaded' || d.status === 'verified').map((d) => d.doc_type);
     const missing = required.filter((t) => !uploaded.includes(t));
+    const base = redactEmployee(e, { includeCompensation: canReadCompensation });
     return {
-      ...e,
+      ...base,
       clocked_in: !!open,
       clock_in_at: open?.clock_in_at || null,
       clock_in_duration_min: open ? Math.round((now - new Date(open.clock_in_at).getTime()) / 60000) : null,
@@ -83,7 +81,7 @@ export async function GET(req) {
         regular_hours: Math.round(period.regular_hours * 100) / 100,
         overtime_hours: Math.round(period.overtime_hours * 100) / 100,
         total_hours: Math.round(period.total_hours * 100) / 100,
-        gross: Math.round(period.gross * 100) / 100,
+        gross: canReadCompensation ? Math.round(period.gross * 100) / 100 : null,
       },
       onboarding: {
         complete: missing.length === 0,

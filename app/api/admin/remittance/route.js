@@ -1,20 +1,18 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { auditSensitiveAttempt, requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
 
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
-  return token === (await adminToken());
-}
-
 // GET /api/admin/remittance — all remittances (owed first), with pay run info
 export async function GET(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireStaffPermission(req, {
+    permission: 'payroll.preview',
+    ownerOnly: true,
+    action: 'remittance.read',
+    metadata: { route: '/api/admin/remittance' },
+  });
+  if (!auth.ok) return auth.response;
   const { data: rem } = await supabaseAdmin
     .from('remittances')
     .select('*, pay_runs(period_start, period_end, total_cra_remittance, status)')
@@ -35,12 +33,34 @@ export async function GET(req) {
 // POST /api/admin/remittance — mark a remittance as paid
 // Body: { remittance_id, paid_method }
 export async function POST(req) {
-  if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { remittance_id, paid_method } = await req.json();
+  const { remittance_id, paid_method, reason = null } = await req.json();
+  const auth = await requireStaffPermission(req, {
+    permission: 'payroll.send',
+    ownerOnly: true,
+    entityType: 'remittance',
+    entityId: remittance_id || null,
+    action: 'remittance.mark_paid',
+    reason,
+  });
+  if (!auth.ok) return auth.response;
+  if (!remittance_id) return NextResponse.json({ error: 'remittance_id required' }, { status: 422 });
+  if (!reason) return NextResponse.json({ error: 'reason is required' }, { status: 422 });
+  const { data: before } = await supabaseAdmin.from('remittances').select('*').eq('id', remittance_id).maybeSingle();
   const { error } = await supabaseAdmin
     .from('remittances')
     .update({ status: 'paid', paid_at: new Date().toISOString(), paid_method: paid_method || 'manual' })
     .eq('id', remittance_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await auditSensitiveAttempt({
+    context: auth.context,
+    allowed: true,
+    permission: 'payroll.send',
+    entityType: 'remittance',
+    entityId: remittance_id,
+    action: 'remittance.mark_paid',
+    reason,
+    before,
+    after: { status: 'paid', paid_method: paid_method || 'manual' },
+  });
   return NextResponse.json({ ok: true });
 }
