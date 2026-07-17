@@ -198,6 +198,8 @@ assert.match(uploadPhotoSource, /Not assigned to this booking/, 'upload-photo mu
 const collectPaymentSource = readFileSync(new URL('../app/api/crew/collect-payment/route.js', import.meta.url), 'utf8');
 assert.match(collectPaymentSource, /isEmployeeAssignedToBooking/, 'collect-payment must check booking assignment');
 assert.match(collectPaymentSource, /Not assigned to this booking/, 'collect-payment must reject unassigned employees');
+assert.match(collectPaymentSource, /already paid/, 'collect-payment must reject duplicate payments');
+assert.match(collectPaymentSource, /payment_status.*pending.*unpaid/, 'collect-payment must only allow pending/unpaid');
 
 const resendLinkSource = readFileSync(new URL('../app/api/crew/resend-payment-link/route.js', import.meta.url), 'utf8');
 assert.match(resendLinkSource, /isEmployeeAssignedToBooking/, 'resend-payment-link must check booking assignment');

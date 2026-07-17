@@ -64,6 +64,14 @@ export async function POST(req) {
     );
   }
 
+  // Duplicate payment protection: reject if already paid.
+  if (booking.payment_status && booking.payment_status !== 'pending' && booking.payment_status !== 'unpaid') {
+    return NextResponse.json(
+      { error: `Booking already paid via ${booking.payment_status}` },
+      { status: 409 }
+    );
+  }
+
   const now = new Date().toISOString();
 
   const { error: updateErr } = await supabaseAdmin
