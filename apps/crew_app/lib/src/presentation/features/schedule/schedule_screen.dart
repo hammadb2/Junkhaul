@@ -83,6 +83,7 @@ class _ScheduleBody extends ConsumerStatefulWidget {
     required this.onRefresh,
     required this.onSelectJob,
     required this.onSignOut,
+    this.queuedActionCount = 0,
   });
 
   final String crewFirstName;
@@ -93,6 +94,7 @@ class _ScheduleBody extends ConsumerStatefulWidget {
   final Future<void> Function() onRefresh;
   final ValueChanged<Job> onSelectJob;
   final VoidCallback onSignOut;
+  final int queuedActionCount;
 
   @override
   ConsumerState<_ScheduleBody> createState() => _ScheduleBodyState();
@@ -133,7 +135,7 @@ class _ScheduleBodyState extends ConsumerState<_ScheduleBody> {
         bottom: false,
         child: Column(
           children: [
-            JhSyncBanner(state: widget.syncState),
+            JhSyncBanner(state: widget.syncState, queuedActionCount: widget.queuedActionCount),
             Expanded(
               child: Stack(
                 children: [

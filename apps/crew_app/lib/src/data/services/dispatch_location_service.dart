@@ -47,7 +47,7 @@ class DispatchLocationService extends Notifier<DispatchTrackingState> {
     _sub = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.medium,
-        timeInterval: Duration(seconds: 3),
+        distanceFilter: 5,
       ),
     ).listen(
       _onPositionUpdate,

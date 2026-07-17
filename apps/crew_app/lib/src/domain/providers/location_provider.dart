@@ -88,7 +88,7 @@ class LocationNotifier extends Notifier<GpsStatus> {
     _sub = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.medium,
-        timeInterval: Duration(seconds: 5),
+        distanceFilter: 10,
       ),
     ).listen(
       (pos) => state = GpsStatus(state: GpsState.ready, position: pos),

@@ -208,7 +208,6 @@ class _ScheduleMapState extends ConsumerState<ScheduleMap> {
           trafficEnabled: false,
           mapToolbarEnabled: false,
           zoomControlsEnabled: false,
-          liteMode: false,
           onCameraIdle: () {
             // Refresh markers after camera settles to keep zIndex correct.
           },

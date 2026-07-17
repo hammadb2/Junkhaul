@@ -86,8 +86,8 @@ class _CloseoutScreenState extends ConsumerState<CloseoutScreen> {
 
     // Calculate shift hours from clock-in time (if still open).
     double? shiftHours;
-    if (openShift != null) {
-      final clockIn = openShift.clockInAt;
+    if (openShift != null && openShift.clockInAt != null) {
+      final clockIn = DateTime.tryParse(openShift.clockInAt!);
       if (clockIn != null) {
         shiftHours = DateTime.now().difference(clockIn).inMinutes / 60.0;
       }
