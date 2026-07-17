@@ -15,7 +15,8 @@
     "lint": "next lint",
     "test": "node supabase/migrations/payroll.test.js && node supabase/migrations/payment-validation.test.js && node tests/foundation.test.js",
     "test:payroll": "node supabase/migrations/payroll.test.js",
-    "test:integration": "node tests/integration/foundation.integration.js"
+    "test:integration": "node tests/integration/foundation.integration.js",
+    "migrations:check": "node scripts/check-migration-history.js"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "3.1.1",

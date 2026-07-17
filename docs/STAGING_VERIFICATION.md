@@ -1,6 +1,6 @@
 # Staging verification notes
 
-Status: `COMPLETE_AND_VERIFIED` for the approved Supabase environment used on 2026-07-17.
+Status: `COMPLETE_AND_VERIFIED` for upgrade-path verification against the approved Supabase environment used on 2026-07-17.
 
 ## Required environment
 
@@ -58,9 +58,10 @@ Each error includes a conflict group count and remediation guidance. No business
 - Supabase Storage: `SUCCEEDS`
 - Service-role operations: `SUCCEEDS`
 - Migration tooling: `SUCCEEDS`
-- Full migration chain through `20260726000001_customer_admin_foundation.sql`: `PASSED`
-- Second-run/idempotent reconciliation verification: `PASSED`
+- Upgrade-path reconciliation migration `20260727000001_reconcile_legacy_schema.sql`: `PASSED`
+- Integration verification after restoring immutable historical migrations: `PASSED`
 - Duplicate preflight checks: `PASSED`; each check raises a clear blocking error and deletes no rows.
+- Migration-history hash check: `PASSED`
 - `npm ci`: `PASSED`
 - `npm test`: `PASSED`
 - `npm run test:integration`: `PASSED`
@@ -72,5 +73,9 @@ Each error includes a conflict group count and remediation guidance. No business
 
 Earlier in this environment, local Supabase could not start because the Docker socket was not accessible. Verification was therefore completed against the approved Supabase project.
 
-- a disposable remote Supabase project, or
-- corrected local Docker permissions.
+Fresh replay from zero was not completed in this workspace after restoring historical migration immutability. Two constraints remain:
+
+- Docker/Supabase local is inaccessible from this shell due Docker socket permissions.
+- At least one immutable historical migration contains replay-time assumptions that require a future baseline/squash migration or a dedicated fresh Supabase environment to validate from zero without editing already-applied files.
+
+Upgrade-path verification is complete; fresh-vs-upgrade schema equivalence remains blocked until a true disposable fresh Supabase environment is available or a baseline migration is accepted.

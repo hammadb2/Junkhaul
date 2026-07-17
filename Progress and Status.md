@@ -30,7 +30,7 @@ This section supersedes broad claims below such as “everything built.” Statu
 ### Verification phase status
 
 - Status: `COMPLETE_AND_VERIFIED`
-- Repository path: `tests/integration/foundation.integration.js`, `tests/foundation.test.js`, `.env.integration.example`, `docs/STAGING_VERIFICATION.md`, `.nvmrc`, `package.json`, `package-lock.json`
+- Repository path: `tests/integration/foundation.integration.js`, `tests/foundation.test.js`, `.env.integration.example`, `docs/STAGING_VERIFICATION.md`, `docs/MIGRATION_HISTORY.md`, `scripts/check-migration-history.js`, `.nvmrc`, `package.json`, `package-lock.json`
 - API: no production API added by the harness.
 - Database table: validates foundation tables when an isolated test DB is provided.
 - Admin visibility: `NO_APP_IMPACT`
@@ -40,8 +40,8 @@ This section supersedes broad claims below such as “everything built.” Statu
 - App impact: `NO_APP_IMPACT`
 - Tests: `COMPLETE_AND_VERIFIED` for pure helper/unit tests and guarded route/database/storage integration tests against the approved Supabase environment.
 - Manual verification: `COMPLETE_AND_VERIFIED` under Node 22.23.1 / npm 10.9.8 for `npm ci`, `npm test`, `npm run test:integration`, `npm run lint`, and `npm run build`.
-- Production status: `BUILT_NOT_VERIFIED`; the migration chain has been applied and rerun successfully against the approved Supabase environment, but this branch is not merged and production webhook cutover remains held.
-- Known gaps: `npm audit` still reports 4 low and 4 moderate advisories; no high or critical advisories remain.
+- Production status: `BUILT_NOT_VERIFIED`; upgrade-path reconciliation has been applied successfully against the approved Supabase environment, but this branch is not merged and production webhook cutover remains held.
+- Known gaps: `npm audit` still reports 4 low and 4 moderate advisories; no high or critical advisories remain. Fresh-from-zero Supabase replay remains blocked in this workspace by Docker access and immutable historical migration replay constraints.
 
 ### Door-hanger and flyer attribution
 
