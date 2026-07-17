@@ -18,6 +18,7 @@ assert.deepEqual(
 
 assert.throws(() => assertDonationTransition('draft', 'picked_up'), /Invalid donation transition/);
 assert.equal(assertDonationTransition('draft', 'submitted'), true);
+assert.equal(assertDonationTransition('manual_review', 'needs_more_photos'), true);
 
 const unclear = analyzeDonationSubmission({
   description: 'clean table',
