@@ -22,19 +22,16 @@ subprojects {
     // Use plugins.withId directly (not afterEvaluate) because
     // evaluationDependsOn(":app") above already evaluates subprojects,
     // making afterEvaluate fail with "project is already evaluated".
+    // Forcing compileSdk=36 satisfies the AAR minCompileSdk=36 requirement
+    // from flutter_plugin_android_lifecycle, so the AarMetadata check passes
+    // normally — no need to disable it (disabling caused bundleDebugAar to
+    // fail because the output directory was never created).
     project.plugins.withId("com.android.library") {
         project.extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
             if (compileSdk == null || compileSdk!! < 36) {
                 compileSdk = 36
             }
         }
-    }
-    // Skip AAR metadata checks that fail because google_navigation_flutter
-    // was published with compileSdk 35 but flutter_plugin_android_lifecycle
-    // requires minCompileSdk 36. The plugins.withId block above forces
-    // compileSdk=36 at build time, so the actual compilation is fine.
-    project.tasks.matching { it.name.contains("AarMetadata") }.configureEach {
-        enabled = false
     }
 }
 
