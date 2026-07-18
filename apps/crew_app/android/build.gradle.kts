@@ -21,22 +21,19 @@ subprojects {
 
 // Force compileSdk=36 for all Android library plugins (including
 // google_navigation_flutter which was published with compileSdk 35).
-// Use gradle.projectsEvaluated (not afterEvaluate or plugins.withId in
-// subprojects) because evaluationDependsOn(":app") above causes subprojects
-// to be evaluated before the subprojects {} block runs, making afterEvaluate
-// fail with "project is already evaluated". plugins.withId fires too early
-// and the compileSdk override doesn't take effect. projectsEvaluated runs
-// after ALL projects are evaluated but before task execution, so the
-// compileSdk change is visible to the AarMetadata check at execution time.
-// This satisfies the minCompileSdk=36 requirement from
-// flutter_plugin_android_lifecycle.
-gradle.projectsEvaluated {
-    subprojects.forEach { p ->
-        p.plugins.withId("com.android.library") {
-            p.extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
-                if (compileSdk == null || compileSdk!! < 36) {
-                    compileSdk = 36
-                }
+// Use pluginManager.withPlugin on each subproject — this fires during
+// plugin application (before the Android extension is fully configured),
+// so the compileSdk override is visible to the AarMetadata check.
+// afterEvaluate fails because evaluationDependsOn already evaluates
+// subprojects. plugins.withId in subprojects {} fires too late.
+// projectsEvaluated fails with "It is too late to set compileSdk".
+// pluginManager.withPlugin fires at the right time: after the plugin
+// is applied but before its DSL is fully locked.
+subprojects {
+    pluginManager.withPlugin("com.android.library") {
+        extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
+            if (compileSdk == null || compileSdk!! < 36) {
+                compileSdk = 36
             }
         }
     }
