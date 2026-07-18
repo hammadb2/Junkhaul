@@ -21,19 +21,24 @@ subprojects {
 
 // Force compileSdk=36 for all Android library plugins (including
 // google_navigation_flutter which was published with compileSdk 35).
-// Use pluginManager.withPlugin on each subproject — this fires during
-// plugin application (before the Android extension is fully configured),
-// so the compileSdk override is visible to the AarMetadata check.
-// afterEvaluate fails because evaluationDependsOn already evaluates
-// subprojects. plugins.withId in subprojects {} fires too late.
+//
+// Timing problem: evaluationDependsOn(":app") causes subprojects to be
+// evaluated before the subprojects {} block runs, so afterEvaluate,
+// plugins.withId, and pluginManager.withPlugin all fire too late.
 // projectsEvaluated fails with "It is too late to set compileSdk".
-// pluginManager.withPlugin fires at the right time: after the plugin
-// is applied but before its DSL is fully locked.
-subprojects {
-    pluginManager.withPlugin("com.android.library") {
-        extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
-            if (compileSdk == null || compileSdk!! < 36) {
-                compileSdk = 36
+//
+// Solution: use gradle.beforeProject to register an afterEvaluate callback
+// BEFORE the project is evaluated. The callback runs after the plugin's
+// build.gradle sets compileSdk=35, overriding it to 36 before the Android
+// plugin's own afterEvaluate callback configures tasks (which is when
+// compileSdk is read and locked).
+gradle.beforeProject {
+    afterEvaluate {
+        if (pluginManager.hasPlugin("com.android.library")) {
+            extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
+                if (compileSdk == null || compileSdk!! < 36) {
+                    compileSdk = 36
+                }
             }
         }
     }
