@@ -17,24 +17,30 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
-    // Force compileSdk=36 for all Android library plugins (including
-    // google_navigation_flutter which was published with compileSdk 35).
-    // Use plugins.withId directly (not afterEvaluate) because
-    // evaluationDependsOn(":app") above already evaluates subprojects,
-    // making afterEvaluate fail with "project is already evaluated".
-    project.plugins.withId("com.android.library") {
-        project.extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
-            if (compileSdk == null || compileSdk!! < 36) {
-                compileSdk = 36
+}
+
+// Force compileSdk=36 for all Android library plugins (including
+// google_navigation_flutter which was published with compileSdk 35).
+//
+// Timing problem: evaluationDependsOn(":app") causes subprojects to be
+// evaluated before the subprojects {} block runs, so afterEvaluate,
+// plugins.withId, and pluginManager.withPlugin all fire too late.
+// projectsEvaluated fails with "It is too late to set compileSdk".
+//
+// Solution: use gradle.beforeProject to register an afterEvaluate callback
+// BEFORE the project is evaluated. The callback runs after the plugin's
+// build.gradle sets compileSdk=35, overriding it to 36 before the Android
+// plugin's own afterEvaluate callback configures tasks (which is when
+// compileSdk is read and locked).
+gradle.beforeProject {
+    afterEvaluate {
+        if (pluginManager.hasPlugin("com.android.library")) {
+            extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
+                if (compileSdk == null || compileSdk!! < 36) {
+                    compileSdk = 36
+                }
             }
         }
-    }
-    // Skip AAR metadata checks that fail because google_navigation_flutter
-    // was published with compileSdk 35 but flutter_plugin_android_lifecycle
-    // requires minCompileSdk 36. The plugins.withId block above forces
-    // compileSdk=36 at build time, so the actual compilation is fine.
-    project.tasks.matching { it.name.contains("AarMetadata") }.configureEach {
-        enabled = false
     }
 }
 
