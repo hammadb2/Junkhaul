@@ -17,19 +17,26 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
-    // Force compileSdk=36 for all Android library plugins (including
-    // google_navigation_flutter which was published with compileSdk 35).
-    // Use plugins.withId directly (not afterEvaluate) because
-    // evaluationDependsOn(":app") above already evaluates subprojects,
-    // making afterEvaluate fail with "project is already evaluated".
-    // Forcing compileSdk=36 satisfies the AAR minCompileSdk=36 requirement
-    // from flutter_plugin_android_lifecycle, so the AarMetadata check passes
-    // normally — no need to disable it (disabling caused bundleDebugAar to
-    // fail because the output directory was never created).
-    project.plugins.withId("com.android.library") {
-        project.extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
-            if (compileSdk == null || compileSdk!! < 36) {
-                compileSdk = 36
+}
+
+// Force compileSdk=36 for all Android library plugins (including
+// google_navigation_flutter which was published with compileSdk 35).
+// Use gradle.projectsEvaluated (not afterEvaluate or plugins.withId in
+// subprojects) because evaluationDependsOn(":app") above causes subprojects
+// to be evaluated before the subprojects {} block runs, making afterEvaluate
+// fail with "project is already evaluated". plugins.withId fires too early
+// and the compileSdk override doesn't take effect. projectsEvaluated runs
+// after ALL projects are evaluated but before task execution, so the
+// compileSdk change is visible to the AarMetadata check at execution time.
+// This satisfies the minCompileSdk=36 requirement from
+// flutter_plugin_android_lifecycle.
+gradle.projectsEvaluated {
+    subprojects.forEach { p ->
+        p.plugins.withId("com.android.library") {
+            p.extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
+                if (compileSdk == null || compileSdk!! < 36) {
+                    compileSdk = 36
+                }
             }
         }
     }
