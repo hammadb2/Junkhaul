@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { requireStaffPermission } from '@/lib/staffAuth';
+import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 
 export const runtime = 'nodejs';
 
 // Exception queue: pending quote decisions ordered by financial exposure
 // (minimum - proposed) and customer wait time.
 export async function GET(req) {
-  const auth = await requireStaffPermission(req, { permission: 'bookings.override', action: 'quote_decisions.list' });
-  if (!auth.ok) return auth.response;
+  const store = await cookies();
+  const token = store.get(ADMIN_COOKIE)?.value;
+  const expected = await adminToken();
+  if (!token || token !== expected) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   const { searchParams } = new URL(req.url);
   const state = searchParams.get('state');
