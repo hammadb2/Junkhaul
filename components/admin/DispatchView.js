@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { money, badgeStyle, LOAD_LABELS } from '@/lib/adminUiHelpers';
+import DispatchControlCentre from './DispatchControlCentre';
 
 const LiveCrewMap = dynamic(() => import('./LiveCrewMap'), { ssr: false });
 
@@ -138,6 +139,7 @@ export default function DispatchView({ flash }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <DispatchControlCentre date={effectiveDate} flash={flash} />
       {dates.length === 0 ? (
         <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(0,0,0,.4)', fontSize: 13 }}>No bookings found</div>
       ) : (<>
