@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { estimateProfit } from '@/lib/pricing';
+import { estimateProfitAsync } from '@/lib/pricing';
 import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
@@ -32,9 +32,9 @@ export async function GET(req) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Compute profit per booking
-  const withProfit = (bookings || []).map((b) => {
-    const profit = estimateProfit({
+  // Compute profit per booking using versioned operating-cost configuration.
+  const withProfit = await Promise.all((bookings || []).map(async (b) => {
+    const profit = await estimateProfitAsync({
       load_size: b.load_size,
       total_price: b.total_price,
       quadrant: b.quadrant,
@@ -47,7 +47,7 @@ export async function GET(req) {
       profit: profit.profit,
       margin: profit.margin,
     };
-  });
+  }));
 
   // Aggregate by quadrant
   const quadrants = ['NE', 'NW', 'SE', 'SW'];

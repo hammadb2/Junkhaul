@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { optimiseRoute } from '@/lib/route';
-import { estimateProfit, LOAD_LABELS } from '@/lib/pricing';
+import { estimateProfitAsync, LOAD_LABELS } from '@/lib/pricing';
 import { requireStaffPermission } from '@/lib/staffAuth';
 
 export const runtime = 'nodejs';
@@ -26,9 +26,9 @@ export async function POST(req) {
 
   const ordered = await optimiseRoute(bookings);
 
-  // Calculate profit for each job
-  const withProfit = ordered.map((b) => {
-    const profit = estimateProfit({
+  // Calculate profit for each job using versioned operating-cost config.
+  const withProfit = await Promise.all(ordered.map(async (b) => {
+    const profit = await estimateProfitAsync({
       load_size: b.load_size,
       total_price: b.total_price,
       quadrant: b.quadrant,
@@ -50,7 +50,7 @@ export async function POST(req) {
       est_profit: profit.profit,
       est_margin: profit.margin + '%',
     };
-  });
+  }));
 
   // Calculate totals
   const totalRevenue = withProfit.reduce((s, b) => s + b.total_price, 0);
