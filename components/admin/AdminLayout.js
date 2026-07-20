@@ -24,6 +24,7 @@ import CallsPanel from './CallsPanel';
 import IntelPanel from './IntelPanel';
 import ReferralsPanel from './ReferralsPanel';
 import ConfigPanel from './ConfigPanel';
+import CostConfigPanel from './CostConfigPanel';
 import AuditTrail from './AuditTrail';
 import DispatchLogView from './DispatchLogView';
 import MarketingPanel from './MarketingPanel';
@@ -49,6 +50,7 @@ const NAV = [
   { label: 'Finance', items: [
     { id: 'earnings', label: 'Earnings', Icon: IconDollar },
     { id: 'payroll', label: 'Payroll', Icon: IconWallet },
+    { id: 'costConfig', label: 'Cost Config', Icon: IconDollar },
   ]},
   { label: 'People', items: [
     { id: 'crew', label: 'Crew', Icon: IconUsers },
@@ -80,6 +82,7 @@ const VIEW_META = {
   donations: ['Donations', 'Donation-only pickup review and route-fit queue'],
   earnings: ['Earnings', 'Revenue performance & sources'],
   payroll: ['Payroll', 'Pay runs, remittances & T4s'],
+  costConfig: ['Cost Config', 'Versioned operating costs and pricing policy'],
   crew: ['Crew', 'Team roster, onboarding & safety'],
   staffAccess: ['Staff Access', 'Owner-only roles, permissions and manager scopes'],
   growth: ['Growth', 'Funnel health & marketing spend'],
@@ -99,6 +102,7 @@ const VIEWS = {
   waitlist: WaitlistView, donations: DonationsView, earnings: EarningsDashboard, crew: CrewView, payroll: PayrollPanel,
   staffAccess: StaffAccessPanel,
   growth: GrowthPanel, marketing: MarketingPanel, communications: CommunicationsPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
+  costConfig: CostConfigPanel,
   config: ConfigPanel, audit: AuditTrail, dispatchlog: DispatchLogView,
 };
 
