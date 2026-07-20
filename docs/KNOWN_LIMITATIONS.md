@@ -5,7 +5,7 @@ Recommendation: blocked for production. The maximum defensible launch posture is
 ## Blocking
 
 - Missing `JUNKHAUL_REHAUL_MASTER_BACKLOG.md`; full acceptance comparison cannot be completed.
-- Local Node is `v21.6.0`, but repo requires `>=22.13.0 <23`; `npm ci` fails with `EBADENGINE`.
+- Default local Node is `v21.6.0`, but Homebrew `node@22` is installed and works as `v22.23.1` with npm `10.9.8`; `npm ci` under Node 22 is blocked by DNS to `registry.npmjs.org`.
 - No successful final GitHub Actions link is available.
 - No staging deployment URL, screenshots, or recorded end-to-end demonstration is available.
 - No production Supabase credentials or migration evidence were available.
@@ -30,4 +30,3 @@ Recommendation: blocked for production. The maximum defensible launch posture is
 - Existing production data may contain duplicate unreleased reservations; migration should be applied first to staging and then production only after backup/preflight.
 - Dependency audit reports unresolved advisories.
 - Build output was not generated, so private env inlining cannot be ruled out.
-

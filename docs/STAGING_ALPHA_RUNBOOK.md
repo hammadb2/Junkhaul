@@ -8,17 +8,17 @@ Worktree: `/Users/hammadbhatti/Junkhaul-origin-main` at `210afe0a3523da26d688831
 
 | Command | Result |
 | --- | --- |
-| `node --version` | `v21.6.0` |
-| `npm --version` | `10.2.4` |
-| `rm -rf node_modules` | Sandbox rejected literal destructive command; worktree had no `node_modules` |
-| `npm ci` | Failed: `EBADENGINE`; required Node `>=22.13.0 <23`, actual `v21.6.0` |
+| `node --version` | Initial default: `v21.6.0`; corrected toolchain: `v22.23.1` via `/opt/homebrew/opt/node@22/bin/node` |
+| `npm --version` | Initial default: `10.2.4`; corrected toolchain: `10.9.8` |
+| `rm -rf node_modules` | Sandbox rejected literal destructive command; worktree had no `node_modules` before retry |
+| `npm ci` | Initial failure: `EBADENGINE`; after Node 22 install, failed twice on DNS: `getaddrinfo ENOTFOUND registry.npmjs.org` fetching `ws-8.21.1.tgz` |
 | `npm run migrations:check` | Passed: `Migration history check passed for 64 files.` |
 | `npm run lint` | Failed: `eslint: command not found` because install failed |
 | `npm run test:unit` | Failed after `auth tests passed`: missing package `sharp` because install failed |
 | `npm run test:migrations` | Passed: payroll `47/0`, payment validation `8/0`, migration history passed |
 | `npm run test:integration` | Failed: missing `@supabase/supabase-js`; install and test DB unavailable |
 | `npm run secret-scan` | Passed |
-| `npm run audit` | Failed release standard: 8 vulnerabilities, including high-audit command output with advisories |
+| `npm run audit` | Earlier default-node run reported advisories; Node 22 retry failed on DNS to npm audit endpoint |
 | `npm run build` | Failed: `next: command not found` because install failed |
 | `flutter pub get` | Failed: DNS lookup for `pub.dev` |
 | `dart run build_runner build --delete-conflicting-outputs` | Failed: DNS lookup for `pub.dev` |
@@ -38,4 +38,3 @@ Worktree: `/Users/hammadbhatti/Junkhaul-origin-main` at `210afe0a3523da26d688831
 ## Demonstration Records To Capture
 
 Capture test identities, quote inputs, cost breakdown, route version, AI evidence, donation approval, inventory ID, SKU, listing ID, cart ID, reservation ID, Stripe PaymentIntent, webhook event ID, order ID, manifest, crew scans, proof of delivery, actual expenses, reconciliation, final contribution/margin, and audit event IDs.
-
