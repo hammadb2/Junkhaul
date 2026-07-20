@@ -7,28 +7,44 @@ import {
   computeOverheadAllocation,
   quotePriceFromCost,
   getCostConfig,
+  resolveEffectiveVersion,
   DEFAULT_VEHICLE_CLASS,
 } from '../lib/costConfig.js';
 
 // Pure function tests with mock rate rows.
 const rentalRate = {
+  status: 'active',
+  effective_from: '2026-07-01T00:00:00Z',
+  effective_to: null,
   daily_rate: 40,
   included_km: 0,
   per_km_rate: 1.491,
 };
 const fuelRate = {
+  status: 'active',
+  effective_from: '2026-07-01T00:00:00Z',
+  effective_to: null,
   price_per_litre: 1.75,
   quote_safety_l_per_100km: 45,
 };
 const laborRate = {
+  status: 'active',
+  effective_from: '2026-07-01T00:00:00Z',
+  effective_to: null,
   hourly_rate: 18,
   burden_percent: 0,
 };
 const facilityRate = {
+  status: 'active',
+  effective_from: '2026-07-01T00:00:00Z',
+  effective_to: null,
   flat_minimum: 80,
   item_fees: {},
 };
 const overheadRate = {
+  status: 'active',
+  effective_from: '2026-07-01T00:00:00Z',
+  effective_to: null,
   payment_fees_percent: 0,
   supplies_per_job: 0,
   insurance_allocation_per_day: 0,
@@ -38,6 +54,9 @@ const overheadRate = {
   risk_reserve_percent: 0,
 };
 const pricingPolicy = {
+  status: 'active',
+  effective_from: '2026-07-01T00:00:00Z',
+  effective_to: null,
   target_margin_percent: 20,
   rounding_rule: 'nearest_dollar',
 };
@@ -108,5 +127,15 @@ assert.equal(cfg.labor.hourly_rate, 18);
 assert.equal(cfg.facility.flat_minimum, 80);
 assert.equal(cfg.policy.target_margin_percent, 20);
 assert.equal(cfg.vehicle.vehicle_class, DEFAULT_VEHICLE_CLASS);
+
+// Historical quote resolution: changing tomorrow's fuel rate cannot alter yesterday's quote.
+const fuelVersions = [
+  { ...fuelRate, status: 'superseded', effective_from: '2026-01-01T00:00:00Z', effective_to: '2026-07-20T00:00:00Z' },
+  { ...fuelRate, price_per_litre: 2.0, status: 'active', effective_from: '2026-07-20T00:00:00Z', effective_to: null },
+];
+const pastQuoteFuel = resolveEffectiveVersion(fuelVersions, '2026-06-15T12:00:00Z');
+const futureQuoteFuel = resolveEffectiveVersion(fuelVersions, '2026-08-01T12:00:00Z');
+assert.equal(pastQuoteFuel.price_per_litre, 1.75);
+assert.equal(futureQuoteFuel.price_per_litre, 2.0);
 
 console.log('costConfig tests passed');

@@ -296,29 +296,3 @@ async function buildImpactPreview(proposedRecord, table, asOf) {
 function roundCurrency(value, decimals = 2) {
   return Math.round(Number(value) * 10 ** decimals) / 10 ** decimals;
 }
-
-// GET /api/admin/cost-config/preview — impact of a proposed version.
-export async function preview(req) {
-  const auth = await requireStaffPermission(req, {
-    permission: 'cost_config.read',
-    action: 'cost_config.preview',
-    metadata: { route: '/api/admin/cost-config/preview' },
-  });
-  if (!auth.ok) return auth.response;
-
-  try {
-    const { searchParams } = req.nextUrl;
-    const table = searchParams.get('type');
-    const raw = searchParams.get('record');
-    if (!table || !raw || !VERSIONED_TABLES.has(table)) {
-      return NextResponse.json({ error: 'type and record query params required' }, { status: 422 });
-    }
-    const record = JSON.parse(raw);
-    const asOf = searchParams.get('asOf') || new Date().toISOString();
-    const preview = await buildImpactPreview(record, table, asOf);
-    return NextResponse.json({ preview });
-  } catch (err) {
-    console.error('cost-config preview error:', err);
-    return NextResponse.json({ error: err.message }, { status: 400 });
-  }
-}
