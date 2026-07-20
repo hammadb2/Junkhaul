@@ -11,9 +11,12 @@ export async function middleware(req) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Attach tenant slug for downstream routes/layouts.
+  // Attach tenant slug and correlation ID for observability.
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-tenant', isRehaulHost(host) ? 'rehaul' : 'junkhaul');
+  if (!requestHeaders.get('x-correlation-id')) {
+    requestHeaders.set('x-correlation-id', `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  }
 
   // Protect /admin (except the login page itself).
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {

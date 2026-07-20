@@ -36,6 +36,9 @@ import BookingDetailView from './BookingDetailView';
 import CommunicationsPanel from './CommunicationsPanel';
 import ManagerDashboard from './ManagerDashboard';
 import StaffAccessPanel from './StaffAccessPanel';
+import SecurityPanel from './SecurityPanel';
+import AlertsPanel from './AlertsPanel';
+import LaunchGatesPanel from './LaunchGatesPanel';
 
 const NAV = [
   { label: 'Overview', items: [
@@ -70,6 +73,11 @@ const NAV = [
     { id: 'intel', label: 'Intel', Icon: IconDiamond },
     { id: 'referrals', label: 'Referrals', Icon: IconLink },
   ]},
+  { label: 'Governance', items: [
+    { id: 'security', label: 'Security & Audit', Icon: IconHistory },
+    { id: 'alerts', label: 'Alerts', Icon: IconBell },
+    { id: 'launchGates', label: 'Launch Gates', Icon: IconClipboard },
+  ]},
   { label: 'System', items: [
     { id: 'config', label: 'Config', Icon: IconSettings },
     { id: 'dispatchlog', label: 'Dispatch Log', Icon: IconPhone },
@@ -103,6 +111,9 @@ const VIEW_META = {
   config: ['Config', 'System settings & kill switches'],
   audit: ['Audit', 'System event log'],
   dispatchlog: ['Dispatch Log', 'AI dispatch agent action history'],
+  security: ['Security & Audit', 'Permission matrix and immutable audit events'],
+  alerts: ['Alerts', 'Open operational and security alerts'],
+  launchGates: ['Launch Gates', 'Staged launch checklist and sign-offs'],
 };
 
 const VIEWS = {
@@ -116,6 +127,7 @@ const VIEWS = {
   itemEvidence: ItemEvidenceReview,
   aiQuality: AIQualityPanel,
   config: ConfigPanel, audit: AuditTrail, dispatchlog: DispatchLogView,
+  security: SecurityPanel, alerts: AlertsPanel, launchGates: LaunchGatesPanel,
 };
 
 export default function AdminLayout({ onLogout }) {
