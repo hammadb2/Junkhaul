@@ -28,7 +28,12 @@ export async function GET(_req, { params }) {
     const intent = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
     clientSecret = intent.client_secret;
   } else {
-    const intent = await createDepositPayment(booking.id, booking.name);
+    const intent = await createDepositPayment({
+      booking_id: booking.id,
+      customer_name: booking.name,
+      amount_cents: 5000,
+      quote_decision_id: booking.quote_decision_id || null,
+    });
     await supabaseAdmin
       .from('bookings')
       .update({ stripe_payment_intent_id: intent.id })

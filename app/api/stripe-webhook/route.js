@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabase';
 import { handleBookingConfirmed } from '@/lib/bookingActions';
+import { confirmQuoteDecisionBooking } from '@/lib/quoteDecision';
 
 export const runtime = 'nodejs';
 
@@ -46,6 +47,15 @@ export async function POST(req) {
             status: 'confirmed',
           })
           .eq('id', booking_id);
+
+        // Confirm the quote decision once payment has succeeded.
+        if (booking.quote_decision_id) {
+          try {
+            await confirmQuoteDecisionBooking({ decisionId: booking.quote_decision_id, bookingId: booking_id });
+          } catch (err) {
+            console.error('Quote decision confirmation failed:', err.message);
+          }
+        }
 
         // Reserve the slot.
         await supabaseAdmin.rpc('increment_slot', {
