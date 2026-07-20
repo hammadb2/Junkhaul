@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { requireStaffPermission } from '@/lib/staffAuth';
+import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { authorizeQuoteDecision } from '@/lib/quoteDecision';
 
 export const runtime = 'nodejs';
 
 // POST { reason, new_price_cents?, authorization_limit_cents? }
 export async function POST(req, { params }) {
-  const auth = await requireStaffPermission(req, { permission: 'bookings.override', ownerOnly: true, action: 'quote_decision.override' });
-  if (!auth.ok) return auth.response;
+  const store = await cookies();
+  const token = store.get(ADMIN_COOKIE)?.value;
+  const expected = await adminToken();
+  if (!token || token !== expected) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   const { id } = await params;
   const { reason, new_price_cents, authorization_limit_cents } = await req.json();
