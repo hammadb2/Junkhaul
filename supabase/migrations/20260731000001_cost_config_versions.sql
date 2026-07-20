@@ -8,6 +8,8 @@
 -- created; changes are applied as new versions that supersede the old.
 -- ============================================================
 
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 -- ============================================================
 -- 1. VEHICLE PROFILES
 --    Configurable truck / trailer profiles with capacity and
@@ -60,7 +62,7 @@ CREATE TABLE IF NOT EXISTS rental_rate_versions (
     provider WITH =,
     location WITH =,
     vehicle_profile_id WITH =,
-    tsrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
+    tstzrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
   ) WHERE (status = 'active')
 );
 
@@ -84,7 +86,7 @@ CREATE TABLE IF NOT EXISTS fuel_rate_versions (
   created_at timestamptz NOT NULL DEFAULT now(),
   audit_history jsonb NOT NULL DEFAULT '[]'::jsonb,
   CONSTRAINT fuel_rate_versions_no_overlap EXCLUDE USING gist (
-    tsrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
+    tstzrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
   ) WHERE (status = 'active')
 );
 
@@ -110,7 +112,7 @@ CREATE TABLE IF NOT EXISTS labor_rate_versions (
   audit_history jsonb NOT NULL DEFAULT '[]'::jsonb,
   CONSTRAINT labor_rate_versions_no_overlap EXCLUDE USING gist (
     role_or_employee WITH =,
-    tsrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
+    tstzrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
   ) WHERE (status = 'active')
 );
 
@@ -140,7 +142,7 @@ CREATE TABLE IF NOT EXISTS facility_rate_versions (
   CONSTRAINT facility_rate_versions_no_overlap EXCLUDE USING gist (
     facility WITH =,
     waste_stream WITH =,
-    tsrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
+    tstzrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
   ) WHERE (status = 'active')
 );
 
@@ -169,7 +171,7 @@ CREATE TABLE IF NOT EXISTS overhead_rate_versions (
   created_at timestamptz NOT NULL DEFAULT now(),
   audit_history jsonb NOT NULL DEFAULT '[]'::jsonb,
   CONSTRAINT overhead_rate_versions_no_overlap EXCLUDE USING gist (
-    tsrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
+    tstzrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
   ) WHERE (status = 'active')
 );
 
@@ -196,7 +198,7 @@ CREATE TABLE IF NOT EXISTS pricing_policy_versions (
   created_at timestamptz NOT NULL DEFAULT now(),
   audit_history jsonb NOT NULL DEFAULT '[]'::jsonb,
   CONSTRAINT pricing_policy_versions_no_overlap EXCLUDE USING gist (
-    tsrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
+    tstzrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz), '[)') WITH &&
   ) WHERE (status = 'active')
 );
 

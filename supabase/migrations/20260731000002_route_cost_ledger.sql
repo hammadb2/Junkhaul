@@ -205,17 +205,23 @@ ALTER TABLE job_cost_allocations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profitability_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expense_receipts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "service_role_all_route_runs" ON route_runs
+DROP POLICY IF EXISTS "service_role_all_route_runs" ON route_runs;
+CREATE POLICY "service_role_all_route_runs" ON route_runs
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "service_role_all_route_stops" ON route_stops
+DROP POLICY IF EXISTS "service_role_all_route_stops" ON route_stops;
+CREATE POLICY "service_role_all_route_stops" ON route_stops
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "service_role_all_cost_ledger" ON cost_ledger_entries
+DROP POLICY IF EXISTS "service_role_all_cost_ledger" ON cost_ledger_entries;
+CREATE POLICY "service_role_all_cost_ledger" ON cost_ledger_entries
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "service_role_all_job_allocations" ON job_cost_allocations
+DROP POLICY IF EXISTS "service_role_all_job_allocations" ON job_cost_allocations;
+CREATE POLICY "service_role_all_job_allocations" ON job_cost_allocations
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "service_role_all_profitability" ON profitability_snapshots
+DROP POLICY IF EXISTS "service_role_all_profitability" ON profitability_snapshots;
+CREATE POLICY "service_role_all_profitability" ON profitability_snapshots
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "service_role_all_expense_receipts" ON expense_receipts
+DROP POLICY IF EXISTS "service_role_all_expense_receipts" ON expense_receipts;
+CREATE POLICY "service_role_all_expense_receipts" ON expense_receipts
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ============================================================
