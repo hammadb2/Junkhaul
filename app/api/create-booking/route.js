@@ -15,7 +15,8 @@ import { normalizePhone } from '@/lib/phone';
 import { ATTRIBUTION_COOKIE, captureAttribution } from '@/lib/attribution';
 import { createPriceLedgerEntry } from '@/lib/priceLedger';
 import { recordTimelineEvent } from '@/lib/timeline';
-import { quoteWithCost, persistProfitabilitySnapshot, toCents } from '@/lib/costLedger';
+import { toCents } from '@/lib/money';
+import { createQuoteDecision, linkQuoteDecisionToBooking } from '@/lib/quoteDecision';
 
 export const runtime = 'nodejs';
 
@@ -189,6 +190,57 @@ export async function POST(req) {
       pricingConfig,
     });
 
+    // Server-side no-loss quote gate.
+    const quoteInput = {
+      name,
+      phone: normalizedPhone || phone,
+      address,
+      unit,
+      load_size,
+      same_day,
+      stairs,
+      has_freon,
+      freon_count,
+      job_date,
+      job_time,
+      job_window_label,
+      job_window_start,
+      job_window_end,
+      travel_km: travelKm,
+      truck_size,
+      photos,
+      photo_skipped,
+      description_text,
+      ai_load_estimate,
+      ai_weight_estimate_kg,
+      ai_confidence,
+      has_hazmat,
+      hazmat_description,
+      requested_price_cents: toCents(priced.total),
+    };
+    const decision = await createQuoteDecision({
+      quoteInput,
+      priceCents: toCents(priced.total),
+      depositCents: toCents(priced.deposit ?? PRICING.deposit),
+      actorType: 'customer',
+    });
+
+    if (decision.state !== 'approved') {
+      return NextResponse.json(
+        {
+          state: decision.state,
+          quote_decision_ref: decision.quote_decision_ref,
+          minimum_price: decision.minimum_price_cents / 100,
+          proposed_price: decision.price_cents / 100,
+          reasons: decision.decision_reasons,
+          message: decision.state === 'needs_evidence'
+            ? 'We need a few more details before we can give a firm quote.'
+            : 'This quote is below our policy minimum and requires a manager review.',
+        },
+        { status: 402 }
+      );
+    }
+
     // Weight safety flag.
     const weight = checkWeightFlag(load_size, ai_weight_estimate_kg, pricingConfig);
     const finalFlag = Boolean(flag_for_review) || weight.severity === 'hard';
@@ -297,6 +349,7 @@ export async function POST(req) {
       status: 'pending_payment',
       referral_code: referral_code || null,
       pricing_config_version: 'runtime_system_config',
+      quote_decision_id: decision.id,
     };
 
     const { data: booking, error } = await supabaseAdmin
@@ -348,6 +401,7 @@ export async function POST(req) {
     await createPriceLedgerEntry({
       booking_id: booking.id,
       lead_id: linkedLead?.id || null,
+      quote_decision_id: decision.id,
       ledger_type: 'initial_quote',
       pricing: {
         ...priced,
@@ -365,36 +419,8 @@ export async function POST(req) {
       customer_notification_status: 'shown_in_checkout',
     });
 
-    // Canonical cost snapshot — estimated cost for this quote.
-    try {
-      const quoteCost = await quoteWithCost({
-        booking: {
-          id: booking.id,
-          load_size,
-          lat: geo?.lat,
-          lng: geo?.lng,
-          address,
-          total_price: priced.total,
-        },
-        distanceKm: (travelKm || 0) * 2,
-        revenueCents: toCents(priced.total),
-      });
-      await persistProfitabilitySnapshot({
-        bookingId: booking.id,
-        snapshotType: 'booking',
-        revenueCents: toCents(priced.total),
-        directCostCents: quoteCost.breakdown.total_cost_cents,
-        riskBufferCents: quoteCost.breakdown.overhead.risk_reserve_cents,
-        inputSnapshot: {
-          assumptions: quoteCost.assumptions,
-          sourceVersions: quoteCost.sourceVersions,
-          breakdown: quoteCost.breakdown,
-        },
-      });
-    } catch (costErr) {
-      // Cost config may be missing in fresh environments; don't fail the booking.
-      console.error('Cost snapshot failed:', costErr.message);
-    }
+    // Link the approved quote decision to the booking.
+    await linkQuoteDecisionToBooking({ decisionId: decision.id, bookingId: booking.id });
 
     await recordTimelineEvent({
       entity_type: 'booking',
@@ -407,7 +433,7 @@ export async function POST(req) {
     });
 
     // Create the $50 deposit PaymentIntent (with receipt email if provided).
-    const intent = await createDepositPayment(booking.id, name, email);
+    const intent = await createDepositPayment({ booking_id: booking.id, customer_name: name, receipt_email: email, amount_cents: decision.deposit_cents, quote_decision_ref: decision.quote_decision_ref });
     await supabaseAdmin
       .from('bookings')
       .update({ stripe_payment_intent_id: intent.id })

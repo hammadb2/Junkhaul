@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { sendWhatsApp, downloadWhatsAppMedia } from '@/lib/whatsapp';
 import { calculatePrice, getPricingConfig, LOAD_LABELS, PRICING } from '@/lib/pricing';
+import { createQuoteDecision, linkQuoteDecisionToBooking } from '@/lib/quoteDecision';
+import { toCents } from '@/lib/money';
 import { analysePhotos, handleSafetyAlert, stripInternalFields } from '@/lib/ai';
 import { edmontonNowParts, formatDateLong, formatTime, jobDateTimeUTC } from '@/lib/dates';
 import { geocodeAddress } from '@/lib/geocode';
+import { calculateTravelFee } from '@/lib/route';
 import { sendDepositLink } from '@/lib/messages';
 import { createDepositPayment } from '@/lib/stripe';
 import { randomBytes } from 'crypto';
@@ -212,6 +215,29 @@ async function createWhatsAppBooking({ name, phone, address, load_size, job_date
   const pricingConfig = await getPricingConfig();
   const priced = calculatePrice({ load_size, stairs, has_freon, freon_count, job_date, job_time, pricingConfig });
   const geo = await geocodeAddress(address);
+  let travelKm = 0;
+  try {
+    const t = await calculateTravelFee({ lat: geo.lat, lng: geo.lng });
+    travelKm = t.km;
+  } catch {}
+
+  const quoteInput = {
+    name, phone, address,
+    load_size, stairs, has_freon, freon_count,
+    job_date, job_time,
+    lat: geo.lat, lng: geo.lng, travel_km: travelKm,
+    requested_price_cents: toCents(priced.total),
+    photo_skipped: true,
+  };
+  const decision = await createQuoteDecision({
+    quoteInput,
+    priceCents: toCents(priced.total),
+    depositCents: toCents(priced.deposit),
+    actorType: 'whatsapp',
+  });
+  if (decision.state !== 'approved') {
+    return { success: false, state: decision.state, reasons: decision.decision_reasons, error: 'Quote requires review or evidence' };
+  }
 
   const { data: slot } = await supabaseAdmin
     .from('schedule')
@@ -236,7 +262,7 @@ async function createWhatsAppBooking({ name, phone, address, load_size, job_date
       same_day: false, same_day_fee: 0,
       stairs, has_freon, freon_count, freon_fee: priced.freon_fee,
       total_price: priced.total,
-      deposit_amount: PRICING.deposit,
+      deposit_amount: priced.deposit,
       deposit_paid: 0, balance_due: priced.balance_due,
       job_date, job_time,
       job_datetime: jobDateTimeUTC(job_date, job_time).toISOString(),
@@ -244,15 +270,23 @@ async function createWhatsAppBooking({ name, phone, address, load_size, job_date
       booking_ref: bookingRef,
       source: 'whatsapp',
       photo_skipped: true,
+      quote_decision_id: decision.id,
     })
     .select()
     .single();
 
   if (error) return { success: false, error: error.message };
+  await linkQuoteDecisionToBooking({ decisionId: decision.id, bookingId: booking.id });
 
   // Create Stripe PaymentIntent
   try {
-    const intent = await createDepositPayment(booking.id, name, null);
+    const intent = await createDepositPayment({
+      booking_id: booking.id,
+      customer_name: name,
+      amount_cents: decision.deposit_cents,
+      quote_decision_id: decision.id,
+      quote_decision_ref: decision.quote_decision_ref,
+    });
     await supabaseAdmin.from('bookings').update({ stripe_payment_intent_id: intent.id }).eq('id', booking.id);
   } catch (e) {
     console.error('Stripe deposit intent failed for WhatsApp booking:', e.message);
