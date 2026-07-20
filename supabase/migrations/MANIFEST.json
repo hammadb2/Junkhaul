@@ -53,6 +53,7 @@
     "20260802000001_disposal_intelligence.sql": "0c5ae741abcead8a9289539173219eb0e9d3f22781016254c33c8ccc8d6aded6",
     "20260803000001_item_evidence_pipeline.sql": "28daae2d0bb5de097c0980a51c4d8e3b9fd5dd25989be9decb3b56034e155429",
     "20260804000001_ai_quality_reporting.sql": "190244ebbe03823f3b908429f1e06bc7e7156676c669d8a31d7522dee01f6252",
-    "20260805000001_physical_measurements.sql": "c8b489a73c5f1f78febb47fd1470e8598bbf4276367f7df34e00eeaf18bbe35c"
+    "20260805000001_physical_measurements.sql": "c8b489a73c5f1f78febb47fd1470e8598bbf4276367f7df34e00eeaf18bbe35c",
+    "20260806000001_dispatch_control_centre.sql": "eaebd981113ef045e00d40c6684adf17c0f9405096e34bf4e19c3e89859940ab"
   }
 }

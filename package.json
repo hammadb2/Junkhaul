@@ -16,7 +16,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "npm run test:unit",
-    "test:unit": "node tests/auth.test.js && node tests/foundation.test.js && node tests/donation-intelligence.test.js && node tests/route-versioning.test.js && node tests/unitConversions.test.js && node tests/costConfig.test.js && node tests/costLedger.test.js && node tests/quoteDecision.test.js && node tests/routeEngine.test.js && node tests/disposal.test.js && node tests/itemEvidence.test.js && node tests/aiQuality.test.js && node tests/physicalMeasurements.test.js",
+    "test:unit": "node tests/auth.test.js && node tests/foundation.test.js && node tests/donation-intelligence.test.js && node tests/route-versioning.test.js && node tests/unitConversions.test.js && node tests/costConfig.test.js && node tests/costLedger.test.js && node tests/quoteDecision.test.js && node tests/routeEngine.test.js && node tests/disposal.test.js && node tests/itemEvidence.test.js && node tests/aiQuality.test.js && node tests/physicalMeasurements.test.js && node tests/dispatch.test.js",
     "test:auth": "node tests/auth.test.js",
     "test:migrations": "node supabase/migrations/payroll.test.js && node supabase/migrations/payment-validation.test.js && npm run migrations:check",
     "test:integration": "node tests/integration/foundation.integration.js && node tests/integration/donation-intelligence.integration.js",
