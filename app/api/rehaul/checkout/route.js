@@ -19,6 +19,9 @@ export async function POST(req) {
       finalSaleAccepted: body.final_sale_accepted,
       finalSaleVersion: body.final_sale_version,
     });
+    if (order.deliveryReviewRequired) {
+      return NextResponse.json(order, { status: 409 });
+    }
     return NextResponse.json(order);
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 400 });
