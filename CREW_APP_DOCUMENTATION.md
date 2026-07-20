@@ -790,9 +790,6 @@ Set a new password from an admin-generated reset link.
 - **POST** — upload crew arrival/completion photo to `job-photos` bucket, appends to `bookings.crew_photos`.
 - Tables: `bookings`.
 
-### `/api/admin/run-migration`
-- **POST** — `secret='jh-migrate-2026'`. Runs schema migrations for crew photos, call history, push subscriptions, employee document types, etc.
-
 ---
 
 ## 17. Supporting Libraries
@@ -1010,7 +1007,6 @@ Implements CRA T4127 payroll deduction formulas for Alberta.
 - `app/api/admin/mark-arrived/route.js`
 - `app/api/admin/get-job-photos/route.js`
 - `app/api/admin/upload-crew-photo/route.js`
-- `app/api/admin/run-migration/route.js`
 
 ### Shared Libraries
 - `lib/employeeAuth.js`
@@ -4894,20 +4890,6 @@ All admin routes require a valid admin cookie (`ADMIN_COOKIE` token matching `ad
 **Response Format:** `{ url: string }`
 
 **Validation/Auth:** Admin cookie required; `file`, `booking_id`, and `type` required; `type` must be `crew_arrival` or `crew_completion`.
-
----
-
-#### `POST /api/admin/run-migration`
-
-**Business Logic:** Runs a one-time data migration script to add missing columns and tables (crew photo fields on bookings, `call_history`, `escalations`, `compensation_log`, `push_subscriptions`, reset-token columns on `employees`, and `employee_documents` doc-type constraint). Used during environment setup.
-
-**Request Body:** `{ secret: 'jh-migrate-2026' }`
-
-**Database Tables Accessed:** Executes SQL via `exec_sql` RPC or returns manual SQL fallback.
-
-**Response Format:** `{ results: [{ step, error }], message?, sql? }`
-
-**Validation/Auth:** Requires hard-coded secret `jh-migrate-2026` in the request body; no cookie auth.
 
 ## Comprehensive Database Schema (Crew App)
 

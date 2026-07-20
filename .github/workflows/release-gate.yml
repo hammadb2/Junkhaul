@@ -1,0 +1,182 @@
+name: Release Quality Gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Public/placeholder values used only in CI to prove the production build
+  # does not inline private secrets. Real values must be supplied as repository
+  # secrets for integration tests.
+  NEXT_PUBLIC_SUPABASE_URL: 'http://localhost'
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: '__ci_anon_key__'
+  NEXT_PUBLIC_SITE_URL: 'https://junkhaul.ca'
+  NEXT_PUBLIC_GOOGLE_BUSINESS_REVIEW_LINK: 'https://junkhaul.ca'
+  SUPABASE_SERVICE_ROLE_KEY: '__ci_service_role_key_secret_scan_test__'
+  STRIPE_SECRET_KEY: '__ci_stripe_secret_key_secret_scan_test__'
+  STRIPE_WEBHOOK_SECRET: '__ci_stripe_webhook_secret__'
+  GROQ_API_KEY: '__ci_groq_api_key_secret_scan_test__'
+  VAPI_API_KEY: '__ci_vapi_api_key_secret_scan_test__'
+  VAPI_SERVER_SECRET: '__ci_vapi_server_secret_secret_scan_test__'
+  QUO_API_KEY: '__ci_quo_api_key_secret_scan_test__'
+  ADMIN_PASSWORD: '__ci_admin_password_secret_scan_test__'
+  CI_SECRET_SCAN_VARS: 'SUPABASE_SERVICE_ROLE_KEY,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,GROQ_API_KEY,VAPI_API_KEY,VAPI_SERVER_SECRET,QUO_API_KEY,ADMIN_PASSWORD'
+
+jobs:
+  quality-gate:
+    name: Quality gate (Node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate migration history
+        run: npm run migrations:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Migration tests
+        run: npm run test:migrations
+
+      - name: Production build
+        run: npm run build
+
+      - name: Secret scan
+        run: npm run secret-scan
+
+      - name: Dependency audit
+        run: npm run audit
+
+  integration:
+    name: Integration tests
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TEST_ENVIRONMENT: ${{ secrets.TEST_ENVIRONMENT }}
+      TEST_PROJECT_REF: ${{ secrets.TEST_PROJECT_REF }}
+      APPROVED_TEST_PROJECT_REF: ${{ secrets.APPROVED_TEST_PROJECT_REF }}
+      ALLOW_TEST_DATABASE_RESET: ${{ secrets.ALLOW_TEST_DATABASE_RESET }}
+      ALLOW_REMOTE_TEST_DATABASE: ${{ secrets.ALLOW_REMOTE_TEST_DATABASE }}
+      TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      TEST_APP_BASE_URL: ${{ secrets.TEST_APP_BASE_URL }}
+      TEST_QUO_WEBHOOK_SIGNING_SECRET: ${{ secrets.TEST_QUO_WEBHOOK_SIGNING_SECRET }}
+      TEST_STORAGE_BUCKET: ${{ secrets.TEST_STORAGE_BUCKET || 'donation-photos' }}
+      INTEGRATION_APPLY_MIGRATIONS: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        if: env.TEST_ENVIRONMENT != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: env.TEST_ENVIRONMENT != ''
+        run: npm ci
+
+      - name: Install psql client
+        if: env.TEST_ENVIRONMENT != ''
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run integration tests
+        if: env.TEST_ENVIRONMENT != ''
+        run: npm run test:integration
+
+      - name: Skip integration tests
+        if: env.TEST_ENVIRONMENT == ''
+        run: echo 'Integration environment not configured; skipping. Set the TEST_ENVIRONMENT repository secret to enable.'
+
+  flutter:
+    name: Flutter checks
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FLUTTER_VERSION: '3.44.4'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Generate secrets.dart from example
+        working-directory: apps/crew_app
+        run: |
+          if [ ! -f lib/src/core/secrets.dart ]; then
+            cp lib/src/core/secrets.dart.example lib/src/core/secrets.dart
+          fi
+
+      - name: Pub get
+        working-directory: apps/crew_app
+        run: flutter pub get
+
+      - name: Build runner
+        working-directory: apps/crew_app
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Dart format check
+        working-directory: apps/crew_app
+        run: dart format --set-exit-if-changed .
+
+      - name: Flutter analyze
+        working-directory: apps/crew_app
+        run: flutter analyze
+
+      - name: Flutter test
+        working-directory: apps/crew_app
+        run: flutter test
+
+  release-gate:
+    name: Release gate
+    runs-on: ubuntu-latest
+    needs: [quality-gate, integration, flutter]
+    if: always()
+    steps:
+      - name: Gate check
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          needs = json.loads('''${{ toJson(needs) }}''')
+          for name, data in needs.items():
+            if data['result'] not in ('success', 'skipped'):
+              print(f'{name} result: {data["result"]}')
+              sys.exit(1)
+          print('Release gate passed')
+          PY

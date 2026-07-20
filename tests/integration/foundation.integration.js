@@ -499,7 +499,7 @@ try {
   assert.ok(deniedAuditCount >= 1, 'Denied sensitive attempt must be audited.');
 
   const migrationEndpoint = await appFetch('/api/admin/run-migration', { method: 'POST', headers: { ...headers, ...cookieFor(ownerSession) }, body: JSON.stringify({ sql: 'select 1' }) });
-  assert.equal(migrationEndpoint.res.status, 410, 'Runtime migration endpoint must remain disabled even for owner.');
+  assert.equal(migrationEndpoint.res.status, 404, 'Runtime migration route must be decommissioned and return 404.');
 
   const staffAccessOwner = await appFetch('/api/admin/staff-access', { headers: cookieFor(ownerSession) });
   assert.equal(staffAccessOwner.res.status, 200, staffAccessOwner.text);

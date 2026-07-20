@@ -19,22 +19,11 @@ async function checkAuth() {
 Never use a hardcoded plaintext secret in the request body — that was the
 original `/api/admin/run-migration` vulnerability (fixed 2026-07-13).
 
-## TODO: decommission /api/admin/run-migration
-The route at `app/api/admin/run-migration/route.js` is a one-time schema
-migration tool. Its auth was hardened (now uses the admin cookie), but the
-route itself is still pending deletion. Before deleting:
-
-1. Move the `escalations` and `compensation_log` `CREATE TABLE` statements
-   (plus their RLS policies) from that route into a new timestamped file under
-   `supabase/migrations/`. This route is currently the ONLY place those two
-   table schemas are defined, and both are actively used by `lib/vapiTools.js`.
-   (Verified 2026-07-13: no existing migration file references either table.)
-2. Confirm the one-time column additions (`crew_photos`, `crew_photos_taken_at`,
-   `crew_arrived_at`, `employees.reset_token`, `employees.reset_expires_at`,
-   `employee_documents` doc_type constraint, `push_subscriptions`) are already
-   live in production.
-3. Delete the route and remove its references from `APP_LOGIC.md`,
-   `docs/APP_LOGIC.md`, and `CREW_APP_DOCUMENTATION.md`.
+## Decommissioned: `/api/admin/run-migration`
+The runtime migration route has been removed. Schema changes are applied via
+versioned files in `supabase/migrations/`. The `escalations` and
+`compensation_log` tables are defined in
+`supabase/migrations/20260726000001_customer_admin_foundation.sql`.
 
 ## Admin visibility gaps (from schema audit, 2026-07-13)
 Tables that collect data but have no admin route/UI. Priority order:
@@ -60,4 +49,7 @@ references in the codebase.
 ## Useful commands
 - Lint: `npm run lint`
 - Build: `npm run build`
-- Payroll tests: `npm test`
+- Unit tests: `npm test` (alias for `npm run test:unit`)
+- Auth/security tests: `npm run test:security:auth`
+- Migration tests: `npm run test:migrations`
+- Integration tests: `npm run test:integration` (requires disposable Supabase env)
