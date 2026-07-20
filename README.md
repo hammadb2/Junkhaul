@@ -17,10 +17,13 @@ booking, any day, guaranteed pickup within 24 hours via dynamic dispatch), all t
 
 ## 1. Local setup
 
+Requires Node 22 and npm 10 (see `.nvmrc`):
+
 ```bash
-npm install
+nvm use              # or install Node 22.13.0+ / npm 10.x
+npm ci               # install from lockfile
 cp .env.example .env.local   # fill in real values (see section 2)
-npm run dev                  # http://localhost:3000
+npm run dev          # http://localhost:3000
 ```
 
 Key routes:
@@ -105,8 +108,12 @@ actions.
 ## Scripts
 
 ```bash
-npm run dev      # dev server
-npm run build    # production build
-npm run start    # serve production build
-npm run lint     # eslint
+npm run dev              # dev server
+npm run build            # production build
+npm run start            # serve production build
+npm run lint             # eslint
+npm test                 # unit tests (auth/foundation/donation/route-versioning)
+npm run test:migrations  # payroll, payment validation, and migration manifest
+npm run test:security    # secret scan + npm audit
+npm run test:integration # requires disposable Supabase env (see .env.integration.example)
 ```

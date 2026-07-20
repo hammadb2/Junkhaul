@@ -851,7 +851,6 @@ All crew app API calls go through this client. Endpoints called:
 | `/api/admin/referrals` | GET | Referral management |
 | `/api/admin/remittance` | GET/POST | Remittance tracking |
 | `/api/admin/reschedule` | POST | Reschedule booking |
-| `/api/admin/run-migration` | POST | DEPRECATED — schema migration (pending deletion) |
 | `/api/admin/safety-incidents` | GET/PATCH | Safety incident reports |
 | `/api/admin/schedule` | GET/POST | Schedule management |
 | `/api/admin/send-sms` | POST | Send manual SMS |
@@ -1606,9 +1605,9 @@ Opportunistic offer accepted
 - No booking price revision history (only `lead_quotes` for pre-booking)
 - No refund history table
 - Vapi calls not attached to bookings (phone_calls.booking_id always null)
-- `escalations` and `compensation_log` tables only defined in deprecated run-migration route
+- `escalations` and `compensation_log` tables migrated to `supabase/migrations/20260726000001_customer_admin_foundation.sql`
 - `crew_location` (singular) is dead code, `crew_locations` (plural) is live
-- `/api/admin/run-migration` pending deletion
+- `/api/admin/run-migration` deleted
 
 ### 12.3 Deployment Status
 

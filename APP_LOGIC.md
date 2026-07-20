@@ -582,7 +582,6 @@ Detects stage from last outbound message:
 - **call-history**: view call logs
 - **waitlist**: view/manage waitlist
 - **stripe-branding**: Stripe branding config
-- **run-migration**: trigger DB migration
 
 ### Route Optimization (app/api/admin/optimise-route/route.js)
 1. Get all confirmed/rescheduled bookings for a date
