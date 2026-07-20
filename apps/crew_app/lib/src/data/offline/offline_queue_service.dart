@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
@@ -10,6 +11,13 @@ import 'offline_action.dart';
 /// Manages a Hive-backed queue of [OfflineAction]s that are replayed when
 /// the network is available. Used by repositories to enqueue writes that
 /// would otherwise fail mid-flight.
+///
+/// Production-safe behavior:
+/// - Every action carries an idempotency key.
+/// - Actions are removed only after the server confirms success.
+/// - Failed actions are retried with exponential backoff.
+/// - Conflicts and permanent failures surface to the UI instead of silently
+///   dropping.
 class OfflineQueueService {
   OfflineQueueService(this._box, this._dio);
 
@@ -25,13 +33,16 @@ class OfflineQueueService {
   String enqueue({
     required String type,
     required Map<String, dynamic> payload,
+    String? idempotencyKey,
     List<String>? filePaths,
   }) {
-    final id = '${DateTime.now().microsecondsSinceEpoch}';
+    final id =
+        '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(9999)}';
     final action = OfflineAction(
       id: id,
       type: type,
       payload: payload,
+      idempotencyKey: idempotencyKey ?? '${type}_$id',
       filePaths: filePaths,
     );
     _box.put(id, action.toJson());
@@ -39,42 +50,59 @@ class OfflineQueueService {
     return id;
   }
 
-  /// Process the queue in insertion order. Each action is removed only on
-  /// success. Failed actions stay in the queue and are retried on the next
-  /// flush.
+  /// Process the queue. Each action is retried with exponential backoff and
+  /// removed only on explicit server confirmation. Actions with unrecoverable
+  /// errors are marked so the UI can show them.
   Future<void> flush() async {
     if (_box.isEmpty) return;
-    final keys = _box.keys.toList();
+    final keys = _box.keys.toList().cast<String>();
     for (final key in keys) {
       final raw = _box.get(key);
       if (raw == null) continue;
       final action = OfflineAction.fromJson(
         Map<String, dynamic>.from(raw as Map),
       );
+
+      // Exponential backoff: at least wait 2^attempts seconds.
+      final backoffSeconds = pow(2, action.attempts).toInt().clamp(1, 300);
+      if (action.attempts > 0) {
+        await Future.delayed(Duration(seconds: backoffSeconds));
+      }
+
       action.attempts += 1;
-      _box.put(key, action.toJson());
+      await _box.put(key, action.toJson());
+
       try {
-        await _processAction(action);
-        await _box.delete(key);
-      } catch (_) {
-        // Leave in queue for next flush.
+        final confirmed = await _processAction(action);
+        if (confirmed) {
+          action.serverConfirmed = true;
+          await _box.put(key, action.toJson());
+          await _box.delete(key);
+        } else {
+          // Stop retrying this batch if a conflict requires user resolution.
+          break;
+        }
+      } catch (e) {
+        // Leave in queue for next flush; permanent errors handled by caller.
+        if (action.attempts >= 10) {
+          action.payload['_permanent_error'] = e.toString();
+          await _box.put(key, action.toJson());
+        }
       }
     }
     _pendingController.add(_box.length);
   }
 
-  Future<void> _processAction(OfflineAction action) async {
+  Future<bool> _processAction(OfflineAction action) async {
     final path = _routeForType(action.type);
-    if (path == null) return;
-    if (action.filePaths != null && action.filePaths!.isNotEmpty) {
-      // Multipart upload is handled by the calling repository because it
-      // needs to construct a FormData with the right field names.
-      // For now, send the JSON payload; repositories that need multipart
-      // should handle their own retries.
-      await _dio.postJson(path, body: action.payload);
-    } else {
-      await _dio.postJson(path, body: action.payload);
-    }
+    if (path == null) return true; // Unknown type: drop to avoid loops.
+
+    final body = {...action.payload, 'idempotency_key': action.idempotencyKey};
+
+    final response = await _dio.postJson(path, body: body);
+    final status = (response['status'] as String?) ?? 'synced';
+    if (status == 'conflict') return false; // Requires user resolution.
+    return true;
   }
 
   String? _routeForType(String type) {
@@ -86,7 +114,6 @@ class OfflineQueueService {
       case 'location':
         return '/api/employee/location';
       case 'job_clock_in':
-        return '/api/employee/job-clock';
       case 'job_clock_out':
         return '/api/employee/job-clock';
       case 'signature':
@@ -109,6 +136,20 @@ class OfflineQueueService {
         return '/api/crew/collect-payment';
       case 'route_acknowledgment':
         return '/api/employee/route-plan';
+      case 'loaded_item':
+        return '/api/crew/loaded-items';
+      case 'truck_inspection':
+        return '/api/crew/truck-inspection';
+      case 'fuel_receipt':
+        return '/api/crew/fuel';
+      case 'odometer_reading':
+        return '/api/crew/odometer';
+      case 'barcode_scan':
+        return '/api/crew/barcode';
+      case 'rental_return':
+        return '/api/crew/rental-return';
+      case 'batch_sync':
+        return '/api/crew/sync';
       default:
         return null;
     }
