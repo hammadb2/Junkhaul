@@ -26,6 +26,8 @@ import ReferralsPanel from './ReferralsPanel';
 import ConfigPanel from './ConfigPanel';
 import CostConfigPanel from './CostConfigPanel';
 import QuoteDecisionsView from './QuoteDecisionsView';
+import ItemEvidenceReview from './ItemEvidenceReview';
+import AIQualityPanel from './AIQualityPanel';
 import AuditTrail from './AuditTrail';
 import DispatchLogView from './DispatchLogView';
 import MarketingPanel from './MarketingPanel';
@@ -53,6 +55,8 @@ const NAV = [
     { id: 'payroll', label: 'Payroll', Icon: IconWallet },
     { id: 'costConfig', label: 'Cost Config', Icon: IconDollar },
     { id: 'quoteDecisions', label: 'Quote Exceptions', Icon: IconHourglass },
+    { id: 'itemEvidence', label: 'Item Evidence Review', Icon: IconSearch },
+    { id: 'aiQuality', label: 'AI Quality', Icon: IconTrending },
   ]},
   { label: 'People', items: [
     { id: 'crew', label: 'Crew', Icon: IconUsers },
@@ -86,6 +90,8 @@ const VIEW_META = {
   payroll: ['Payroll', 'Pay runs, remittances & T4s'],
   costConfig: ['Cost Config', 'Versioned operating costs and pricing policy'],
   quoteDecisions: ['Quote Exceptions', 'Pending or underpriced quotes requiring review'],
+  itemEvidence: ['Item Evidence Review', 'Review AI-detected items, weights and hazards'],
+  aiQuality: ['AI Quality', 'Model performance, correction rate and safety metrics'],
   crew: ['Crew', 'Team roster, onboarding & safety'],
   staffAccess: ['Staff Access', 'Owner-only roles, permissions and manager scopes'],
   growth: ['Growth', 'Funnel health & marketing spend'],
@@ -107,6 +113,8 @@ const VIEWS = {
   growth: GrowthPanel, marketing: MarketingPanel, communications: CommunicationsPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
   costConfig: CostConfigPanel,
   quoteDecisions: QuoteDecisionsView,
+  itemEvidence: ItemEvidenceReview,
+  aiQuality: AIQualityPanel,
   config: ConfigPanel, audit: AuditTrail, dispatchlog: DispatchLogView,
 };
 
