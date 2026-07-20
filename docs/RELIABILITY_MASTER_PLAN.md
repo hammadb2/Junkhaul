@@ -5,12 +5,22 @@
 
 ---
 
-## 0. Environment constraint (read first)
+## 0. Environment constraint (read first) — UPDATE: resolved, real Phase 2 results below
 
-**Node.js/npm are not installed in this sandbox** (`node`/`npm` not on PATH, no system install found, no `.nvmrc` in the repo to pin a version). This means Phase 2 (`npm ci`, `npm test`, `npm run lint`, `npm run build`, `npm audit`, Flutter toolchain) **could not be executed in this session**. Nothing in this document claims a command was run unless a result is shown. Two consequences:
+**Update:** this sandbox had no system Node.js/npm and no admin rights to run the normal MSI installer (winget install requires elevation, which this shell can't grant). Worked around it with a portable Node 22.14.0 zip distribution (no install/elevation required) fetched directly from `nodejs.org` and unpacked into the session scratch directory — not installed system-wide, not committed to the repo. This let Phase 2 commands actually run for real. Results:
 
-1. Every "existing test" reference below is a **static read of the test file's content**, not a passing-test confirmation. Test files that exist may still be failing right now — unknown until someone runs them in an environment with Node 22 installed.
-2. Phase 2 needs to happen in an environment where Node can actually be installed (your machine, a CI runner, or a container). I can do this in a future session if given a shell with Node available, or Daniyal can run the exact command list in section 9 and paste back results.
+| Command | Result |
+|---|---|
+| `npm ci` | **Fails on Windows/Linux**: `EBADPLATFORM` — the committed `package-lock.json` only carries the `darwin-arm64` optional build of `@img/sharp`, so strict lockfile installs (`npm ci`, and internally `npm audit fix`) reject on any other OS/CPU. This is a real portability bug in the lockfile, not an environment problem — it would also break a Linux CI runner. `npm install` (looser resolution) works around it and produced one benign lockfile diff (added a missing `"license": "ISC"` field to an existing entry, no version/integrity changes). Recommend regenerating the lockfile from a machine/CI step that installs on both platforms (or at minimum Linux, since that's what CI would use) so `npm ci` works everywhere. |
+| `npm test` | **PASS.** `payroll.test.js`: 47/47. `payment-validation.test.js`: 8/8. `foundation.test.js`: 161/161 (attribution, consent/STOP-START, expected-reply matching, donation state machine, roles/permissions, webhook dedup). All three suites are genuinely green — this is real evidence, not a static read. |
+| `npm run lint` | **PASS**, warnings only (11× `no-img-element` perf warnings, 3× `react-hooks/exhaustive-deps`). No errors. |
+| `npm run build` | **PASS.** Production build completes clean, all routes compile. |
+| `npm audit` | **11 vulnerabilities: 4 low, 5 moderate, 1 high, 1 critical.** Critical: `next` (current pin `15.1.9`) has a critical-severity advisory bundle including an **authorization bypass in Next.js Middleware** (GHSA-f82v-jwr5-mffw) — directly relevant here because `middleware.js` is this app's *only* gate for `/admin/*`. Also SSRF via middleware redirects, cache poisoning, XSS in App Router, and a dev-server origin-verification gap. Fixing requires bumping `next` to `15.5.20`+ (outside the current package.json range — a deliberate upgrade + regression pass, not a blind `--force`). High: `brace-expansion` DoS, fixable non-breaking via plain `npm audit fix` (blocked in this session by the same lockfile platform issue as `npm ci` — same root cause, same fix). Moderate: `postcss` (transitively via `next`, same fix), `@supabase/auth-js` (insecure path routing — needs `@supabase/supabase-js` bumped to `2.110.7`), `uuid` (via `googleapis`/`gaxios`, breaking bump). None of these were applied yet — see the new P0 item below.
+| Flutter toolchain | Not run — no Android/Xcode toolchain available in this sandbox; needs a machine with those installed. Static findings in section 2.G stand independent of this. |
+
+**New P0, added after this run:** upgrade Next.js off `15.1.9` past the middleware-authorization-bypass advisory, given `middleware.js` is the sole gate protecting every `/admin/*` route. This needs its own careful PR (Next 15.1→15.5 minor bump, full regression pass, not a `--force`), and takes priority alongside the other P0s in section 6.
+
+Also confirmed: several files this brief assumed exist on `main` do not: `.nvmrc`, `.github/workflows/*` (no CI exists on `main` at all), `docs/STAGING_VERIFICATION.md`, `docs/MANUAL_ADMIN_ACCEPTANCE.md`, `docs/ADMIN_PERMISSION_MATRIX.md`, `lib/launchGates.js`, `lib/alerts.js`, `app/api/admin/launch-gates/route.js`, `app/api/admin/alerts/route.js`, `supabase/migrations/MANIFEST.json`. All of them exist **only** on an unmerged remote branch, `origin/agent/rehaul-verification-hardening`, which is a Rehaul-scoped hardening effort (out of scope per your instructions — "do not expand Rehaul"). This explains the mismatch; it is not this audit skipping anything. See section 1.2.
 
 **Also note:** several files this brief assumed exist on `main` do not: `.nvmrc`, `.github/workflows/*` (no CI exists on `main` at all), `docs/STAGING_VERIFICATION.md`, `docs/MANUAL_ADMIN_ACCEPTANCE.md`, `docs/ADMIN_PERMISSION_MATRIX.md`, `lib/launchGates.js`, `lib/alerts.js`, `app/api/admin/launch-gates/route.js`, `app/api/admin/alerts/route.js`, `supabase/migrations/MANIFEST.json`. All of them exist **only** on an unmerged remote branch, `origin/agent/rehaul-verification-hardening`, which is a Rehaul-scoped hardening effort (out of scope per your instructions — "do not expand Rehaul"). This explains the mismatch; it is not this audit skipping anything. See section 1.2.
 
@@ -183,7 +193,10 @@ Legend: **COMPLETE_AND_VERIFIED** (working + has passing automated test evidence
 11. Reconcile `crew_location`/`crew_locations` to one canonical table across all 7+ call sites (customer tracking currently depends on which crew app the crew member used).
 12. Wire `lib/priceLedger.js` into the actual quote/price-change code paths so immutable pricing history is real, not just scaffolded.
 13. Create `supabase/migrations/MANIFEST.json` and a way to verify it against what's actually applied in production.
-14. Get Phase 2 (`npm ci`/`test`/`lint`/`build`/`audit`) actually running somewhere (this sandbox has no Node) and fix whatever it surfaces.
+14. ~~Get Phase 2 (`npm ci`/`test`/`lint`/`build`/`audit`) actually running somewhere~~ — **done, see section 0.** `test`/`lint`/`build` all pass with real evidence. `npm ci` fails cross-platform due to a lockfile issue (see below).
+15. **Upgrade `next` off `15.1.9`** — critical-severity advisory bundle includes an authorization bypass in Next.js Middleware, and `middleware.js` is the only thing gating `/admin/*`. Needs a deliberate version bump (target `15.5.20`+) with a full regression pass, not a blind `--force`.
+16. Fix the `package-lock.json` cross-platform issue (`npm ci`/`npm audit fix` fail with `EBADPLATFORM` on Windows because the lockfile only carries the `darwin-arm64` optional `sharp` build) — regenerate it somewhere that resolves optional deps for all target platforms, otherwise CI will hit the same failure on a Linux runner.
+17. Apply the non-breaking `npm audit fix` for `brace-expansion` (high-severity DoS) once the lockfile issue above is resolved.
 
 ### P1 — required during controlled pilot
 - Wire `staff_accounts`/manager role cookie into the login flow so `lib/roles.js`'s manager-vs-owner model is actually enforced (today everyone with the admin password is `'owner'`).
