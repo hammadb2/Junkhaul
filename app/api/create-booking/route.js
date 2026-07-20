@@ -15,6 +15,7 @@ import { normalizePhone } from '@/lib/phone';
 import { ATTRIBUTION_COOKIE, captureAttribution } from '@/lib/attribution';
 import { createPriceLedgerEntry } from '@/lib/priceLedger';
 import { recordTimelineEvent } from '@/lib/timeline';
+import { quoteWithCost, persistProfitabilitySnapshot, toCents } from '@/lib/costLedger';
 
 export const runtime = 'nodejs';
 
@@ -363,6 +364,37 @@ export async function POST(req) {
       reason: 'Customer accepted website quote before deposit payment',
       customer_notification_status: 'shown_in_checkout',
     });
+
+    // Canonical cost snapshot — estimated cost for this quote.
+    try {
+      const quoteCost = await quoteWithCost({
+        booking: {
+          id: booking.id,
+          load_size,
+          lat: geo?.lat,
+          lng: geo?.lng,
+          address,
+          total_price: priced.total,
+        },
+        distanceKm: (travelKm || 0) * 2,
+        revenueCents: toCents(priced.total),
+      });
+      await persistProfitabilitySnapshot({
+        bookingId: booking.id,
+        snapshotType: 'booking',
+        revenueCents: toCents(priced.total),
+        directCostCents: quoteCost.breakdown.total_cost_cents,
+        riskBufferCents: quoteCost.breakdown.overhead.risk_reserve_cents,
+        inputSnapshot: {
+          assumptions: quoteCost.assumptions,
+          sourceVersions: quoteCost.sourceVersions,
+          breakdown: quoteCost.breakdown,
+        },
+      });
+    } catch (costErr) {
+      // Cost config may be missing in fresh environments; don't fail the booking.
+      console.error('Cost snapshot failed:', costErr.message);
+    }
 
     await recordTimelineEvent({
       entity_type: 'booking',
