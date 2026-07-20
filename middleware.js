@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
 import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
+import { isRehaulHost, shouldBlockAdminOnRehaul } from '@/lib/rehaul';
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
+  const host = req.headers.get('host') || '';
+
+  // Rehaul host cannot reach JunkHaul admin routes.
+  if (shouldBlockAdminOnRehaul(host, pathname)) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // Attach tenant slug for downstream routes/layouts.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-tenant', isRehaulHost(host) ? 'rehaul' : 'junkhaul');
 
   // Protect /admin (except the login page itself).
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
@@ -15,9 +26,9 @@ export async function middleware(req) {
     }
   }
 
-  return NextResponse.next();
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)'],
 };
