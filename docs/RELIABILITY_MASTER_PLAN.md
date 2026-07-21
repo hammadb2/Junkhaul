@@ -1,211 +1,126 @@
-# Junk Haul Reliability Master Plan — Phase 1 Baseline
+# Junk Haul Reliability Master Plan — Corrected Baseline
 
-**Prepared:** 2026-07-20 · **Branch:** `reliability/phase-1` (off `main` @ `210afe0`, fetched from `origin` at audit time)
-**Method:** Static code inspection only (see "Environment constraint" below — no commands were executed against a live database, Stripe, Quo, or Vapi account). Every status below is graded against actual code in the repository, not against the claims in `Progress and status.md`, which self-reports several areas as `COMPLETE_AND_VERIFIED` that this audit found to be materially incomplete. Where this document disagrees with `Progress and status.md`, this document is authoritative because it cites the specific file/line evidence; `Progress and status.md` cites none.
+**Prepared:** 2026-07-20 (correction pass) · **Branch:** `reliability/phase-1-corrections` (off true `origin/main` @ `b35e6b7`)
+
+## ERRATUM — read this before anything below
+
+The version of this document merged via PR #30 (commit `30b00a7`) was built against a **stale local `main` checkout that was 141 commits behind the real `origin/main`**. I branched off local `main` instead of `origin/main` at the very start of that session and didn't catch it until a live database check turned up ~190 production tables with no corresponding code in what I'd been auditing. That gap represents 16+ already-merged PRs: a full Rehaul commerce platform, dispatch control centre, cost ledger, quote-decision gating, disposal intelligence, physical measurements, daily reconciliation/payroll, a phase-5 admin security/launch-gates/alerts system, and a crew-app "production-safe sync, idempotency, and field capture" overhaul. The real `main` has **197 API routes**, not the ~110 the original document was built against.
+
+**Specific claims in the merged version that were wrong and are retracted here:**
+- "No CI exists" — wrong. `.github/workflows/release-gate.yml` and `crew-mobile-build.yml` both exist and are **actually passing** on recent `main` commits (verified via the GitHub Actions API, not just file existence).
+- "`docs/STAGING_VERIFICATION.md`, `docs/MANUAL_ADMIN_ACCEPTANCE.md`, `docs/ADMIN_PERMISSION_MATRIX.md`, `.nvmrc` don't exist" — wrong, all exist, and are detailed, evidence-cited documents, not aspirational fluff. See section 2.
+- "`lib/launchGates.js`, `lib/alerts.js` don't exist, nothing to investigate for the rehaul-tenant-hardcoding concern" — wrong, and worse: **the concern was correct**. See section 3.1 — this is now a confirmed, still-open bug.
+- "Crew app job steps are non-functional UI shells, nothing reaches the backend" — wrong on true `main`. See section 3.4 — this is now confirmed **substantially fixed**.
+- "`escalations`/`compensation_log` only defined in the ad-hoc `run-migration` route" — wrong. A real migration exists (`20260726000001_customer_admin_foundation.sql`), and `app/api/admin/run-migration/route.js` is confirmed deleted.
+- "`next` is pinned at `15.1.9` with a critical middleware-auth-bypass advisory" — wrong, true `main` is already on `next@15.5.20`.
+
+I'm not deleting the old content because the corrective story matters, but treat everything below section 2 as the current, authoritative picture, and treat anything from the originally-merged version not repeated here as **unverified against the real codebase** — don't act on it without rechecking.
+
+**What this correction pass covers vs. doesn't:** given the codebase is now ~2x the size I originally scoped this against, I prioritized (a) re-verifying every claim from the original document that turned out to be checkable and wrong, (b) spot-checking the specific concerns your brief named, (c) reading the existing engineering docs (which are substantially more rigorous than `Progress and status.md`) rather than re-deriving everything from raw code. I did **not** re-derive a line-by-line status for all 197 routes or all ~90 `lib/*.js` files — that's flagged explicitly in section 4 as remaining work, not silently skipped.
 
 ---
 
-## 0. Environment constraint (read first)
+## 1. Environment note
 
-**Node.js/npm are not installed in this sandbox** (`node`/`npm` not on PATH, no system install found, no `.nvmrc` in the repo to pin a version). This means Phase 2 (`npm ci`, `npm test`, `npm run lint`, `npm run build`, `npm audit`, Flutter toolchain) **could not be executed in this session**. Nothing in this document claims a command was run unless a result is shown. Two consequences:
-
-1. Every "existing test" reference below is a **static read of the test file's content**, not a passing-test confirmation. Test files that exist may still be failing right now — unknown until someone runs them in an environment with Node 22 installed.
-2. Phase 2 needs to happen in an environment where Node can actually be installed (your machine, a CI runner, or a container). I can do this in a future session if given a shell with Node available, or Daniyal can run the exact command list in section 9 and paste back results.
-
-**Also note:** several files this brief assumed exist on `main` do not: `.nvmrc`, `.github/workflows/*` (no CI exists on `main` at all), `docs/STAGING_VERIFICATION.md`, `docs/MANUAL_ADMIN_ACCEPTANCE.md`, `docs/ADMIN_PERMISSION_MATRIX.md`, `lib/launchGates.js`, `lib/alerts.js`, `app/api/admin/launch-gates/route.js`, `app/api/admin/alerts/route.js`, `supabase/migrations/MANIFEST.json`. All of them exist **only** on an unmerged remote branch, `origin/agent/rehaul-verification-hardening`, which is a Rehaul-scoped hardening effort (out of scope per your instructions — "do not expand Rehaul"). This explains the mismatch; it is not this audit skipping anything. See section 1.2.
+Node 22/npm 10 confirmed via `.nvmrc` (`22.13.0`) matching the repo requirement. This sandbox has no system Node install and no admin rights to run an installer; a portable Node 22.14.0 distribution was used for the commands that did run (see section 5). `npm ci` on the corrected branch was not completed in this pass (interrupted) — needs a follow-up run before trusting a "tests pass on true main" claim the way section 5 could show for the stale branch.
 
 ---
 
-## 1. Repository state (as found, before any Phase-1 changes)
+## 2. Existing engineering docs — use these, don't duplicate them
 
-### 1.1 Working tree had pre-existing uncommitted work
+The real `main` already has documentation that's materially more rigorous than `Progress and status.md` (which is aspirational/self-reported with no cited evidence). Treat these as living, authoritative sources for their scope, not something this master plan needs to re-derive:
 
-When this session started, `main`'s working tree already had **uncommitted modifications and untracked files** (attribution engine, consent/SMS suppression, donation lifecycle, price ledger, timeline events, roles/permission model, a large new migration `20260716_foundation_attribution_messaging_donation.sql`, and its test file). This looks like unfinished prior work-in-progress, not something this audit created. I did not commit, discard, or alter any of it — it now simply carries forward uncommitted on `reliability/phase-1` as well. **It is reflected in the workflow inventory below** (e.g. attribution, consent, donation sections) because it's real code sitting in the tree, but treat its status as more provisional than committed code until someone decides whether to finish and commit it.
+- **`docs/ADMIN_PERMISSION_MATRIX.md`** — route-by-route permission classification for every `/api/admin/**` route (auth mechanism, allowed roles, manager-scope requirements, audit requirements, test coverage, final classification: `SECURED_AND_TESTED` / `SECURED_NOT_TESTED` / `LEGACY_LOW_RISK` / `LEGACY_HIGH_RISK` / `DISABLED` / `REMOVE`). No route is currently `LEGACY_HIGH_RISK`. Most routes are `SECURED_NOT_TESTED` (auth/permission checks exist, integration coverage doesn't yet) rather than `SECURED_AND_TESTED` — that's real, itemized remaining work, not a gap in the doc.
+- **`docs/STAGING_VERIFICATION.md`** — records a real verification pass against the actual Supabase project (`mvsopvphpuucrbuqsfky` — the same project you gave me pooler credentials for) on 2026-07-17: `npm ci`/`test`/`test:integration`/`lint`/`build` all passed, migration tooling and a duplicate-preflight/hash check passed, `npm audit` was 4 low / 4 moderate / 0 high / 0 critical at that time. It also explicitly flags two unresolved gaps: abandoned-donation-draft cleanup is `NOT_BUILT`, and rejected/completed evidence retention policy is `PARTIAL` — both still worth carrying as open items.
+- **`docs/MANUAL_ADMIN_ACCEPTANCE.md`** — a real manual acceptance pass (2026-07-17) with integration-test citations for each check (owner/staff auth, employee correctly blocked with 403, owner-only payroll denial, runtime migration endpoint returns 410, manager-scope deny behavior, audit viewer redaction, etc.). Flags real remaining UX polish: "Booking Detail actions are available through a JSON action payload control, not polished per-action forms" and "Staff Access and Manager Dashboard have functional controls but should receive design polish."
+- **`docs/DEPENDENCY_ADVISORIES.md`** — itemized advisory-by-advisory plan (last reviewed 2026-07-17): 0 high/critical at that time, moderate Google API chain advisories deliberately deferred with a stated reason (major-version upgrade risk, not directly reachable from customer/admin flows). **Note: `npm audit` needs rerunning now** — my Phase 2 evidence on the (wrong, stale) branch showed a critical Next.js advisory that doesn't apply to true `main` (already patched there), so this doc's "0 critical" from 2026-07-17 is very plausibly still accurate on true `main`, but should be reconfirmed, not assumed.
 
-### 1.2 29 remote branches exist; only two carry unmerged work
+**Implication for your original Phase 4 questions:** most of what your brief asked me to investigate (permission system coverage, migration/manifest drift, dependency advisories) already has a real, evidence-based answer living in these docs. The two things that don't — because they're bugs nobody had written up yet — are sections 3.1 and 3.2 below.
 
-`git fetch` surfaced 29 branches beyond `main` (mostly `agent/*`, `devin/*`, `fix/*` naming, dated 2026-07-17 through 2026-07-20). Checked each for unique commits relative to `main`:
+---
 
-| Branch | Unique commits | What it contains |
+## 3. Confirmed findings (this pass, direct code + live DB evidence)
+
+### 3.1 `rehaul` tenant hardcoding — CONFIRMED REAL BUG, exactly as your brief suspected
+
+`app/api/admin/launch-gates/route.js` and `app/api/admin/alerts/route.js` both call `getTenantBySlug('rehaul')` unconditionally (lines 5, 20, 33 and 5, 20 respectively) instead of resolving the tenant the request is actually for. `lib/launchGates.js` and `lib/alerts.js` themselves are correctly tenant-parameterized (`ensureLaunchGates({ tenantId, ... })` etc.) — the bug is only in the two route files.
+
+Confirmed via live DB read (read-only, against the Supabase project you gave me the pooler URL for): the `tenants` table has two rows —
+```
+junkhaul  (id 7af06a04-6924-4b05-a0d6-5b099024365a)
+rehaul    (id e1a32d51-83cd-4bfa-97e2-d2d31d94f6aa)
+```
+`launch_gates` and `alerts` are both currently **empty** (0 rows each) — so this hasn't visibly broken anything yet in the UI, but the moment anyone calls these routes, every launch gate and every operational alert will be created and readable only under the `rehaul` tenant ID. **Junk Haul's own launch-readiness gates and operational alerts can never be created or read through these routes as written.** Given rule "Junk Haul launch reliability takes priority over Rehaul," this needs to resolve the tenant from the request (session/staff context, or an explicit `tenant` param) instead of hardcoding it.
+
+### 3.2 Inbound SMS/Quo webhook: THREE parallel handlers, not two
+
+Original finding said two duplicate inbound SMS routes existed. Correction: there are now **three**:
+
+| Route | Signature verification | Status |
 |---|---|---|
-| `preserve/crew-app-local-work` | 1 (2026-07-17) | **Real, more-complete Flutter crew-app code** — rewires all 9 job-step screens to actually call the backend (signature, payment, item-conditions, storage-drop, landfill), adds a working signature pad, camera service, 8 onboarding screens, job-navigation screen, new domain models (customer/job/payment/signature). Confirmed by diff: `signature_step.dart` on this branch actually invokes `api.submitSignature(...)` from `job_screen.dart`; on `main` the equivalent call is commented out (see section 3.F). |
-| `agent/rehaul-verification-hardening` | 3 (2026-07-19) | Rehaul-only: `.github/workflows/release-gate.yml`, `supabase/migrations/MANIFEST.json`, `20260816000001_rehaul_commerce_hardening.sql`, `lib/rehaulOrders.js` changes, several new docs (`STAGING_ALPHA_RUNBOOK.md`, `KNOWN_LIMITATIONS.md`, etc.). Out of scope for Junk Haul reliability work per your instructions, but this is where the CI/release-gate pattern referenced in your brief actually lives — worth reusing the *pattern* for Junk Haul without touching Rehaul code. |
-| All other 27 branches | 0 | Fully stale — identical to an old point on `main`'s history, no unique work. Safe to ignore/eventually delete, not touched in this audit. |
+| `app/api/sms-webhook/route.js` | **None** — no secret/signature check found anywhere in the file | Legacy, still live |
+| `app/api/sms/inbound/route.js` | `verifyRequest()` checks `QUO_WEBHOOK_SECRET`, but **fails open**: `if (!secret) return true; // No secret configured (dev) — allow` (line 60) | Legacy, still live, self-describes as "the canonical Quo inbound router" in its own header comment despite this |
+| `app/api/quo/inbound/route.js` | Uses `lib/quoWebhookAuth.js` — real HMAC-SHA256 signature verification with timestamp tolerance and `crypto.timingSafeEqual` constant-time comparison. This is a properly built, secure implementation. | New, appears to be the intended real canonical route |
 
-**Recommendation (not yet acted on):** `preserve/crew-app-local-work` should almost certainly be merged before the crew app is trusted for real jobs — main's crew job-step screens are non-functional stubs (section 3.F) and this branch already fixes most of it. This is flagged as a P0 decision for you, not something I merged unilaterally, since merging Flutter work this large is a scope decision.
+The secure implementation (`lib/quoWebhookAuth.js` + `app/api/quo/inbound/route.js`) already exists and is well-built — this isn't a "build security from scratch" task, it's a **consolidation** task: retire the two legacy routes (or at minimum verify which one Quo's dashboard actually points at, then delete the other two) so there's exactly one inbound webhook and it's the secure one. Don't guess which URL is live in Quo's config — ask before deleting either legacy route, since a wrong guess breaks live SMS.
 
----
+### 3.3 Vercel cron config still references a nonexistent route
 
-## 2. Workflow-by-workflow status
+`vercel.json` still schedules `/api/cron/seed-reviewer-jobs` (daily, `30 12 * * *`) — this route does not exist anywhere in `app/api/cron/**` (confirmed via directory listing on true `main`; the closest real route is `review-request`, singular). This cron 404s every day. Unlike the other corrections in this document, this one is unchanged from the original finding — it's still broken on true `main`.
 
-Legend: **COMPLETE_AND_VERIFIED** (working + has passing automated test evidence) · **BUILT_NOT_VERIFIED** (code exists, looks complete, no test proves it) · **PARTIAL** (some paths work, known gaps) · **NOT_BUILT** · **BLOCKED_EXTERNAL** (needs a credential/environment this session doesn't have).
+### 3.4 Crew app job-completion flow — CONFIRMED SUBSTANTIALLY FIXED (original finding was wrong)
 
-### A. Lead capture & photo quote — **PARTIAL**
-- **Frontend:** `app/book/page.js`, `app/book/hanger/`, `app/book/donation/`
-- **Backend:** `app/api/capture-lead/route.js`, `app/api/photo-quote/route.js`, `app/api/analyze/route.js`, `app/api/verify-phone/route.js`
-- **DB:** `leads`, `lead_quotes`, `photo_quote_cache`, `photo_phashes`, `image_quotes`, `price_ledger` (uncommitted), `phone_verifications`
-- **Tests:** none automated for lead capture or photo-quote endpoints. `scripts/test-photo-quote.cjs` exists (untracked) — manual/ad-hoc script, not part of `npm test`.
-- **Findings:**
-  - `photo_quote_cache` gives idempotent quoting for identical photo sets (hash-based) — good pattern.
-  - No test proves AI-failure fallback actually degrades to manual review safely, or that hazmat/overweight/unclear photos are blocked from silent auto-approval — this needs a dedicated test (see P0 list).
-  - `lib/priceLedger.js` (uncommitted) is designed to be an append-only immutable ledger, but it isn't wired into `capture-lead` or `photo-quote` routes yet — those routes don't appear to call it, so "quote changes create new ledger entries" (a non-negotiable rule) is **not yet enforced in code**, only scaffolded.
-- **External config required:** `GROQ_API_KEY` (photo/description AI), Gemini key referenced in `lib/ai.js`/README but not in `.env.example` — confirm which var name is actually read.
-- **Responsible role:** Backend/AI owner. **Launch blocking:** Yes (P0) — immutable pricing history is a non-negotiable rule and is currently unenforced.
+Checked `job_screen.dart` directly: the signature step's `onComplete` callback now calls `_submitSignature()`, which calls `api.submitSignature(bookingId, customerNameTyped, amountConfirmed, paymentMethod, routeId, routeVersion)` via `employeeApiProvider`, with a documented fallback to enqueue for offline retry on failure. Cash payment collection (`api.collectCashPayment`), payment-link resend (`api.resendPaymentLink`), and item-condition submission (`api.submitItemConditions`) are all real, wired API calls with route/version context attached — not the commented-out/local-only stubs the original finding described. `signature_step.dart` itself still has one `TODO(dev)` about exporting the actual signature PNG client-side, so treat that specific piece as `PARTIAL`, not fully closed.
 
-### B. Scheduling & slot capacity — **PARTIAL**
-- **Frontend:** `app/book/page.js` (schedule step)
-- **Backend:** `app/api/slots/route.js`, `app/api/create-booking/route.js`, `lib/slotAvailability.js`, `lib/dispatch.js`, `lib/surge.js`
-- **DB:** `schedule`, `bookings`, `slot_demand_snapshots`, `crew_assignments`
-- **Tests:** none found for concurrent-booking slot contention. `increment_slot()`/`decrement_slot()` are DB functions (from `0001_init.sql`) — likely atomic at the SQL level, but no integration test proves two simultaneous bookings for the last slot resolve to exactly one winner.
-- **Findings:** `create-booking` has no visible idempotency key — if a client retries a POST (e.g. double-tap, network retry) before the first request completes, there is no dedup check found in the route; needs verification.
-- **Responsible role:** Backend. **Launch blocking:** Yes (P0) — overselling capacity directly breaks the 24-hour guarantee and customer trust.
+**Not yet re-verified in this pass** (see section 4): the remaining job steps (truck-loading, drop-flow/storage, route-decision/landfill), the offline queue's idempotency-key behavior, and whether photo/signature files actually upload via multipart now (vs. the JSON-only-no-file-attached issue in the original finding). Given how wrong the original blanket "nothing works" claim turned out to be, don't assume the remaining steps are still broken either — they need a direct look, not an inference either direction.
 
-### C. 24-hour dispatch guarantee — **PARTIAL**
-- **Backend:** `lib/dispatch.js` (dynamic slot-fit engine), `app/api/cron/seed-daily-assignments/route.js`, `app/api/admin/optimise-route/route.js`
-- **DB:** `crew_assignments`, `bookings.crew_assignment_id` (migration `20260722_dynamic_dispatch.sql`)
-- **Findings:** No `escalation`/alerting path found that fires when a booking is at risk of missing its 24-hour window — `escalations` table exists only as an ad-hoc `CREATE TABLE IF NOT EXISTS` inside `app/api/admin/run-migration/route.js` (never migrated properly — see section 4.1), and nothing in `lib/dispatch.js` or the cron jobs writes to it. The guarantee currently has **no measurable enforcement path**: no job scans "bookings approaching 24h with no crew assignment" and no job pages a human.
-- **Responsible role:** Ops/dispatch owner. **Launch blocking:** Yes (P0) — this is the platform's core promise with no enforcement mechanism.
+### 3.5 `escalations`/`compensation_log` — CONFIRMED RESOLVED
 
-### D. Stripe deposit & payment — **BUILT_NOT_VERIFIED**
-- **Frontend:** `app/book/page.js` (pay step), `app/pay/[id]/page.js`
-- **Backend:** `app/api/create-booking/route.js` (PaymentIntent creation), `app/api/stripe-webhook/route.js`, `app/api/crew/balance-payment/[booking_id]/route.js`, `app/api/track/[token]/tip/route.js`
-- **DB:** `bookings` (payment fields), `transaction_receipts`, `crew_tips`
-- **Tests:** `supabase/migrations/payment-validation.test.js` (198 lines, tracked) exists and appears to cover server-side amount/currency validation logic — **not executed this session** (no Node runtime available), so "passes" is unconfirmed.
-- **Findings:**
-  - `app/api/stripe-webhook/route.js` uses `stripe.webhooks` signature verification (good — rejects unsigned/invalid payloads).
-  - No explicit duplicate-event-id dedup check found in the webhook handler — Stripe recommends checking `event.id` against a processed-events table; not present. A duplicate delivery (Stripe explicitly says webhooks can be sent more than once) could double-process a payment_intent.succeeded event unless the booking-confirmation logic is itself idempotent by booking state (needs verification, not confirmed either way from static read).
-  - `app/api/admin/stripe-branding/route.js` is a stray one-off admin utility (uploads a business logo, hardcodes a live Stripe account ID `acct_1TpfJQPM0KC3Ztg7` in source) that **bypasses the shared admin permission system entirely** — checks `password !== process.env.ADMIN_PASSWORD` directly in the request body instead of `ADMIN_COOKIE`/`adminToken()`. This violates the AGENTS.md pattern and rule #9 (shared staff permission system). Should be deleted or brought into the standard auth pattern.
-- **External config required:** Stripe **test** keys (`sk_test_`/`pk_test_`), `STRIPE_WEBHOOK_SECRET` from a **test-mode** webhook endpoint — do not use production keys for any P0 verification work.
-- **Responsible role:** Backend/payments owner. **Launch blocking:** Yes (P0) — payment correctness is non-negotiable.
+Both tables are now defined in `supabase/migrations/20260726000001_customer_admin_foundation.sql`, a real forward migration. `app/api/admin/run-migration/route.js` is confirmed absent from the true `main` tree (`docs/MANUAL_ADMIN_ACCEPTANCE.md` independently confirms this — "Runtime migration endpoint disabled... owner receives `410`" is a *different*, deliberately-disabled placeholder, not the old vulnerable route).
 
-### E. SMS (Quo) — **PARTIAL**
-- **Backend:** `lib/sms.js` (outbound), `app/api/sms-webhook/route.js` (older inbound handler), `app/api/sms/inbound/route.js` (newer inbound handler — **two parallel inbound webhook routes exist**), `lib/consent.js`, `lib/expectedReply.js`
-- **DB:** `sms_consent`, `expected_replies`, `message_templates` (all uncommitted, from the foundation migration)
-- **Findings:**
-  - **Neither** `app/api/sms-webhook/route.js` nor `app/api/sms/inbound/route.js` verifies an inbound signature/secret from Quo — both trust any POST to the URL. Given Quo is the SMS provider, an attacker who discovers the webhook URL could inject fake inbound messages (fake STOP requests suppressing real customers, fake "YES" replies claiming reward offers, etc.).
-  - Two inbound routes doing overlapping jobs (STOP/START consent, expected-reply matching) is a duplication risk — unclear which one Quo is actually configured to call in production, and if both are live they could double-process the same inbound message differently.
-  - `lib/consent.js` (uncommitted) implements STOP/START suppression as an in-app library — needs confirming it's also enforced in Supabase Edge Functions (the cron-driven `morning-reminders`, `day-summary`, `review-requests` functions mentioned in README live in `supabase/functions/`, outside this Next.js app, and were not part of this repo scan since edge functions aren't in `app/api`). **Not verified** whether edge functions independently check consent before sending.
-- **Responsible role:** Backend/comms owner. **Launch blocking:** Yes (P0 for signature verification + consolidating to one inbound route; P1 for edge-function consent audit).
+### 3.6 Dependency/CI state — CONFIRMED RESOLVED (original findings were wrong)
 
-### F. Vapi (voice) — **PARTIAL**
-- **Backend:** `app/api/vapi/route.js`, `app/api/vapi-outbound/route.js`, `app/api/assistant-request/route.js`, `lib/vapiTools.js`, `lib/dispatchTools.js`
-- **DB:** `phone_calls`, `call_history`, `ai_agent_actions`
-- **Findings (significant):**
-  - `app/api/vapi/route.js` checks `x-vapi-secret` — good.
-  - `app/api/vapi-outbound/route.js` only checks the secret **`if (expectedSecret)`** — i.e., if `VAPI_SERVER_SECRET` is unset in the environment, the check is skipped entirely rather than failing closed. This is the opposite of `lib/cronAuth.js`'s pattern (which fails closed if `CRON_SECRET` is unset) and should be fixed to match.
-  - `app/api/assistant-request/route.js` has no signature/secret check found at all.
-  - **`phone_calls` vs `call_history` split-brain (verified by grep):** every call-ingestion path (`app/api/quo-calls/route.js`, `app/api/vapi/route.js`, `app/api/vapi-outbound/route.js`, `lib/vapiTools.js`) writes to **`phone_calls`**. Every admin-facing read path (`lib/aiAgent.js` urgent-call feed, `lib/dispatchTools.js`, `app/api/assistant-request/route.js`, `app/api/admin/command-center/route.js`, `app/api/admin/call-history/route.js`, `app/api/admin/insights/route.js`) reads from **`call_history`**, which nothing writes to except a dead `CREATE TABLE` statement in `run-migration`. **This means the admin command-center's "urgent/negative-sentiment call" alerts and the `/admin` call-history page are almost certainly always empty in production right now**, despite calls actually being logged (into the wrong table). This is a concrete, verifiable, high-value bug.
-- **Responsible role:** Backend/voice owner. **Launch blocking:** Yes (P0) — this directly breaks the "failed tool calls produce a human escalation" and "call records attach to correct lead/booking" requirements, since the admin views that would show escalations are reading an empty table.
-
-### G. Crew app (Flutter) — **NOT_BUILT** (on `main`); **BUILT_NOT_VERIFIED** (on unmerged `preserve/crew-app-local-work`)
-- **Frontend:** `apps/crew_app/lib/src/presentation/features/job/steps/*.dart` (9 steps), `job_screen.dart`, `onboard_screen.dart`
-- **Backend:** `app/api/employee/**`, `app/api/crew/**` (all implemented, see section 4.2)
-- **Findings — this is the single biggest gap found in this audit:**
-  - On `main`, **every one of the 9 job-step screens is a UI shell that never calls its backend endpoint.** Concretely: `before_after_step.dart` and `signature_step.dart` fake photo capture with a hardcoded `'placeholder://...'` string instead of invoking the camera; the `signature` package is declared as a dependency but never imported/used anywhere; `signature_step.dart`'s actual `submitSignature(...)` call is commented out, so **job completion never reaches the backend**; `load_truck_step.dart` has no API call at all (not even commented — fully local state); `payment_step.dart`'s cash-collection and card-resend-link calls are both commented out; `arrived_step.dart`'s item-conditions submission is commented out despite the corresponding `EmployeeApi.submitItemConditions` method existing and being correctly implemented; `route_decision_step.dart`'s landfill lookup and `drop_flow_step.dart`'s storage-facility fetch are both commented out in favor of hardcoded/local-only behavior.
-  - **Net effect: on `main`, a crew member using this app cannot actually record a photo, a signature, a payment, an item condition, a truck-load state, or a storage/landfill drop that reaches the server.** Everything after "arrived" is cosmetic.
-  - The offline queue (`lib/src/data/offline/offline_queue_service.dart`) has **no idempotency key or dedup mechanism** — replaying a queued action after a timeout will resend it verbatim, risking duplicate clock-ins/signatures/receipts once the screens above are wired up to actually call it. It also silently drops photo/signature file uploads: `_processAction()`'s comment claims multipart upload is handled elsewhere, but the code just sends the JSON payload with no file attached — **photos and signatures captured offline are never actually uploaded**, even when the file path is real.
-  - `_routeForType()` doesn't recognize `job_clock_in`/`job_clock_out` action types that its own switch statement defines, meaning those actions would be silently treated as "processed" and deleted from the queue without ever reaching the server (`if (path == null) return;` followed by unconditional deletion in the caller).
-  - **No `test/` directory exists in the Flutter app at all** — zero automated tests despite `flutter_test`/`mockito` being declared dependencies.
-  - **No CI exists** for the crew app (or for anything) — `.github/workflows/` does not exist anywhere in this repo.
-  - **The fix already exists, unmerged:** `preserve/crew-app-local-work` (section 1.2) rewires the job-completion path for real (verified: its `job_screen.dart` calls `_submitSignature()` → `api.submitSignature(...)`), adds a working signature pad and camera service, and adds the 8 onboarding screens that `main`'s `onboard_screen.dart` explicitly states are "Phase 7.2, not yet built." That branch itself still has one `TODO(dev)` noting the signature PNG export needs finishing, so even it is `BUILT_NOT_VERIFIED`, not `COMPLETE_AND_VERIFIED` — but it is a vastly smaller gap to close than starting from `main`.
-- **Responsible role:** Mobile/crew-app owner. **Launch blocking:** Yes — **this is the most severe P0 in the entire audit.** The core promise ("crew arrives, takes photos, gets signature, takes payment") does not function end-to-end on `main` today.
-
-### H. Manager/admin permissions — **PARTIAL**
-- **Backend:** `middleware.js` (edge-level cookie gate on `/admin/*`), `lib/adminAuth.js`, `lib/roles.js` (uncommitted)
-- **Findings:**
-  - `middleware.js` correctly gates all of `/admin/*` behind `ADMIN_COOKIE`.
-  - `lib/roles.js` (uncommitted, new) defines a real owner/admin/manager/employee permission model with explicit `OWNER_ONLY_ACTIONS` (payroll approve/run/rate-edit, refunds, banking view, employee termination, audit delete, config edit, pricing override) vs `MANAGER_ALLOWED_ACTIONS` — this directly encodes rules #8 and #9 from your brief. **However**, its own top comment says role currently always resolves to `'owner'` for anyone holding the single admin password — the `staff_accounts`/`jh_staff_role` cookie path it's designed for is not wired into the login flow yet (no route sets `jh_staff_role`). **In practice there is currently only one role in production: owner.** Manager-scoped access (assigned crews/routes only) does not yet exist as an enforced boundary anywhere — most `/api/admin/**` routes checked only `ADMIN` (the shared password cookie), not `ROLE`-based scoping.
-  - Two routes bypass the shared pattern entirely: `app/api/admin/login/route.js` (expected — it's the login endpoint) and **`app/api/admin/stripe-branding/route.js`** (not expected — see section D).
-  - `app/api/admin/run-migration/route.js` still exists as a live route (per `AGENTS.md`'s own pending TODO from 2026-07-13) — it defines `escalations` and `compensation_log` outside any real migration file, which also means those two tables are not in the manifest-tracked schema history at all.
-- **Responsible role:** Backend/admin owner. **Launch blocking:** P1 for full manager scoping (fine to launch with owner-only for a small pilot), **P0** for closing the `stripe-branding` bypass and finishing the `escalations`/`compensation_log` migration (rule #11: no schema should live only in an ad-hoc route).
-
-### I. Reconciliation / payroll / closeout — **PARTIAL**
-- **Backend:** `app/api/admin/payroll/{preview,run,approve}/route.js`, `app/api/cron/run-payroll/route.js`, `lib/payroll.js`, `lib/payrollRates.js`
-- **Tests:** `supabase/migrations/payroll.test.js` (331 lines, tracked) — covers payroll math; not executed this session.
-- **Findings:** `app/api/admin/payroll/run/route.js` accepts **either** `ADMIN` cookie **or** `CRON` secret — meaning the payroll-run trigger can come from either a human admin action or the scheduled cron; both paths converge on the same handler, which is a reasonable idempotent-trigger design, but there's no automated test confirming double-triggering (e.g., cron fires while an admin is also mid-approval) can't create two pay runs for the same period.
-- **Vercel cron mismatch (verified, concrete bug):** `vercel.json` schedules a cron job at `/api/cron/seed-reviewer-jobs` — **this route does not exist anywhere in the repo** (confirmed via full directory listing of `app/api/cron/*`; the closest real route is `review-request`, singular, different path). This cron will 404 every day at the scheduled time and silently do nothing. Additionally, `vercel.json` only schedules 5 of the 11 `/api/cron/*` routes that exist (`abandonment-followup`, `demand-snapshot`, `generate-t4s`, `opportunistic-offer`, `refresh-rates`, `remittance-reminder`, `review-request` have no Vercel cron trigger at all) — unless something else (Supabase pg_cron, per the README's separate cron table) is calling these Next.js routes directly, several operational jobs (abandonment follow-up SMS, remittance reminders, T4 generation) may never fire in production.
-- **Responsible role:** Ops/finance owner. **Launch blocking:** P0 for the broken `seed-reviewer-jobs` cron path and confirming which of the 11 `/api/cron/*` routes are actually wired to a trigger in production (Vercel and/or Supabase pg_cron) — an unwired cron route is silent data corruption waiting to happen (e.g., missed remittance reminders have real CRA financial consequences).
+`package.json` on true `main` pins `"next": "15.5.20"` — the critical middleware-authorization-bypass advisory that applied to `15.1.9` does not apply here. GitHub Actions "Release Quality Gate" has genuinely run and passed on recent `main` commits, including the merge of PR #30 itself (`b35e6b7`, success) — confirmed via the Actions API, not just reading the workflow YAML. `npm run test:unit` on true `main` runs **19** test files (`auth`, `foundation`, `donation-intelligence`, `route-versioning`, `unitConversions`, `costConfig`, `costLedger`, `quoteDecision`, `routeEngine`, `disposal`, `itemEvidence`, `aiQuality`, `physicalMeasurements`, `dispatch`, `crewSync`, `reconciliation`, `rehaul`, `donations`, `rehaulCommerce`, `phase5`), a much larger and more current suite than the 3-file suite I evaluated on the stale branch. There's also now `test:migrations`, `test:integration`, `test:security`, `migrations:check`, `secret-scan`, and `audit` npm scripts that didn't exist on the stale branch.
 
 ---
 
-## 3. Cross-cutting technical debt (Phase 4 items you specifically asked about)
+## 4. Not yet re-verified — explicit gaps, not silent ones
 
-1. **`rehaul` tenant hardcoding in launch-gates/alerts:** `lib/launchGates.js`, `lib/alerts.js`, `app/api/admin/launch-gates/route.js`, `app/api/admin/alerts/route.js` **do not exist on `main` or this branch at all** — they only exist on `origin/agent/rehaul-verification-hardening`. There is nothing to fix on the Junk Haul side today; this concern applies only to that unmerged Rehaul branch, which is out of scope. No action needed unless/until that branch is merged, at which point the tenant-resolution logic should be audited before merge.
-2. **`crew_location` vs `crew_locations`:** confirmed two entirely different live schemas (session-token-keyed vs employee-id-keyed). A 2026-07-20 migration comment claims the singular table is "dead code," but **7 live route files still read/write it** (`crew/location`, `crew/clock-off`, `crew/nearby-opportunities`, `cron/opportunistic-offer`, `employee/nearby-opportunities`, `employee/route-plan`, `employee/route-decision`, `crew/track/[booking_id]`). The PIN-based crew app (`/api/crew/*`) writes exclusively to the singular table; the session-based employee app (`/api/employee/*`) writes exclusively to the plural table. **Which one a customer's tracking page shows depends on which crew-facing app/route the crew member happens to be using** — `app/api/track/[token]/route.js` reads plural only, `app/api/crew/track/[booking_id]/route.js` reads singular only. This is a real, user-facing bug risk, not just tech debt: a customer could see stale/no location depending on which crew login path was used. **Recommendation:** pick one (plural, since it has realtime enabled and is the one the migration comment intends to be canonical) and migrate all 7 singular-table call sites to it, or explicitly document why both must coexist.
-3. **`system_events` / `timeline_events` / `audit_events` / `phone_calls` / `call_history`:** `audit_events` doesn't exist anywhere (not a real table, despite being named in your brief — likely conflated with `system_events`, which is the actual immutable audit log). `phone_calls`/`call_history` is a genuine dead-read-path bug (section 2.F). `system_events` and `timeline_events` are both live and serve distinct, non-overlapping purposes (ops/cron audit trail vs customer-facing lead/booking/donation event feed) — no consolidation needed there.
-4. **Admin permission system coverage:** the majority of `/api/admin/**` routes correctly use `ADMIN_COOKIE`/`adminToken()`. Two confirmed exceptions: `admin/login` (expected) and `admin/stripe-branding` (not expected, should be fixed/removed). No routes were found with a stale "auth placeholder" comment that skips auth entirely, aside from the webhook/cron routes which correctly use different auth mechanisms appropriate to their caller (Stripe signature, cron secret, Vapi secret) — though as noted, `vapi-outbound` and `assistant-request` have weaker or missing checks.
-5. **Migration sequence date sanity:** the newest migration in the directory is dated `20260725` (5 days after today's real date). **No migration is dated in August 2026 or later** — your brief's premise of migrations dated `20260801`–`20260815` does not match what's actually in this repo (that date range only exists on the unrelated Rehaul branch as `20260816000001_rehaul_commerce_hardening.sql`, further out even than what was described). The `20260705`–`20260725` dates appear to be an in-repo convention of using the fictional "current" project date rather than real calendar dates — worth confirming with whoever set that convention, but nothing here suggests migrations were pre-applied to production ahead of schedule; there's no evidence either way since this session has no production DB access.
-6. **`supabase/migrations/MANIFEST.json` does not exist on `main` or this branch.** There is currently no way to detect drift between "migrations in this repo" and "migrations actually applied to production" other than manually diffing against whatever Supabase reports — this is a real gap (P0, see list below) since rule #11 depends on being able to trust the migration history is exactly what's live.
-7. **Retention/cleanup for abandoned donation drafts and rejected/completed evidence:** `lib/donation.js` (uncommitted) defines the donation state machine, but no cron job or scheduled cleanup was found for abandoned `donation_requests` drafts, and no retention policy exists for rejected donation photos or completed job evidence (photos, signatures). This is undecided territory, not yet a "bug," but should be a P1/P2 decision — indefinite retention of customer photos has both storage-cost and privacy implications.
-8. **Dependency advisories:** `docs/DEPENDENCY_ADVISORIES.md` referenced in your brief does not exist in this repo. `npm audit` could not be run this session (no Node). This needs Phase 2 execution in a real environment before any advisory patching can happen.
+These were part of the original document's findings and I have **not** rechecked them against true `main` yet. Do not treat either the old finding or an assumption that it's "probably fixed like everything else" as reliable — both directions have been wrong at least once already this session:
 
----
-
-## 4. Existing automated test inventory (static read only — not executed)
-
-| File | Lines | Covers | Run via |
-|---|---|---|---|
-| `supabase/migrations/payroll.test.js` | 331 | CRA T4127 payroll math | `npm test`, `npm run test:payroll` |
-| `supabase/migrations/payment-validation.test.js` | 198 | Stripe amount/currency validation logic | `npm test` (no standalone script) |
-| `supabase/migrations/foundation.test.js` | 595 | Attribution, consent/STOP-START, expected-reply matching, donation state machine, manager-vs-owner role gating | `npm test`, `npm run test:foundation` (needs `test-loader.mjs`, itself untracked) |
-| `scripts/test-photo-quote.cjs` | — | Photo-quote endpoint, manual/ad-hoc | Not wired into `npm test` |
-
-**No `test:migrations`, `test:security`, or `test:integration` npm scripts exist** — your brief's Phase 2 command list assumes scripts that aren't in `package.json` yet. These would need to be added as part of P0/P1 work, not just run.
-
-**Missing tests (highest priority first):** concurrent slot-booking race, Stripe webhook duplicate/out-of-order delivery, Quo inbound duplicate webhook + signature rejection, crew offline-action replay/dedup, manager-scope boundary enforcement, payroll double-run prevention, AI-provider-unavailable fallback, cron-route wiring/reachability.
+- `crew_location` (singular) vs `crew_locations` (plural) duplication — does `supabase/migrations/20260807000001_crew_production_safe.sql` consolidate these, or do both still exist as separate live schemas?
+- `phone_calls` vs `call_history` write/read split.
+- Full 9-step crew job flow (only signature/payment/item-conditions spot-checked; truck-loading, drop-flow, route-decision not yet rechecked).
+- Offline queue idempotency-key and multipart file-upload behavior specifically.
+- `supabase/migrations/MANIFEST.json` structure and whether it matches the directory 1:1; what `supabase/migrations/20260727000001_reconcile_legacy_schema.sql` actually reconciles (referenced by `docs/STAGING_VERIFICATION.md` as handling "upgrade-path reconciliation" — I haven't read it).
+- Whether `npm run migrations:check` (`scripts/check-migration-history.js`) would actually catch the "production `schema_migrations` table only lists 0001/0002 while ~190 tables exist" situation I found via direct DB read, or whether it's a repo-internal-only check that wouldn't catch live drift.
+- 24-hour dispatch guarantee enforcement/escalation path.
+- Full concurrency/idempotency guarantees for Stripe webhooks and payroll runs.
+- A fresh `npm ci`/`test`/`lint`/`build`/`audit` run against this corrected branch (started, interrupted, not completed).
 
 ---
 
-## 5. External configuration Daniyal must provide before P0 work starts
+## 5. Phase 2 evidence — needs to be rerun against the corrected branch
 
-- Stripe **test-mode** secret/publishable keys + a **test-mode** webhook signing secret (do not reuse production keys for verification work)
-- A disposable/staging Supabase project (or confirmation that the current one is safe to write test data to) — this repo's `.env.example` has no separate staging URL documented
-- Quo sandbox credentials, or confirmation of how to safely test inbound webhook signature verification without touching real customer numbers
-- Vapi sandbox/test assistant + server secret
-- Confirmation of the actual production cron trigger mechanism (Vercel cron vs Supabase pg_cron vs both) so the `seed-reviewer-jobs` mismatch and un-scheduled routes (section 2.I) can be root-caused correctly
-- A decision on `preserve/crew-app-local-work`: merge it as a P0 prerequisite for crew-app work, or have this audit rebuild the same wiring from scratch on `main`
+The real command output in the previously-merged version (216/216 tests passing, lint/build clean, 11 audit findings including a critical `next` advisory) was **all gathered against the stale, wrong branch** and does not describe true `main`. It's retracted, not carried forward. A fresh run against `reliability/phase-1-corrections` is needed before any test-evidence claim in this document can cite real numbers again.
 
 ---
 
-## 6. Prioritized punch list
+## 6. Updated priority list
 
-### P0 — launch blockers (must fix before taking real orders)
-1. Wire the 9 crew-app job-step screens to their (already-implemented) backend endpoints — or merge `preserve/crew-app-local-work` and finish its one remaining TODO (signature export). Nothing after "crew arrives" currently reaches the server on `main`.
-2. Add idempotency/dedup to the crew-app offline queue (photo/signature multipart upload is currently silently dropped; `job_clock_in`/`job_clock_out` action types are silently unroutable and get deleted without being sent).
-3. Fix the `phone_calls`/`call_history` split — either write ingestion to `call_history` or read admin/alert surfaces from `phone_calls`. Admin call escalation views are currently reading an empty table.
-4. Fix the broken Vercel cron entry (`/api/cron/seed-reviewer-jobs` → 404) and audit which of the 11 `/api/cron/*` routes actually have a live trigger in production.
-5. Add signature/secret verification to `app/api/sms-webhook`, `app/api/sms/inbound`, `app/api/quo-calls`, `app/api/whatsapp-webhook` (POST), and `app/api/assistant-request`; fix `vapi-outbound`'s fail-open secret check to fail closed like `cronAuth.js` does.
-6. Consolidate the two inbound-SMS routes (`sms-webhook` vs `sms/inbound`) to one canonical handler.
-7. Remove or properly re-gate `app/api/admin/stripe-branding/route.js` (bypasses the shared permission system; hardcodes a live account ID).
-8. Move `escalations`/`compensation_log` table definitions out of `app/api/admin/run-migration/route.js` into a real forward-only migration, then delete that route (per `AGENTS.md`'s own standing TODO).
-9. Build measurable 24-hour-guarantee enforcement + escalation path — nothing currently watches for at-risk bookings.
-10. Add concurrency tests + verify atomicity for slot booking (oversell risk) and payroll run-triggering (double-run risk).
-11. Reconcile `crew_location`/`crew_locations` to one canonical table across all 7+ call sites (customer tracking currently depends on which crew app the crew member used).
-12. Wire `lib/priceLedger.js` into the actual quote/price-change code paths so immutable pricing history is real, not just scaffolded.
-13. Create `supabase/migrations/MANIFEST.json` and a way to verify it against what's actually applied in production.
-14. Get Phase 2 (`npm ci`/`test`/`lint`/`build`/`audit`) actually running somewhere (this sandbox has no Node) and fix whatever it surfaces.
+**P0 — launch blockers, confirmed still open:**
+1. Fix `rehaul` tenant hardcoding in `app/api/admin/launch-gates/route.js` and `app/api/admin/alerts/route.js` (section 3.1).
+2. Consolidate the three inbound SMS/Quo webhook routes to the one secure one (section 3.2) — needs a decision on which URL Quo is actually configured to call before deleting anything.
+3. Fix the `vercel.json` → `/api/cron/seed-reviewer-jobs` broken cron path (section 3.3).
+4. Complete section 4's re-verification list, prioritizing `crew_location`/`crew_locations` and `phone_calls`/`call_history` (both were confirmed real splits in the old audit; unknown if still true).
+5. Re-run Phase 2 commands against the corrected branch for real evidence.
 
-### P1 — required during controlled pilot
-- Wire `staff_accounts`/manager role cookie into the login flow so `lib/roles.js`'s manager-vs-owner model is actually enforced (today everyone with the admin password is `'owner'`).
-- Verify Supabase Edge Functions (`morning-reminders`, `day-summary`, etc., outside this repo scan) independently respect SMS consent/STOP suppression.
-- Add `test:migrations`, `test:security`, `test:integration` npm scripts (currently absent).
-- Add automated tests for AI-provider-unavailable fallback, Quo-unavailable fallback, Supabase-write-mid-failure handling.
-- Decide and document retention/cleanup policy for abandoned donation drafts and rejected/completed evidence photos.
-- Add `.github/workflows` CI for both the Next.js app and the crew Flutter app (none exists today) — the Rehaul branch's `release-gate.yml` is a reusable pattern reference, not to be merged as-is.
+**Retracted from the old P0 list (confirmed resolved, no longer P0):** Next.js critical vuln, crew app "nothing reaches the backend," `escalations`/`compensation_log` migration, `run-migration` route decommission, "no CI exists."
 
-### P2 — required before scaling
-- Consolidate/delete the 27 fully-stale remote branches.
-- Full test pyramid per Phase 5 of your brief (unit → route → DB integration → provider fixtures → concurrency → staged e2e).
-- Real-device crew app acceptance pass (GPS/geofence behavior currently has zero Flutter-side implementation or tests — confirmed no `geofence` references anywhere in `apps/crew_app/lib`).
-- Dependency advisory review once `npm audit` can actually be run.
-
-### P3 — polish / later
-- Everything in Rehaul (explicitly deprioritized per your instructions).
-- Cleanup of the `theme_preview` screen and other dev-only crew-app scaffolding.
-- Reconciling documentation (`Progress and status.md`, `APP_LOGIC.md`) to match actual verified status rather than aspirational status once P0/P1 land.
+**Everything else from the original P1–P3 lists:** unverified either way against true `main` — needs the section 4 work before it can be re-prioritized honestly.
 
 ---
 
 ## 7. Stop point
 
-This completes Phase 1. Per your instructions, **no P0 fixes have been started.** Waiting for explicit go-ahead before touching any of the items in section 6.
+This correction pass is not a complete re-audit of the expanded codebase — see section 4 for what's still open. Given how much of the original document turned out to be wrong in both directions (things I said existed that didn't, and things I said were broken that are now fixed), I'd rather hand back a smaller set of confirmed, evidence-backed findings than a complete-looking document with unverified filler. Recommend treating section 4 as the next work item before resuming P0 fixes on the items not yet confirmed.
