@@ -75,11 +75,13 @@ export default function LeadsView({ flash }) {
             id: l.id,
             name: l.name || 'Unknown',
             phone: l.phone || '',
+            address: l.address || '',
             quoted: l.created_at ? l.created_at.slice(0, 10) : '',
             load: latestQuote.load_size || 'quarter',
             price: latestQuote.price || 0,
             status: leadStatus,
             lastTouch,
+            flagged: !!l.flag_for_review,
           };
         });
         setLeads(mapped);
@@ -174,11 +176,14 @@ export default function LeadsView({ flash }) {
             {rows.map((l) => (
               <tr key={l.id} onDoubleClick={() => openDetail(l.id)} style={{ borderBottom: '1px solid rgba(0,0,0,.045)', cursor: 'pointer' }}>
                 <td style={{ padding: '10px 0 10px 18px' }}><input type="checkbox" checked={!!selected[l.id]} onChange={() => toggleRow(l.id)} /></td>
-                <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1a1a1a' }}>{l.name}<div style={{ fontSize: 11.5, fontWeight: 400, color: 'rgba(0,0,0,.4)' }}>{l.phone}</div></td>
+                <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1a1a1a' }}>{l.name}<div style={{ fontSize: 11.5, fontWeight: 400, color: 'rgba(0,0,0,.4)' }}>{l.phone}{l.address ? ` · ${l.address}` : ''}</div></td>
                 <td style={{ padding: '10px 12px', color: 'rgba(0,0,0,.55)' }}>{l.quoted}</td>
                 <td style={{ padding: '10px 12px', color: 'rgba(0,0,0,.55)' }}>{LOAD_LABELS[l.load]}</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: '#1a1a1a' }}>{money(l.price)}</td>
-                <td style={{ padding: '10px 12px' }}><span style={STATUS_BADGE[l.status]}>{l.status[0].toUpperCase() + l.status.slice(1)}</span></td>
+                <td style={{ padding: '10px 12px' }}>
+                  <span style={STATUS_BADGE[l.status]}>{l.status[0].toUpperCase() + l.status.slice(1)}</span>
+                  {l.flagged && <span style={{ ...badgeStyle('rgba(239,68,68,.12)', '#EF4444'), marginLeft: 6 }}>Flagged</span>}
+                </td>
                 <td style={{ padding: '10px 18px', color: 'rgba(0,0,0,.42)' }}>{l.lastTouch}</td>
               </tr>
             ))}
@@ -202,7 +207,9 @@ export default function LeadsView({ flash }) {
               <div style={{ display: 'grid', gap: 14, marginTop: 16 }}>
                 <Section title="Identity">
                   <p>{detail.lead.name || 'Unknown'} · {detail.lead.phone} · {detail.lead.email || 'no email'}</p>
+                  <p>Address: {detail.lead.address || 'not captured'}</p>
                   <p>Normalized {detail.lead.normalized_phone || '—'} · session {detail.lead.session_id || detail.lead.booking_session_id || '—'}</p>
+                  {detail.lead.flag_for_review && <p style={{ color: '#EF4444', fontWeight: 700 }}>⚑ Flagged for review</p>}
                 </Section>
                 <Section title="Attribution">
                   {(detail.attribution || []).map((a) => <p key={a.id}>{a.touch_type}: {a.channel}/{a.source} · {a.tracking_code || a.utm_campaign || '—'} · {a.campaign?.name || '—'}</p>)}
@@ -212,9 +219,43 @@ export default function LeadsView({ flash }) {
                   <p>Current step {detail.lead.current_step || detail.lead.last_step_reached || '—'} · abandonment {detail.lead.abandonment_point || '—'}</p>
                   <p>Quote revealed {detail.lead.quote_revealed_at || '—'} · last activity {detail.lead.last_activity_at || detail.lead.updated_at || '—'}</p>
                 </Section>
+                <Section title="Description">
+                  {describeLead(detail.lead.description_text)}
+                </Section>
                 <Section title="Photos and quote history">
-                  <p>Lead photos {(detail.lead.photos || []).length}</p>
-                  {(detail.lead.quotes || []).map((q) => <p key={q.id}>{q.created_at}: {q.load_size} · {money(q.price)}</p>)}
+                  {(detail.lead.photos || []).length > 0 && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                      {(detail.lead.photos || []).map((url, i) => (
+                        <a key={i} href={url} target="_blank" rel="noreferrer">
+                          <img src={url} alt={`Lead photo ${i + 1}`} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(0,0,0,.1)' }} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {(detail.lead.photos || []).length === 0 && <p>No photos uploaded.</p>}
+                  {(detail.lead.quotes || []).map((q) => (
+                    <div key={q.id} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid rgba(0,0,0,.06)' }}>
+                      <p>{q.created_at}: {q.load_size} · {money(q.price)}</p>
+                      {Array.isArray(q.itemized?.items) && q.itemized.items.length > 0 && (
+                        <p style={{ fontSize: 12, color: 'rgba(0,0,0,.55)' }}>
+                          {q.itemized.items.map((it) => `${it.quantity}× ${it.name} ($${it.line_total})`).join(', ')}
+                        </p>
+                      )}
+                      {(q.photos || []).length > 0 && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                          {q.photos.map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noreferrer">
+                              <img src={url} alt={`Quote photo ${i + 1}`} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(0,0,0,.1)' }} />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </Section>
+                <Section title="Admin notes">
+                  {(detail.lead.admin_notes || '').split('\n').filter(Boolean).map((note, i) => <p key={i}>{note}</p>)}
+                  {!(detail.lead.admin_notes || '').trim() && <p>No notes yet.</p>}
                 </Section>
                 <Section title="Communications">
                   {(detail.messages || []).map((m) => <p key={m.id}>{m.direction} {m.message_type}: {m.provider_status} · {m.failure_reason || ''}</p>)}
@@ -248,6 +289,17 @@ export default function LeadsView({ flash }) {
       )}
     </div>
   );
+}
+
+function describeLead(descriptionText) {
+  if (!descriptionText) return <p>No description captured.</p>;
+  try {
+    const parsed = JSON.parse(descriptionText);
+    if (Array.isArray(parsed?.items) && parsed.items.length > 0) {
+      return <p>{parsed.items.map((it) => `${it.quantity}× ${it.name}`).join(', ')}</p>;
+    }
+  } catch (_) { /* not JSON, fall through to raw text */ }
+  return <p>{descriptionText}</p>;
 }
 
 function Section({ title, children }) {
