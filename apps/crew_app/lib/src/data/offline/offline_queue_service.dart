@@ -101,7 +101,9 @@ class OfflineQueueService {
       // dropping an unroutable action would lose it without any record.
       // Throw so it's retried and eventually surfaces as a permanent error
       // instead of vanishing.
-      throw StateError('offline queue: no route for action type "${action.type}"');
+      throw StateError(
+        'offline queue: no route for action type "${action.type}"',
+      );
     }
 
     if (action.filePaths != null && action.filePaths!.isNotEmpty) {
