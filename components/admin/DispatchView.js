@@ -53,6 +53,7 @@ export default function DispatchView({ flash }) {
           flagged: !!b.flag_for_review,
           riskScore: b.no_show_risk_score || 0,
           possibleCrossPhotoDuplicates: b.possible_cross_photo_duplicates || null,
+          assignedCrew: b.assigned_crew_names || [],
         }));
         setBookings(mapped);
       }
@@ -102,6 +103,7 @@ export default function DispatchView({ flash }) {
             deposit: !!b.deposit_paid,
             flagged: !!b.flag_for_review,
             riskScore: b.no_show_risk_score || 0,
+            assignedCrew: b.assigned_crew_names || [],
           }));
           const otherDays = bookings.filter((b) => b.date !== effectiveDate);
           setBookings([...otherDays, ...mapped]);
@@ -246,6 +248,9 @@ export default function DispatchView({ flash }) {
                     <span style={badgeStyle('rgba(0,0,0,.05)', 'rgba(0,0,0,.5)')}>{b.quadrant}</span>
                     {b.flagged && <span style={badgeStyle('rgba(249,115,22,.12)', '#f97316')}>Flagged</span>}
                     {!b.deposit && <span style={badgeStyle('rgba(239,68,68,.1)', '#EF4444')}>No deposit</span>}
+                    {b.assignedCrew.length > 0
+                      ? <span style={badgeStyle('rgba(59,130,246,.1)', '#3B82F6')}>{b.assignedCrew.join(', ')}</span>
+                      : <span style={badgeStyle('rgba(0,0,0,.05)', 'rgba(0,0,0,.4)')}>Unassigned</span>}
                   </div>
                   <div style={{ fontSize: 12, color: 'rgba(0,0,0,.42)', marginTop: 1 }}>{b.address}</div>
                 </div>
