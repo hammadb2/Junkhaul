@@ -9,6 +9,7 @@ import {
   rankLeads,
 } from '@/lib/discountEngine';
 import { isKillSwitchOn, cronStarted, cronFinished, cronFailed, logEvent } from '@/lib/audit';
+import { createExpectedReply } from '@/lib/quoInbound';
 
 export const runtime = 'nodejs';
 
@@ -141,19 +142,37 @@ async function runLiveMode(todayStr, hour) {
 
     await sendSMS(topLead.phone, smsBody, null, 'deadhead_offer');
 
-    await supabaseAdmin.from('nearby_offers').insert({
+    const offerExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const { data: newOffer } = await supabaseAdmin.from('nearby_offers').insert({
       lead_id: topLead.id,
       customer_phone: topLead.phone,
       customer_name: topLead.name,
       offer_type: 'deadhead',
-      offer_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      offer_expires_at: offerExpiresAt,
       original_price: discount.originalPrice,
       discounted_price: discount.discountedPrice,
       discount_percent: discount.discountPct,
       crew_lat: loc.latitude,
       crew_lng: loc.longitude,
       distance_km: topLead.detourKm,
-    });
+    }).select().single();
+
+    // So a "YES" reply can actually be matched back to this offer — see
+    // app/api/sms-webhook/route.js and lib/nearbyOfferAcceptance.js.
+    if (newOffer) {
+      try {
+        await createExpectedReply({
+          phone: topLead.phone,
+          entity_type: 'nearby_offer',
+          entity_id: newOffer.id,
+          expected_intent: 'confirm_offer',
+          valid_responses: ['YES', 'Y', 'CONFIRM', 'OK'],
+          expires_at: offerExpiresAt,
+        });
+      } catch (err) {
+        console.error('Failed to create expected reply for deadhead offer:', err.message);
+      }
+    }
 
     await supabaseAdmin
       .from('leads')

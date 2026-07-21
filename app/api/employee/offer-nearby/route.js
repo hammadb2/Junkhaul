@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getAuthedEmployee } from '@/lib/employeeAuth';
 import { sendSMS } from '@/lib/sms';
+import { createExpectedReply } from '@/lib/quoInbound';
 
 export const runtime = 'nodejs';
 
@@ -120,6 +121,21 @@ export async function POST(req) {
     await sendSMS(customer.phone, smsBody, booking_id || null, 'nearby_offer');
   } catch (err) {
     return NextResponse.json({ error: 'SMS failed' }, { status: 500 });
+  }
+
+  // So a "YES" reply can actually be matched back to this offer — see
+  // app/api/sms-webhook/route.js and lib/nearbyOfferAcceptance.js.
+  try {
+    await createExpectedReply({
+      phone: customer.phone,
+      entity_type: 'nearby_offer',
+      entity_id: offer.id,
+      expected_intent: 'confirm_offer',
+      valid_responses: ['YES', 'Y', 'CONFIRM', 'OK'],
+      expires_at: expiresAt,
+    });
+  } catch (err) {
+    console.error('Failed to create expected reply for nearby offer:', err.message);
   }
 
   return NextResponse.json({ offer_id: offer.id });
