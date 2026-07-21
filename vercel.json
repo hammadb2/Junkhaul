@@ -19,7 +19,7 @@
     },
     {
       "path": "/api/cron/at-risk-24h",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
