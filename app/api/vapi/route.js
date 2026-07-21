@@ -4,6 +4,7 @@ import { runVapiTool } from '@/lib/vapiTools';
 import { runDispatchTool } from '@/lib/dispatchTools';
 import { runDonationVapiTool } from '@/lib/donationVapiTools';
 import { sendSMS } from '@/lib/sms';
+import { recordCallHistory } from '@/lib/callHistory';
 
 // Customer-facing runner: donation tools first (by name), falling back to
 // the general customer-service tool set. Crew-facing (dispatch) calls never
@@ -129,6 +130,14 @@ export async function POST(req) {
     } catch (e) {
       console.error('phone_calls log failed:', e);
     }
+    await recordCallHistory({
+      callerNumber,
+      vapiCallId: message.call?.id || null,
+      agentType,
+      durationSeconds,
+      callOutcome: endedReason,
+      transcript,
+    });
 
     // ── Send SMS on every customer-initiated hangup ──
     // If the customer hung up (not the agent, not an error), send a
