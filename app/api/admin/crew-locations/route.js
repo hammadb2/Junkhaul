@@ -40,23 +40,25 @@ export async function GET(req) {
 
   // Also fetch today's crew assignments to show which job each crew is on
   const today = new Date().toISOString().split('T')[0];
-  const { data: assignments } = await supabaseAdmin
+  const { data: assignments, error: assignmentsError } = await supabaseAdmin
     .from('crew_assignments')
     .select(`
       id,
-      driver_id,
-      partner_id,
-      date,
-      bookings(id, name, address, address_data, status, time_slot, window_label)
+      driver_employee_id,
+      secondary_employee_id,
+      assignment_date,
+      bookings(id, name, address, address_data, status, job_time)
     `)
-    .eq('date', today)
+    .eq('assignment_date', today)
     .eq('status', 'active');
+
+  if (assignmentsError) console.error('crew-locations assignment lookup failed:', assignmentsError.message);
 
   // Map employee_id → assignment for quick lookup
   const assignmentMap = {};
   for (const a of assignments || []) {
-    if (a.driver_id) assignmentMap[a.driver_id] = a;
-    if (a.partner_id) assignmentMap[a.partner_id] = a;
+    if (a.driver_employee_id) assignmentMap[a.driver_employee_id] = a;
+    if (a.secondary_employee_id) assignmentMap[a.secondary_employee_id] = a;
   }
 
   // Enrich crew locations with assignment info
