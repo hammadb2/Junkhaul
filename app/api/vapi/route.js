@@ -116,11 +116,12 @@ export async function POST(req) {
       : assistantName === 'Dispatch' ? 'dispatch'
       : 'unknown';
 
+    const callDirection = message.call?.type === 'outboundPhoneCall' ? 'outbound' : 'inbound';
     try {
       await supabaseAdmin.from('phone_calls').insert({
         vapi_call_id: message.call?.id || null,
         caller_number: callerNumber,
-        direction: message.call?.type === 'outboundPhoneCall' ? 'outbound' : 'inbound',
+        direction: callDirection,
         duration_seconds: durationSeconds,
         cost_usd: message.cost || null,
         transcript,
@@ -134,6 +135,7 @@ export async function POST(req) {
       callerNumber,
       vapiCallId: message.call?.id || null,
       agentType,
+      direction: callDirection,
       durationSeconds,
       callOutcome: endedReason,
       transcript,
