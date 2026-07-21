@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { crewAuth } from '@/lib/crewAuth';
 import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
 import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
 
@@ -12,14 +11,9 @@ export const runtime = 'nodejs';
 // Saves crew-verified item conditions (good/damaged/missing)
 // when crew arrives at the pickup location.
 //
-// Auth: accepts either the employee session cookie (jh_employee_session)
-// or the legacy x-crew-pin header, matching the sibling
-// /api/crew/collect-payment, /api/crew/resend-payment-link, and
-// /api/crew/upload-photo routes. Previously this route only accepted
-// the PIN header, but the crew app's session-based client (the one
-// actually in use — see docs/RELIABILITY_MASTER_PLAN.md) has always
-// called this endpoint with a session cookie, so every real item-
-// condition submission was failing with 401.
+// Auth: employee session cookie (jh_employee_session) only. The legacy
+// x-crew-pin fallback was removed — the PIN-based crew app has no
+// recorded usage (see docs/RELIABILITY_MASTER_PLAN.md).
 //
 // Body:
 //   booking_id: string
@@ -28,8 +22,7 @@ export const runtime = 'nodejs';
 export async function POST(req) {
   try {
     const employee = await getAuthedEmployee(req);
-    const pinAuthed = !employee && await crewAuth(req);
-    if (!employee && !pinAuthed) {
+    if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -38,16 +31,15 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing booking_id or conditions' }, { status: 400 });
     }
 
-    // If authenticated via employee session, verify the employee is
-    // assigned to this booking's crew. Legacy PIN auth bypasses this check.
-    if (employee && !await isEmployeeAssignedToBooking(employee.id, booking_id)) {
+    // Verify the employee is assigned to this booking's crew.
+    if (!await isEmployeeAssignedToBooking(employee.id, booking_id)) {
       return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
     }
 
     const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
-      isLegacyPinAuth: !employee && pinAuthed,
+      isLegacyPinAuth: false,
       actionType: 'item_conditions',
-      employeeId: employee?.id,
+      employeeId: employee.id,
     });
     if (!routeCheck.valid) {
       if (routeCheck.status === 400) return missingVersionResponse();
