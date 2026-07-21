@@ -302,7 +302,7 @@ export default function DispatchView({ flash }) {
       </div>
       </>)}
       {showBookingForm && (
-        <div onClick={() => setShowBookingForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div onClick={() => setShowBookingForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: 24, width: 440, maxWidth: '90vw', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#1a1a1a', marginBottom: 16 }}>New Booking</div>
             <div style={{ display: 'grid', gap: 12 }}>
@@ -353,7 +353,7 @@ export default function DispatchView({ flash }) {
         </div>
       )}
       {showDateForm && (
-        <div onClick={() => setShowDateForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div onClick={() => setShowDateForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: 24, width: 360 }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#1a1a1a', marginBottom: 16 }}>Add date tab</div>
             <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1px solid rgba(0,0,0,.1)', fontSize: 13, outline: 'none', marginBottom: 16 }} />
