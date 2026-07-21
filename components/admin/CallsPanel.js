@@ -12,6 +12,11 @@ const SENT_BADGE = {
   positive: badgeStyle('rgba(34,197,94,.12)', '#22C55E'),
 };
 
+const DIR_BADGE = {
+  inbound: badgeStyle('rgba(59,130,246,.12)', '#3B82F6'),
+  outbound: badgeStyle('rgba(168,85,247,.12)', '#A855F7'),
+};
+
 export default function CallsPanel() {
   const [calls, setCalls] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -30,7 +35,11 @@ export default function CallsPanel() {
           name: c.caller_name || c.name || 'Unknown',
           phone: c.caller_number || c.phone || '',
           sentiment: c.sentiment || 'neutral',
-          summary: c.summary || c.transcript || '',
+          summary: c.call_summary || c.summary || c.transcript || '',
+          direction: c.direction || null,
+          outcome: c.call_outcome || null,
+          durationSeconds: c.duration_seconds ?? null,
+          bookingRef: c.booking_ref || null,
           date: c.call_date ? new Date(c.call_date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) + ', ' + new Date(c.call_date).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }) : '',
         }));
         setCalls(mapped);
@@ -49,7 +58,7 @@ export default function CallsPanel() {
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead><tr style={{ background: '#FAFAFA', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
-            {['Sentiment', 'Caller', 'Summary', 'Date'].map((h) => (
+            {['Sentiment', 'Dir', 'Caller', 'Summary', 'Outcome', 'Duration', 'Date'].map((h) => (
               <th key={h} style={{ textAlign: 'left', padding: '11px 12px', fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,.4)', textTransform: 'uppercase' }}>{h}</th>
             ))}
           </tr></thead>
@@ -57,8 +66,11 @@ export default function CallsPanel() {
             {calls.map((c) => (
               <tr key={c.id} onClick={() => setSelected(c)} onKeyDown={(e) => { if (e.key === 'Enter') setSelected(c); }} tabIndex={0} style={{ borderBottom: '1px solid rgba(0,0,0,.045)', cursor: 'pointer' }}>
                 <td style={{ padding: '11px 18px' }}><span style={SENT_BADGE[c.sentiment]}>{c.sentiment}</span></td>
+                <td style={{ padding: '11px 12px' }}>{c.direction ? <span style={DIR_BADGE[c.direction]}>{c.direction === 'inbound' ? '↓ In' : '↑ Out'}</span> : <span style={{ color: 'rgba(0,0,0,.3)' }}>—</span>}</td>
                 <td style={{ padding: '11px 12px' }}><div style={{ fontWeight: 600, color: '#1a1a1a' }}>{c.name}</div><div style={{ fontSize: 11.5, color: 'rgba(0,0,0,.4)', fontFamily: 'monospace' }}>{c.phone}</div></td>
-                <td style={{ padding: '11px 12px', color: 'rgba(0,0,0,.55)', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.summary}</td>
+                <td style={{ padding: '11px 12px', color: 'rgba(0,0,0,.55)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.summary}</td>
+                <td style={{ padding: '11px 12px', color: 'rgba(0,0,0,.55)' }}>{c.outcome || '—'}{c.bookingRef ? ` · ${c.bookingRef}` : ''}</td>
+                <td style={{ padding: '11px 12px', color: 'rgba(0,0,0,.55)', fontVariantNumeric: 'tabular-nums' }}>{c.durationSeconds != null ? `${Math.floor(c.durationSeconds / 60)}:${String(c.durationSeconds % 60).padStart(2, '0')}` : '—'}</td>
                 <td style={{ padding: '11px 18px', color: 'rgba(0,0,0,.4)', whiteSpace: 'nowrap' }}>{c.date}</td>
               </tr>
             ))}
@@ -75,7 +87,10 @@ export default function CallsPanel() {
             </div>
             <div style={{ fontSize: 13, color: 'rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div><strong style={{ color: '#1a1a1a' }}>Caller:</strong> {selected.name} · <span style={{ fontFamily: 'monospace' }}>{selected.phone}</span></div>
+              <div><strong style={{ color: '#1a1a1a' }}>Direction:</strong> {selected.direction ? <span style={DIR_BADGE[selected.direction]}>{selected.direction}</span> : 'unknown'}</div>
               <div><strong style={{ color: '#1a1a1a' }}>Sentiment:</strong> <span style={SENT_BADGE[selected.sentiment]}>{selected.sentiment}</span></div>
+              <div><strong style={{ color: '#1a1a1a' }}>Outcome:</strong> {selected.outcome || '—'} · <strong style={{ color: '#1a1a1a' }}>Duration:</strong> {selected.durationSeconds != null ? `${Math.floor(selected.durationSeconds / 60)}:${String(selected.durationSeconds % 60).padStart(2, '0')}` : '—'}</div>
+              {selected.bookingRef && <div><strong style={{ color: '#1a1a1a' }}>Booking:</strong> {selected.bookingRef}</div>}
               <div style={{ marginTop: 6 }}><strong style={{ color: '#1a1a1a' }}>Summary</strong></div>
               <div style={{ background: '#FAFAFA', borderRadius: 10, padding: 12, fontSize: 12.5, lineHeight: 1.5 }}>{selected.summary}</div>
             </div>

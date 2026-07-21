@@ -38,11 +38,12 @@ export async function POST(req) {
     const callerNumber = data.from || data.callerNumber || null;
     const durationSeconds = data.duration ? Math.round(data.duration) : null;
     const callOutcome = data.status || data.outcome || null;
+    const callDirection = data.direction === 'outbound' ? 'outbound' : 'inbound';
     try {
       await supabaseAdmin.from('phone_calls').insert({
         vapi_call_id: data.id || data.callId || null,
         caller_number: callerNumber,
-        direction: data.direction === 'outbound' ? 'outbound' : 'inbound',
+        direction: callDirection,
         duration_seconds: durationSeconds,
         cost_usd: data.cost || null,
         outcome: callOutcome,
@@ -55,6 +56,7 @@ export async function POST(req) {
       callerNumber,
       vapiCallId: data.id || data.callId || null,
       agentType: 'booking',
+      direction: callDirection,
       durationSeconds,
       callOutcome,
     });
