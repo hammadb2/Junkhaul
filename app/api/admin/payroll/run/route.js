@@ -27,22 +27,51 @@ export async function POST(req) {
     return NextResponse.json({ error: 'period_start and period_end required' }, { status: 422 });
   }
 
-  // Gather un-paid shifts
-  const { data: shifts } = await supabaseAdmin
+  // Create the pay run first, in 'draft' state (calculated totals are
+  // filled in below once shifts are claimed), so shifts can be atomically
+  // tagged with a real pay_run_id. Two concurrent calls for the same/
+  // overlapping period (cron + manual trigger, or a retried cron) must
+  // not both pay out the same shifts.
+  const { data: claimingRun, error: claimErr } = await supabaseAdmin
+    .from('pay_runs')
+    .insert({
+      period_start: period_start,
+      period_end: period_end,
+      status: 'draft',
+    })
+    .select()
+    .single();
+  if (claimErr) return NextResponse.json({ error: claimErr.message }, { status: 500 });
+
+  // Atomically claim un-paid shifts in this period: only rows still at
+  // pay_run_id IS NULL are updated, and each row's UPDATE is serialized by
+  // Postgres's row-level locking, so a concurrent caller running the same
+  // query can never claim the same shift twice.
+  const { data: claimedTimesheets, error: claimTimesheetsErr } = await supabaseAdmin
     .from('timesheets')
-    .select('id, employee_id, regular_hours, overtime_hours, total_hours, gross_pay')
+    .update({ pay_run_id: claimingRun.id })
     .is('pay_run_id', null)
     .not('clock_out_at', 'is', null)
     .gte('clock_in_at', period_start)
-    .lte('clock_in_at', period_end + 'T23:59:59');
+    .lte('clock_in_at', period_end + 'T23:59:59')
+    .select('id, employee_id, regular_hours, overtime_hours, total_hours, gross_pay');
 
+  if (claimTimesheetsErr) {
+    await supabaseAdmin.from('pay_runs').delete().eq('id', claimingRun.id);
+    return NextResponse.json({ error: claimTimesheetsErr.message }, { status: 500 });
+  }
+
+  const shifts = claimedTimesheets;
   if (!shifts || shifts.length === 0) {
+    // Nothing to claim — either genuinely no unpaid shifts, or another
+    // concurrent run just claimed them all. Either way, this run does
+    // nothing further; remove the empty claiming row.
+    await supabaseAdmin.from('pay_runs').delete().eq('id', claimingRun.id);
     return NextResponse.json({ error: 'No un-paid shifts in this period' }, { status: 400 });
   }
 
   // Aggregate per employee
   const byEmp = new Map();
-  const shiftIdsByEmp = new Map();
   for (const s of shifts) {
     const cur = byEmp.get(s.employee_id) || { employee_id: s.employee_id, regularHours: 0, overtimeHours: 0, totalHours: 0, gross: 0 };
     cur.regularHours += Number(s.regular_hours || 0);
@@ -50,9 +79,6 @@ export async function POST(req) {
     cur.totalHours += Number(s.total_hours || 0);
     cur.gross += Number(s.gross_pay || 0);
     byEmp.set(s.employee_id, cur);
-    const ids = shiftIdsByEmp.get(s.employee_id) || [];
-    ids.push(s.id);
-    shiftIdsByEmp.set(s.employee_id, ids);
   }
   const entries = [...byEmp.values()].map((e) => ({
     ...e,
@@ -70,12 +96,11 @@ export async function POST(req) {
     payDate: new Date(),
   });
 
-  // Persist pay run
+  // Fill in the claimed pay run with its calculated totals (shifts were
+  // already atomically tagged with this run's id above, in the claim step).
   const { data: payRun, error: runErr } = await supabaseAdmin
     .from('pay_runs')
-    .insert({
-      period_start: period_start,
-      period_end: period_end,
+    .update({
       status: 'calculated',
       edition: run.edition,
       total_gross: run.totals.total_gross,
@@ -88,23 +113,16 @@ export async function POST(req) {
       total_cra_remittance: run.totals.total_cra_remittance,
       remittance_due_date: run.totals.remittance_due_date,
     })
+    .eq('id', claimingRun.id)
     .select()
     .single();
   if (runErr) return NextResponse.json({ error: runErr.message }, { status: 500 });
 
   // Persist stubs
   const stubRows = run.stubs.map((s) => ({ ...s, pay_run_id: payRun.id }));
-  const { data: insertedStubs, error: stubErr } = await supabaseAdmin
+  const { error: stubErr } = await supabaseAdmin
     .from('pay_stubs').insert(stubRows).select('id, employee_id');
   if (stubErr) return NextResponse.json({ error: stubErr.message }, { status: 500 });
-
-  // Tag shifts with pay_run_id
-  const stubByEmp = new Map((insertedStubs || []).map((s) => [s.employee_id, s.id]));
-  for (const [empId, shiftIds] of shiftIdsByEmp) {
-    await supabaseAdmin.from('timesheets')
-      .update({ pay_run_id: payRun.id })
-      .in('id', shiftIds);
-  }
 
   // Create remittance record
   await supabaseAdmin.from('remittances').insert({
