@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { crewAuth } from '@/lib/crewAuth';
 import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
 import { sendSMS } from '@/lib/sms';
 import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
@@ -9,12 +10,12 @@ export const runtime = 'nodejs';
 // POST /api/crew/resend-payment-link — sends the customer an SMS with a link
 // to the /pay/[booking_id] page where they can pay on their own device.
 //
-// Auth: employee session cookie (jh_employee_session) only. The legacy
-// x-crew-pin fallback was removed — the PIN-based crew app has no
-// recorded usage (see docs/RELIABILITY_MASTER_PLAN.md).
+// Auth: accepts either the employee session cookie (jh_employee_session)
+// or the legacy x-crew-pin header.
 export async function POST(req) {
   const employee = await getAuthedEmployee(req);
-  if (!employee) {
+  const pinAuthed = !employee && await crewAuth(req);
+  if (!employee && !pinAuthed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -31,17 +32,18 @@ export async function POST(req) {
   }
 
   const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
-    isLegacyPinAuth: false,
+    isLegacyPinAuth: !employee && pinAuthed,
     actionType: 'payment',
-    employeeId: employee.id,
+    employeeId: employee?.id,
   });
   if (!routeCheck.valid) {
     if (routeCheck.status === 400) return missingVersionResponse();
     return staleRouteResponse(routeCheck.body);
   }
 
-  // Verify the employee is assigned to this booking's crew.
-  if (!await isEmployeeAssignedToBooking(employee.id, booking_id)) {
+  // If authenticated via employee session, verify the employee is assigned
+  // to this booking's crew. Legacy PIN auth bypasses this check.
+  if (employee && !await isEmployeeAssignedToBooking(employee.id, booking_id)) {
     return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
   }
 
