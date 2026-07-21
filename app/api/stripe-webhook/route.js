@@ -3,6 +3,8 @@ import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabase';
 import { handleBookingConfirmed } from '@/lib/bookingActions';
 import { confirmQuoteDecisionBooking } from '@/lib/quoteDecision';
+import { createAlert } from '@/lib/alerts';
+import { getTenantBySlug } from '@/lib/rehaul';
 
 export const runtime = 'nodejs';
 
@@ -57,11 +59,32 @@ export async function POST(req) {
           }
         }
 
-        // Reserve the slot.
-        await supabaseAdmin.rpc('increment_slot', {
+        // Reserve the slot. increment_slot() only applies if capacity
+        // remains and reports whether it actually reserved one — a paid
+        // booking can still race another paid booking for the last slot,
+        // so this must be detected rather than silently oversold.
+        const { data: reserved } = await supabaseAdmin.rpc('increment_slot', {
           p_date: booking.job_date,
           p_time: booking.job_time,
         });
+
+        if (reserved === false) {
+          console.error(`Slot oversold: booking ${booking_id} paid but ${booking.job_date} ${booking.job_time} was already full.`);
+          try {
+            const tenant = await getTenantBySlug('junkhaul');
+            await createAlert({
+              tenantId: tenant.id,
+              category: 'capacity_oversold',
+              severity: 'critical',
+              title: 'Slot oversold after payment',
+              description: `Booking ${booking.booking_ref || booking_id} paid successfully for ${booking.job_date} ${booking.job_time}, but that slot was already at capacity. Needs manual reschedule or capacity review — do not cancel automatically.`,
+              entityType: 'booking',
+              entityId: booking_id,
+            });
+          } catch (alertErr) {
+            console.error('Failed to create capacity_oversold alert:', alertErr.message);
+          }
+        }
 
         // Fire confirmation + operator alerts + flags.
         await handleBookingConfirmed(booking_id);
