@@ -95,7 +95,27 @@ class OfflineQueueService {
 
   Future<bool> _processAction(OfflineAction action) async {
     final path = _routeForType(action.type);
-    if (path == null) return true; // Unknown type: drop to avoid loops.
+    if (path == null) {
+      // Unknown type: this should never happen in practice (every enqueue()
+      // call site uses a type _routeForType understands), but silently
+      // dropping an unroutable action would lose it without any record.
+      // Throw so it's retried and eventually surfaces as a permanent error
+      // instead of vanishing.
+      throw StateError('offline queue: no route for action type "${action.type}"');
+    }
+
+    if (action.filePaths != null && action.filePaths!.isNotEmpty) {
+      // No enqueue() call site currently attaches filePaths (photo/signature
+      // capture is always a direct, online-only multipart upload today), so
+      // there's no established per-type field-name convention to build
+      // FormData from generically. Fail loudly rather than silently sending
+      // the JSON payload with the files dropped, so this doesn't become a
+      // silent data-loss bug the moment some future screen starts using it.
+      throw UnimplementedError(
+        'offline queue: action "${action.type}" has filePaths but multipart '
+        'replay is not implemented — add it before enqueueing files',
+      );
+    }
 
     final body = {...action.payload, 'idempotency_key': action.idempotencyKey};
 
