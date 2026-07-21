@@ -21,7 +21,9 @@ export default function WaitlistView({ flash }) {
           name: w.name || 'Unknown',
           phone: w.phone || '',
           address: w.address || '',
-          dayType: w.day_type || 'weekday',
+          dayType: w.preferred_day_type || 'any',
+          preferredDate: w.preferred_date ? w.preferred_date.slice(0, 10) : null,
+          preferredTime: w.preferred_time || null,
           load: w.load_size || 'quarter',
           joined: w.created_at ? w.created_at.slice(0, 10) : '',
           notified: !!w.notified,
@@ -74,7 +76,7 @@ export default function WaitlistView({ flash }) {
               {w.notified && <span style={badgeStyle('rgba(34,197,94,.1)', '#22C55E')}>Notified</span>}
             </div>
             <div style={{ fontSize: 12.5, color: 'rgba(0,0,0,.45)', marginTop: 2 }}>
-              <a href={`tel:${w.phone}`} style={{ color: '#f97316' }}>{w.phone}</a> · {w.address} · Joined {w.joined}
+              <a href={`tel:${w.phone}`} style={{ color: '#f97316' }}>{w.phone}</a> · {w.address} · Wants {w.preferredDate || 'any date'}{w.preferredTime ? ` at ${w.preferredTime}` : ''} · Joined {w.joined}
             </div>
           </div>
           <button
