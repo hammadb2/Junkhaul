@@ -4,6 +4,7 @@ import { sendSMS } from '@/lib/sms';
 import { generateRoutePlan, insertStopMidRoute } from '@/lib/routeOptimizer';
 import { sendPushToEmployees } from '@/lib/pushNotifications';
 import { edmontonNowParts, jobDateTimeUTC } from '@/lib/dates';
+import { QUO_SIGNATURE_HEADER, verifyQuoWebhookSignature } from '@/lib/quoWebhookAuth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -17,7 +18,9 @@ export const maxDuration = 30;
 // next 5 minutes to lock it in." This endpoint receives that reply.
 //
 // It is a public webhook (no auth — it's called by the SMS provider)
-// but verifies a shared secret when QUO_WEBHOOK_SECRET is set.
+// but verifies the Quo HMAC signature (see lib/quoWebhookAuth.js), same
+// mechanism as /api/quo/inbound. Fails closed unless
+// QUO_WEBHOOK_SIGNATURE_REQUIRED=false is explicitly set.
 //
 // Flow:
 //   1. Parse the inbound SMS (Quo webhook format or plain {From,Body}).
@@ -55,12 +58,16 @@ function parseInbound(payload) {
 }
 
 // --- Verify the request is from a legitimate SMS provider ---
-function verifyRequest(req) {
-  const secret = process.env.QUO_WEBHOOK_SECRET;
-  if (!secret) return true; // No secret configured (dev) — allow
-  const fromHeader = req.headers.get('x-webhook-secret');
-  const fromQuery = new URL(req.url).searchParams.get('secret');
-  return fromHeader === secret || fromQuery === secret;
+function verifyRequest(req, rawBody) {
+  const signingSecret = process.env.QUO_WEBHOOK_SIGNING_SECRET || process.env.QUO_WEBHOOK_SECRET;
+  const signatureHeader = req.headers.get(QUO_SIGNATURE_HEADER);
+  const requireSignature = process.env.QUO_WEBHOOK_SIGNATURE_REQUIRED !== 'false';
+  const verification = verifyQuoWebhookSignature({ rawBody, signatureHeader, signingSecret });
+  if (!requireSignature) return true;
+  if (!verification.ok) {
+    console.warn('sms/inbound webhook rejected:', { reason: verification.reason });
+  }
+  return verification.ok;
 }
 
 // --- Normalize a phone number to comparable forms ---
@@ -83,15 +90,17 @@ async function getTodaysAssignment(employeeId) {
 }
 
 export async function POST(req) {
+  const rawBody = await req.text();
+
   // --- Verify sender ---
-  if (!verifyRequest(req)) {
+  if (!verifyRequest(req, rawBody)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   // --- Parse payload ---
   let payload;
   try {
-    payload = await req.json();
+    payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ ok: true });
   }

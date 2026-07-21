@@ -12,9 +12,25 @@ import { calculateTravelFee } from '@/lib/route';
 import { sendDepositLink } from '@/lib/messages';
 import { createDepositPayment } from '@/lib/stripe';
 import { randomBytes } from 'crypto';
+import { QUO_SIGNATURE_HEADER, verifyQuoWebhookSignature } from '@/lib/quoWebhookAuth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
+
+// Verifies the Quo HMAC signature (see lib/quoWebhookAuth.js), same
+// mechanism as /api/quo/inbound and /api/sms/inbound. Fails closed unless
+// QUO_WEBHOOK_SIGNATURE_REQUIRED=false is explicitly set.
+function verifyRequest(req, rawBody) {
+  const signingSecret = process.env.QUO_WEBHOOK_SIGNING_SECRET || process.env.QUO_WEBHOOK_SECRET;
+  const signatureHeader = req.headers.get(QUO_SIGNATURE_HEADER);
+  const requireSignature = process.env.QUO_WEBHOOK_SIGNATURE_REQUIRED !== 'false';
+  const verification = verifyQuoWebhookSignature({ rawBody, signatureHeader, signingSecret });
+  if (!requireSignature) return true;
+  if (!verification.ok) {
+    console.warn('sms-webhook rejected:', { reason: verification.reason });
+  }
+  return verification.ok;
+}
 
 async function groqChat(messages, maxTokens = 300) {
   const apiKey = process.env.GROQ_API_KEY;
@@ -385,9 +401,15 @@ function isPaid(text) {
 // MAIN WEBHOOK HANDLER
 // ============================================================
 export async function POST(req) {
+  const rawBody = await req.text();
+
+  if (!verifyRequest(req, rawBody)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   let payload;
   try {
-    payload = await req.json();
+    payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ ok: true });
   }
