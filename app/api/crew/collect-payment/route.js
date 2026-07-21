@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { crewAuth } from '@/lib/crewAuth';
 import { getAuthedEmployee, isEmployeeAssignedToBooking } from '@/lib/employeeAuth';
 import { sendSMS } from '@/lib/sms';
 import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
@@ -12,12 +11,12 @@ export const runtime = 'nodejs';
 // the Stripe charge and updates payment_status directly via webhook.
 // This route is only for the cash_crew method.
 //
-// Auth: accepts either the employee session cookie (jh_employee_session)
-// or the legacy x-crew-pin header.
+// Auth: employee session cookie (jh_employee_session) only. The legacy
+// x-crew-pin fallback was removed — the PIN-based crew app has no
+// recorded usage (see docs/RELIABILITY_MASTER_PLAN.md).
 export async function POST(req) {
   const employee = await getAuthedEmployee(req);
-  const pinAuthed = !employee && await crewAuth(req);
-  if (!employee && !pinAuthed) {
+  if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -34,17 +33,16 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Missing booking_id or method' }, { status: 400 });
   }
 
-  // If authenticated via employee session, verify the employee is assigned
-  // to this booking's crew. Legacy PIN auth bypasses this check.
-  if (employee && !await isEmployeeAssignedToBooking(employee.id, booking_id)) {
+  // Verify the employee is assigned to this booking's crew.
+  if (!await isEmployeeAssignedToBooking(employee.id, booking_id)) {
     return NextResponse.json({ error: 'Not assigned to this booking' }, { status: 403 });
   }
 
   // Stale-write protection: reject if route_version is stale or missing.
   const routeCheck = await checkRouteVersion(booking_id, route_id, route_version, {
-    isLegacyPinAuth: !employee && pinAuthed,
+    isLegacyPinAuth: false,
     actionType: 'payment',
-    employeeId: employee?.id,
+    employeeId: employee.id,
   });
   if (!routeCheck.valid) {
     if (routeCheck.status === 400) return missingVersionResponse();
