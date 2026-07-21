@@ -46,11 +46,12 @@ const donationProposalSource = readFileSync(
 );
 
 // Read all route-sensitive endpoint sources.
+// en-route, arrived, start-job, and complete-job were removed 2026-07-21
+// along with the rest of the PIN-only crew auth surface (see
+// docs/RELIABILITY_MASTER_PLAN.md) — their route-version-guard coverage
+// is superseded by app/api/employee/job-clock, which already appears
+// below.
 const endpointSources = {
-  'en-route': readFileSync(new URL('../app/api/crew/en-route/route.js', import.meta.url), 'utf8'),
-  'arrived': readFileSync(new URL('../app/api/crew/arrived/route.js', import.meta.url), 'utf8'),
-  'start-job': readFileSync(new URL('../app/api/crew/start-job/route.js', import.meta.url), 'utf8'),
-  'complete-job': readFileSync(new URL('../app/api/crew/complete-job/route.js', import.meta.url), 'utf8'),
   'item-conditions': readFileSync(new URL('../app/api/crew/item-conditions/route.js', import.meta.url), 'utf8'),
   'resend-payment-link': readFileSync(new URL('../app/api/crew/resend-payment-link/route.js', import.meta.url), 'utf8'),
   'collect-payment': collectPaymentSource,
@@ -152,7 +153,7 @@ for (const [name, source] of Object.entries(endpointSources)) {
   assert.match(source, /route_id/, `${name} must accept route_id`);
   assert.match(source, /route_version/, `${name} must accept route_version`);
 }
-console.log('✓ Stale-write protection applied to all 11 route-sensitive endpoints');
+console.log(`✓ Stale-write protection applied to all ${Object.keys(endpointSources).length} route-sensitive endpoints`);
 
 // 12. Modern versionless behavior — rejected with 400.
 assert.match(guardSource, /Route version required for this action/, 'must reject versionless modern app');

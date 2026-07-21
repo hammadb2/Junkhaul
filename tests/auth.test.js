@@ -125,14 +125,20 @@ assert.match(resendLinkSource, /isEmployeeAssignedToBooking/, 'resend-payment-li
 assert.match(resendLinkSource, /Not assigned to this booking/, 'resend-payment-link must reject unassigned employees');
 assert.match(resendLinkSource, /status: 403/, 'resend-payment-link must return 403 for unassigned');
 
-// Legacy crew PIN auth must still work (bypasses assignment check).
-assert.match(uploadPhotoSource, /crewAuth/, 'upload-photo must still accept crew PIN auth');
-assert.match(collectPaymentSource, /crewAuth/, 'collect-payment must still accept crew PIN auth');
-assert.match(resendLinkSource, /crewAuth/, 'resend-payment-link must still accept crew PIN auth');
+// Legacy crew PIN auth removed (2026-07-21): crew_pin.updated_at had been
+// unchanged since 2026-07-06, crew_location (the PIN app's own GPS table)
+// had zero rows ever, and employee_sessions (the session-based app that's
+// actually installed) showed real, recent activity. lib/crewAuth.js and the
+// crew_pin table were both dropped in the same change that updated these
+// three routes to employee-session-only auth — see
+// docs/RELIABILITY_MASTER_PLAN.md for the usage evidence.
+assert.doesNotMatch(uploadPhotoSource, /crewAuth/, 'upload-photo must not reference removed crewAuth');
+assert.doesNotMatch(collectPaymentSource, /crewAuth/, 'collect-payment must not reference removed crewAuth');
+assert.doesNotMatch(resendLinkSource, /crewAuth/, 'resend-payment-link must not reference removed crewAuth');
 
-// Employee session auth must be tried first, PIN as fallback.
-assert.match(uploadPhotoSource, /getAuthedEmployee[\s\S]*!employee[\s\S]*crewAuth/, 'upload-photo must try employee session first');
-assert.match(collectPaymentSource, /getAuthedEmployee[\s\S]*!employee[\s\S]*crewAuth/, 'collect-payment must try employee session first');
-assert.match(resendLinkSource, /getAuthedEmployee[\s\S]*!employee[\s\S]*crewAuth/, 'resend-payment-link must try employee session first');
+// Employee session auth is the only auth path now.
+assert.match(uploadPhotoSource, /getAuthedEmployee/, 'upload-photo must use employee session auth');
+assert.match(collectPaymentSource, /getAuthedEmployee/, 'collect-payment must use employee session auth');
+assert.match(resendLinkSource, /getAuthedEmployee/, 'resend-payment-link must use employee session auth');
 
 console.log('auth tests passed');
