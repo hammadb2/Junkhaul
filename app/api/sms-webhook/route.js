@@ -13,6 +13,8 @@ import { sendDepositLink } from '@/lib/messages';
 import { createDepositPayment } from '@/lib/stripe';
 import { randomBytes } from 'crypto';
 import { QUO_SIGNATURE_HEADER, verifyQuoWebhookSignature } from '@/lib/quoWebhookAuth';
+import { resolveExpectedReply, consumeExpectedReply } from '@/lib/quoInbound';
+import { acceptNearbyOffer } from '@/lib/nearbyOfferAcceptance';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -480,6 +482,26 @@ export async function POST(req) {
   if (upper === 'HELP') {
     await sendSMS(from, 'Junk Haul Calgary, same day junk removal. Book at junkhaul.ca or call (587) 325 0751. Reply STOP to opt out.', recentBooking?.id, 'help');
     return NextResponse.json({ ok: true });
+  }
+
+  // ── EXPECTED-REPLY MATCHING (opportunistic pickup offers) ──
+  // Customers who got a "Reply YES in the next N minutes" opportunistic
+  // offer text (app/api/employee/offer-nearby, app/api/cron/opportunistic-
+  // offer) have a matching expected_replies row. Check for a match before
+  // falling into the generic booking-flow/AI-conversation handling below —
+  // otherwise a YES to a time-sensitive pickup offer just gets chatted at.
+  const expected = await resolveExpectedReply(from, text);
+  if (expected.status === 'matched') {
+    await consumeExpectedReply(expected.expected.id);
+    if (expected.expected.entity_type === 'nearby_offer') {
+      const result = await acceptNearbyOffer({ offerId: expected.expected.entity_id, respondingPhone: from });
+      return NextResponse.json({ ok: true, routed: 'nearby_offer', result });
+    }
+    // Other expected-reply entity types (none currently created) fall
+    // through to the general conversation handling below.
+  } else if (expected.status === 'ambiguous') {
+    await sendSMS(from, 'We sent you more than one offer — could you call us at (587) 325 0751 so we get the right one?', recentBooking?.id, 'clarification_needed');
+    return NextResponse.json({ ok: true, routed: 'ambiguous_expected_reply' });
   }
 
   // ── PHOTO HANDLING (MMS) ──
