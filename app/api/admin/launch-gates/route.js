@@ -17,7 +17,7 @@ export async function GET(req) {
   if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const tenant = await getTenantBySlug('rehaul');
+    const tenant = await getTenantBySlug(req.headers.get('x-tenant') || 'junkhaul');
     const gates = await getLaunchGates({ tenantId: tenant.id });
     return NextResponse.json({ gates });
   } catch (err) {
@@ -30,7 +30,7 @@ export async function POST(req) {
 
   const body = await req.json();
   try {
-    const tenant = await getTenantBySlug('rehaul');
+    const tenant = await getTenantBySlug(req.headers.get('x-tenant') || 'junkhaul');
     const gate = await signLaunchGate({
       tenantId: tenant.id,
       gate: body.gate,

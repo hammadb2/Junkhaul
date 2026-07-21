@@ -17,7 +17,7 @@ export async function GET(req) {
   if (!(await checkAuth())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const tenant = await getTenantBySlug('rehaul');
+    const tenant = await getTenantBySlug(req.headers.get('x-tenant') || 'junkhaul');
     const alerts = await getOpenAlerts({ tenantId: tenant.id });
     return NextResponse.json({ alerts });
   } catch (err) {
@@ -31,8 +31,20 @@ export async function POST(req) {
   const body = await req.json();
   try {
     switch (body.action) {
-      case 'create':
-        return NextResponse.json({ alert: await createAlert(body) });
+      case 'create': {
+        const tenant = await getTenantBySlug(body.tenant_slug || req.headers.get('x-tenant') || 'junkhaul');
+        return NextResponse.json({
+          alert: await createAlert({
+            tenantId: tenant.id,
+            category: body.category,
+            severity: body.severity,
+            title: body.title,
+            description: body.description,
+            entityType: body.entity_type,
+            entityId: body.entity_id,
+          }),
+        });
+      }
       case 'acknowledge':
         return NextResponse.json({ alert: await acknowledgeAlert({ alertId: body.alert_id, actorId: body.actor_id }) });
       case 'resolve':
