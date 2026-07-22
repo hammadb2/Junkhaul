@@ -7,7 +7,7 @@ import {
   stripInternalFields,
 } from '@/lib/ai';
 import { calculatePrice, getPricingConfig, checkWeightFlag } from '@/lib/pricing';
-import { buildItemizedQuote, matchItemToCatalog, recalcWithDisposal } from '@/lib/itemPricing';
+import { buildItemizedQuote, matchItemToCatalog, recalcWithDisposal, checkItemEligibility } from '@/lib/itemPricing';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { computePhotoHash, getCachedAnalysis, setCachedAnalysis } from '@/lib/photoCache';
 import { computeDHash } from '@/lib/perceptualHash';
@@ -74,8 +74,10 @@ function mergeDiffItemized(diffResult, previousItemized) {
     }
     // Fallback: price fresh if we can't find the previous entry.
     const catalogMatch = matchItemToCatalog(item.name);
+    const eligibility = checkItemEligibility(item.name, item.estimated_weight_kg || catalogMatch?.avg_kg);
     const quantity = item.quantity || 1;
-    const unitPrice = catalogMatch?.price || 25;
+    const isHazmat = item.is_hazmat || false || eligibility.rejected;
+    const unitPrice = isHazmat ? 0 : (catalogMatch?.price || 25);
     return {
       name: catalogMatch?.is_fallback ? item.name : (catalogMatch?.name || item.name),
       original_name: item.name,
@@ -85,19 +87,22 @@ function mergeDiffItemized(diffResult, previousItemized) {
       line_total: unitPrice * quantity,
       category: catalogMatch?.category || 'misc',
       is_freon: item.is_freon || catalogMatch?.category === 'freon',
-      is_hazmat: item.is_hazmat || false,
+      is_hazmat: isHazmat,
       donatable: catalogMatch?.donatable ?? true,
       avg_kg: catalogMatch?.avg_kg || item.estimated_weight_kg || 20,
-      note: catalogMatch?.note || null,
-      disposal: 'dump',
+      note: eligibility.rejected ? eligibility.reason : (catalogMatch?.note || null),
+      rejected: eligibility.rejected,
+      disposal: eligibility.rejected ? 'not_accepted' : 'dump',
     };
   });
 
   // Add new items — price them fresh.
   for (const added of diffResult.added_items || []) {
     const catalogMatch = matchItemToCatalog(added.name);
+    const eligibility = checkItemEligibility(added.name, added.estimated_weight_kg || catalogMatch?.avg_kg);
     const quantity = added.quantity || 1;
-    const unitPrice = catalogMatch?.price || 25;
+    const isHazmat = added.is_hazmat || false || eligibility.rejected;
+    const unitPrice = isHazmat ? 0 : (catalogMatch?.price || 25);
     mergedItems.push({
       name: catalogMatch?.is_fallback ? added.name : (catalogMatch?.name || added.name),
       original_name: added.name,
@@ -107,11 +112,12 @@ function mergeDiffItemized(diffResult, previousItemized) {
       line_total: unitPrice * quantity,
       category: catalogMatch?.category || 'misc',
       is_freon: added.is_freon || catalogMatch?.category === 'freon',
-      is_hazmat: added.is_hazmat || false,
+      is_hazmat: isHazmat,
       donatable: catalogMatch?.donatable ?? true,
       avg_kg: catalogMatch?.avg_kg || added.estimated_weight_kg || 20,
-      note: catalogMatch?.note || null,
-      disposal: 'dump',
+      note: eligibility.rejected ? eligibility.reason : (catalogMatch?.note || null),
+      rejected: eligibility.rejected,
+      disposal: eligibility.rejected ? 'not_accepted' : 'dump',
     });
   }
 
