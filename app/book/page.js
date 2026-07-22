@@ -333,6 +333,7 @@ export default function BookPage() {
                 clientSecret={booking.client_secret}
                 total={booking.total}
                 balance_due={booking.balance_due}
+                breakdown={booking.breakdown}
                 onPaid={() => {
                   setBooking((b) => ({
                     ...b,

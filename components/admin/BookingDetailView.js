@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import CostBreakdown from '@/components/CostBreakdown.js';
 
 export default function BookingDetailView() {
   const [id, setId] = useState('');
@@ -57,6 +58,18 @@ export default function BookingDetailView() {
           <Card title="Pricing ledger">
             {(data.pricing_ledger || []).map((l) => <p key={l.id}>{l.ledger_type}: ${l.total} · {l.actor_type} · {l.reason}</p>)}
           </Card>
+          <div style={{ gridColumn: '1 / -1', background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,.06)', padding: 16 }}>
+            <div style={{ fontWeight: 800, marginBottom: 12 }}>Full internal cost &amp; profit breakdown</div>
+            {data.quote_decision?.cost_snapshot ? (
+              <CostBreakdown
+                breakdown={data.quote_decision.cost_snapshot.breakdown}
+                assumptions={data.quote_decision.cost_snapshot.assumptions}
+                rateVersionIds={data.quote_decision.cost_snapshot.rateVersionIds}
+              />
+            ) : (
+              <p style={{ fontSize: 13, color: 'rgba(0,0,0,.5)' }}>No cost snapshot on this booking&apos;s quote decision.</p>
+            )}
+          </div>
           <Card title="Attribution">
             {(data.attribution || []).map((a) => <p key={a.id}>{a.touch_type}: {a.channel}/{a.source} · {a.tracking_code || a.utm_campaign || '—'}</p>)}
           </Card>

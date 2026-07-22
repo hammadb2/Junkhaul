@@ -14,7 +14,17 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 );
 
-function InnerForm({ total, balance_due, onPaid }) {
+function BreakdownLine({ label, value }) {
+  if (!value) return null;
+  return (
+    <div className="flex justify-between mt-1">
+      <span className="text-gray-500">{label}</span>
+      <span>${value}</span>
+    </div>
+  );
+}
+
+function InnerForm({ total, balance_due, breakdown, onPaid }) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState(null);
@@ -55,6 +65,16 @@ function InnerForm({ total, balance_due, onPaid }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="rounded-2xl bg-gray-50 p-4 text-sm">
+        {breakdown && (
+          <>
+            <BreakdownLine label="Base price" value={breakdown.base_price} />
+            <BreakdownLine label="Same-day" value={breakdown.same_day_fee} />
+            <BreakdownLine label="Stairs" value={breakdown.stairs_fee} />
+            <BreakdownLine label="Freon appliances" value={breakdown.freon_fee} />
+            <BreakdownLine label="Travel" value={breakdown.travel_fee} />
+            <div className="border-t border-gray-200 my-2" />
+          </>
+        )}
         <div className="flex justify-between">
           <span className="text-gray-500">Total job price</span>
           <span className="font-semibold">${total}</span>
@@ -83,7 +103,7 @@ function InnerForm({ total, balance_due, onPaid }) {
   );
 }
 
-export default function PaymentStep({ clientSecret, total, balance_due, onPaid }) {
+export default function PaymentStep({ clientSecret, total, balance_due, breakdown, onPaid }) {
   if (!clientSecret) return null;
   return (
     <Elements
@@ -93,7 +113,7 @@ export default function PaymentStep({ clientSecret, total, balance_due, onPaid }
         appearance: { theme: 'flat', variables: { colorPrimary: '#f97316' } },
       }}
     >
-      <InnerForm total={total} balance_due={balance_due} onPaid={onPaid} />
+      <InnerForm total={total} balance_due={balance_due} breakdown={breakdown} onPaid={onPaid} />
     </Elements>
   );
 }
