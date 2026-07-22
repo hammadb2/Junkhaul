@@ -25,6 +25,18 @@ const VERSIONED_TABLES = new Set([
   'pricing_policy_versions',
 ]);
 
+// vehicle_profiles is not a versioned table (no effective_from/to) — it's
+// a flat fleet roster with an active flag, edited in place rather than
+// superseded. Kept separate from VERSIONED_TABLES so the supersede/
+// concurrency logic below never applies to it.
+const VEHICLE_PROFILE_FIELDS = [
+  'name', 'vehicle_class', 'volume_cuft', 'volume_yd3', 'legal_payload_kg',
+  'operational_weight_limit_kg', 'fuel_baseline_l_per_100km',
+  'interior_length_ft', 'interior_width_ft', 'interior_height_ft',
+  'fuel_tank_capacity_l', 'ramp_details', 'planned_payload_percent',
+  'clean_eligible', 'dirty_eligible', 'active', 'source',
+];
+
 const SCENARIO_DISTANCE_KM = 65.98;
 const SCENARIO_ONSITE_MINUTES = {
   single_item: 20,
@@ -164,8 +176,8 @@ export async function POST(req) {
     });
     if (!auth.ok) return auth.response;
 
-    if (!table || !VERSIONED_TABLES.has(table)) {
-      return NextResponse.json({ error: 'Invalid or missing versioned type' }, { status: 422 });
+    if (!table || !(VERSIONED_TABLES.has(table) || table === 'vehicle_profiles')) {
+      return NextResponse.json({ error: 'Invalid or missing type' }, { status: 422 });
     }
     if (!record || typeof record !== 'object') {
       return NextResponse.json({ error: 'record object required' }, { status: 422 });
@@ -175,6 +187,10 @@ export async function POST(req) {
     }
     if (!adminPassword || !verifyReauth(adminPassword)) {
       return NextResponse.json({ error: 'Re-authentication required' }, { status: 401 });
+    }
+
+    if (table === 'vehicle_profiles') {
+      return await saveVehicleProfile({ record, reason, auth });
     }
 
     const normalized = normalizeRecord(table, record);
@@ -238,6 +254,57 @@ export async function POST(req) {
     console.error('cost-config POST error:', err);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
+}
+
+// Helper: update an existing fleet truck (record.id present) or add a new
+// one. Not versioned — edited in place — but still requires the same
+// reason + admin re-auth as versioned changes, and is audit-logged with a
+// before/after snapshot so fleet-spec changes remain traceable.
+async function saveVehicleProfile({ record, reason, auth }) {
+  const { id, ...rest } = record;
+  const payload = {};
+  for (const key of VEHICLE_PROFILE_FIELDS) {
+    if (rest[key] !== undefined) payload[key] = rest[key];
+  }
+
+  if (id) {
+    const before = await supabaseAdmin.from('vehicle_profiles').select('*').eq('id', id).single();
+    if (before.error || !before.data) {
+      return NextResponse.json({ error: 'Vehicle profile not found' }, { status: 404 });
+    }
+    const { data, error } = await supabaseAdmin.from('vehicle_profiles').update(payload).eq('id', id).select().single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await auditSensitiveAttempt({
+      context: auth.context,
+      allowed: true,
+      permission: 'cost_config.manage',
+      entityType: 'vehicle_profiles',
+      entityId: data.id,
+      action: 'cost_config.update_vehicle_profile',
+      reason,
+      before: before.data,
+      after: data,
+      metadata: {},
+    });
+    return NextResponse.json({ profile: data });
+  }
+
+  const { data, error } = await supabaseAdmin.from('vehicle_profiles').insert(payload).select().single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await auditSensitiveAttempt({
+    context: auth.context,
+    allowed: true,
+    permission: 'cost_config.manage',
+    entityType: 'vehicle_profiles',
+    entityId: data.id,
+    action: 'cost_config.create_vehicle_profile',
+    reason,
+    after: data,
+    metadata: {},
+  });
+  return NextResponse.json({ profile: data });
 }
 
 // Helper: compute impact preview for a proposed record.
