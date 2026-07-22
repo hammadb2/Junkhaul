@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { sendWhatsApp, downloadWhatsAppMedia } from '@/lib/whatsapp';
-import { calculatePrice, getPricingConfig, LOAD_LABELS, PRICING } from '@/lib/pricing';
+import { calculatePrice, quoteCustomerPrice, getPricingConfig, LOAD_LABELS, PRICING } from '@/lib/pricing';
 import { createQuoteDecision, linkQuoteDecisionToBooking } from '@/lib/quoteDecision';
 import { toCents } from '@/lib/money';
 import { analysePhotos, handleSafetyAlert, stripInternalFields } from '@/lib/ai';
@@ -213,13 +213,22 @@ async function getAvailableSlots() {
 // ── Create booking from WhatsApp ──
 async function createWhatsAppBooking({ name, phone, address, load_size, job_date, job_time, stairs, has_freon, freon_count }) {
   const pricingConfig = await getPricingConfig();
-  const priced = calculatePrice({ load_size, stairs, has_freon, freon_count, job_date, job_time, pricingConfig });
   const geo = await geocodeAddress(address);
+  let travelFee = 0;
   let travelKm = 0;
   try {
     const t = await calculateTravelFee({ lat: geo.lat, lng: geo.lng });
+    travelFee = t.fee;
     travelKm = t.km;
   } catch {}
+
+  // Real cost-engine price — same source of truth as the web booking flow
+  // (lib/pricing.js's quoteCustomerPrice).
+  const priced = await quoteCustomerPrice({
+    load_size, stairs, has_freon, freon_count, job_date, job_time,
+    travel_fee: travelFee, lat: geo.lat, lng: geo.lng, address,
+    pricingConfig,
+  });
 
   const quoteInput = {
     name, phone, address,
@@ -232,6 +241,7 @@ async function createWhatsAppBooking({ name, phone, address, load_size, job_date
   const decision = await createQuoteDecision({
     quoteInput,
     priceCents: toCents(priced.total),
+    costSnapshot: priced.raw_cost_snapshot,
     depositCents: toCents(priced.deposit),
     actorType: 'whatsapp',
   });
@@ -260,7 +270,10 @@ async function createWhatsAppBooking({ name, phone, address, load_size, job_date
       load_size,
       base_price: priced.base_price,
       same_day: false, same_day_fee: 0,
-      stairs, has_freon, freon_count, freon_fee: priced.freon_fee,
+      stairs, stairs_fee: priced.stairs_fee,
+      has_freon, freon_count, freon_fee: priced.freon_fee,
+      travel_fee: priced.travel_fee, travel_km: travelKm,
+      truck_size: priced.truck_size,
       total_price: priced.total,
       deposit_amount: priced.deposit,
       deposit_paid: 0, balance_due: priced.balance_due,
@@ -431,6 +444,11 @@ export async function POST(req) {
         const load_size = safeAnalysis.load_size || 'quarter';
         const freon_count = safeAnalysis.freon_count || (safeAnalysis.has_freon ? 1 : 0);
         const pricingConfig = await getPricingConfig();
+        // Flat-rate estimate is intentional here: the address isn't known
+        // yet at this point in the conversation, so a real route distance
+        // can't be computed. createWhatsAppBooking() (below, once address/
+        // date are confirmed) uses the real cost engine for the actual
+        // charged price.
         const priced = calculatePrice({ load_size, has_freon: safeAnalysis.has_freon, freon_count, pricingConfig });
 
         let msg = `Based on your photos youre looking at a ${LOAD_LABELS[load_size]}, $${priced.total} total.`;

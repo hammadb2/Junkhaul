@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
-import { calculatePrice, getPricingConfig, PRICING, checkWeightFlag, LOAD_LABELS } from '@/lib/pricing';
+import { quoteCustomerPrice, getPricingConfig, PRICING, checkWeightFlag, LOAD_LABELS } from '@/lib/pricing';
 import { computeSurgeMultiplier } from '@/lib/surge';
 import { geocodeAddress } from '@/lib/geocode';
 import { calculateTravelFee } from '@/lib/route';
@@ -50,6 +50,7 @@ export async function POST(req) {
       description_text = null,
       ai_load_estimate = null,
       ai_weight_estimate_kg = null,
+      ai_volume_estimate_cuft = null,
       ai_confidence = null,
       has_hazmat = false,
       hazmat_description = null,
@@ -176,7 +177,14 @@ export async function POST(req) {
       console.error('Travel fee calculation failed:', err.message);
     }
 
-    priced = calculatePrice({
+    // Base price now comes from the real internal cost engine (smallest
+    // 15/20/26ft truck that safely covers the job's actual weight AND
+    // volume, real route distance, live fuel, labor, disposal, overhead,
+    // and target margin) instead of a flat per-load-size lookup — see
+    // lib/pricing.js's quoteCustomerPrice. The customer's own truck_size
+    // selection is no longer what determines the truck or its cost; the
+    // engine always picks what the job actually needs.
+    priced = await quoteCustomerPrice({
       load_size,
       same_day,
       stairs,
@@ -186,7 +194,11 @@ export async function POST(req) {
       job_time,
       surge_multiplier: surge.multiplier,
       travel_fee: travelFee,
-      truck_size: [15, 20, 26].includes(Number(truck_size)) ? Number(truck_size) : 15,
+      lat: geo.lat,
+      lng: geo.lng,
+      address,
+      weight_kg: ai_weight_estimate_kg || undefined,
+      volume_cuft: ai_volume_estimate_cuft || undefined,
       pricingConfig,
     });
 
@@ -207,7 +219,7 @@ export async function POST(req) {
       job_window_start,
       job_window_end,
       travel_km: travelKm,
-      truck_size,
+      truck_size: priced.truck_size,
       photos,
       photo_skipped,
       description_text,
@@ -221,6 +233,11 @@ export async function POST(req) {
     const decision = await createQuoteDecision({
       quoteInput,
       priceCents: toCents(priced.total),
+      // Reuse the exact cost snapshot that set the price above, rather
+      // than letting quoteDecision.js recompute a second, independent
+      // snapshot — guarantees the profit-protection check is judging the
+      // same assumptions the price was actually built from.
+      costSnapshot: priced.raw_cost_snapshot,
       depositCents: toCents(priced.deposit ?? PRICING.deposit),
       actorType: 'customer',
     });
@@ -252,18 +269,24 @@ export async function POST(req) {
     if (ai_load_estimate && LOAD_ORDER.indexOf(ai_load_estimate) > LOAD_ORDER.indexOf(load_size)) {
       upgrade_pending = true;
       suggested_load_size = ai_load_estimate;
-      suggested_price = calculatePrice({
+      const suggested = await quoteCustomerPrice({
         load_size: ai_load_estimate,
         same_day,
         stairs,
         has_freon,
+        freon_count,
         job_date,
         job_time,
         surge_multiplier: surge.multiplier,
         travel_fee: travelFee,
-        truck_size: [15, 20, 26].includes(Number(truck_size)) ? Number(truck_size) : 15,
+        lat: geo.lat,
+        lng: geo.lng,
+        address,
+        weight_kg: ai_weight_estimate_kg || undefined,
+        volume_cuft: ai_volume_estimate_cuft || undefined,
         pricingConfig,
-      }).total;
+      });
+      suggested_price = suggested.total;
     }
 
     let linkedLead = null;
@@ -315,7 +338,10 @@ export async function POST(req) {
       freon_fee: priced.freon_fee,
       travel_fee: priced.travel_fee,
       travel_km: travelKm,
-      truck_size: [15, 20, 26].includes(Number(truck_size)) ? Number(truck_size) : 15,
+      // Engine-selected truck — always the smallest of the 15/20/26ft
+      // fleet that safely covers this job's real weight AND volume, not
+      // whatever the customer clicked in the UI (see quoteCustomerPrice).
+      truck_size: priced.truck_size,
       truck_fee: priced.truck_fee,
       total_price: priced.total,
       dynamic_multiplier: priced.dynamic_multiplier,
@@ -334,6 +360,7 @@ export async function POST(req) {
       description_text,
       ai_load_estimate,
       ai_weight_estimate_kg,
+      ai_volume_estimate_cuft,
       ai_confidence,
       has_hazmat,
       hazmat_description,

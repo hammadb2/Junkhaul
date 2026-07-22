@@ -71,6 +71,7 @@
     "20260820000001_call_history_direction.sql": "89c646429109881949363ee7ca2d1c4779fccf0e00bbade2c1d733ffb0fff005",
     "20260822000001_pricing_engine_truck_fleet.sql": "7a41c4fc2c378fa8c98a473f89325e6a71627409cfd246d910b3913967469a20",
     "20260822000002_pricing_engine_fuel_live.sql": "d313fd02e45bfdef5caff446284daebd53968f90ad0ec74655c59d0f95ef32e0",
-    "20260822000003_fuel_price_refresh_cron.sql": "253434d1796f40ab24ef2041ddc3ce97cf8972201dd9712fb4bcebbc0cfa5ce7"
+    "20260822000003_fuel_price_refresh_cron.sql": "253434d1796f40ab24ef2041ddc3ce97cf8972201dd9712fb4bcebbc0cfa5ce7",
+    "20260823000001_pricing_engine_phase2_customer_price.sql": "7e9d9de50d969395334627133e248e3fe6a1ef3d1d21dc5f033b2624649bf09c"
   }
 }
