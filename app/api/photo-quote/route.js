@@ -166,6 +166,10 @@ const SCAN_SCHEMA = {
             type: 'string',
             enum: ['full_image', 'top_left', 'top_center', 'top_right', 'mid_left', 'center', 'mid_right', 'bot_left', 'bot_center', 'bot_right'],
           },
+          freon_evacuation_sticker_visible: {
+            type: 'boolean',
+            description: 'ONLY meaningful for refrigerant-containing appliances (fridge, freezer, AC unit, dehumidifier, water cooler). True only if you can actually see a technician sticker/tag/label on the unit indicating refrigerant was professionally evacuated/reclaimed. False (default) for every other item, and false if the appliance is present but no such sticker is visible.',
+          },
         },
         required: ['label', 'count', 'est_volume_cuft_each', 'est_weight_kg_each', 'condition', 'hazard_flag', 'confidence', 'visual_evidence', 'source_region'],
       },
@@ -224,6 +228,17 @@ to one of those, use a generic descriptive label instead (e.g. "large tan
 cylindrical container, unidentified") and set confidence to "low" -- do
 NOT confidently assign a specific appliance category and its associated
 fees to something you are only guessing at from silhouette.
+
+FREON EVACUATION STICKER -- for any refrigerant-containing appliance
+(fridge, freezer, AC unit, dehumidifier, water cooler), look specifically
+for a technician sticker, tag, or label on the unit (often on the back,
+side, or compressor area) stating the refrigerant was professionally
+evacuated/reclaimed. Only set freon_evacuation_sticker_visible=true if you
+can actually see such a sticker with legible or clearly technician-style
+markings -- not just because the unit looks old or empty. This is
+evidence a human will double-check before waiving any disposal fee, so
+false positives cost nothing but false confidence does: when genuinely
+unsure, set it to false.
 
 For each item, estimate volume in cubic feet using visible reference
 objects in frame (a standard doorway is ~80in tall, a dining chair seat is
@@ -609,6 +624,16 @@ export async function POST(req) {
     const freonRegex = /refrigerator|freezer|fridge|air conditioner|ac unit|water cooler|dehumidifier/i;
     const hasFreon = allItems.some((i) => freonRegex.test(i.label));
     const freonCount = allItems.filter((i) => freonRegex.test(i.label)).reduce((sum, i) => sum + i.count, 0);
+    // "Photo evidence of evacuation sticker" — not just a yes/no toggle.
+    // The freon fee is ALWAYS charged regardless of this claim (never a
+    // silent discount from an unverified AI read of a phone photo); a
+    // sticker the model reports seeing only flags the booking for a
+    // human to double-check against the actual photo, which can then
+    // credit the fee back if genuinely verified. See create-booking's
+    // freon_evacuation_status handling.
+    const freonEvacuationClaimed = allItems.some(
+      (i) => freonRegex.test(i.label) && i.freon_evacuation_sticker_visible === true
+    );
 
     // Map Gemini scan items to the shape buildItemizedQuote expects, and run
     // the deterministic eligibility gate (whole vehicles + anything a
@@ -668,6 +693,8 @@ export async function POST(req) {
       load_size: bookingQuote.load_size,
       has_freon: hasFreon,
       freon_count: freonCount,
+      freon_evacuation_claimed: freonEvacuationClaimed,
+      freon_evacuation_status: freonEvacuationClaimed ? 'pending_review' : 'not_claimed',
       has_hazmat: hasHazmat,
       hazmat_description: hasHazmat
         ? [...allItems.filter((i) => i.hazard_flag).map((i) => i.label), ...rejectedItems.map((i) => i.note)].join('; ')

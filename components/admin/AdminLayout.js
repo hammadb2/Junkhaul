@@ -26,6 +26,7 @@ import ReferralsPanel from './ReferralsPanel';
 import ConfigPanel from './ConfigPanel';
 import CostConfigPanel from './CostConfigPanel';
 import QuoteDecisionsView from './QuoteDecisionsView';
+import FreonEvidenceQueue from './FreonEvidenceQueue';
 import ItemEvidenceReview from './ItemEvidenceReview';
 import AIQualityPanel from './AIQualityPanel';
 import AuditTrail from './AuditTrail';
@@ -58,6 +59,7 @@ const NAV = [
     { id: 'payroll', label: 'Payroll', Icon: IconWallet },
     { id: 'costConfig', label: 'Cost Config', Icon: IconDollar },
     { id: 'quoteDecisions', label: 'Quote Exceptions', Icon: IconHourglass },
+    { id: 'freonEvidence', label: 'Freon Evidence', Icon: IconSearch },
     { id: 'itemEvidence', label: 'Item Evidence Review', Icon: IconSearch },
     { id: 'aiQuality', label: 'AI Quality', Icon: IconTrending },
   ]},
@@ -98,6 +100,7 @@ const VIEW_META = {
   payroll: ['Payroll', 'Pay runs, remittances & T4s'],
   costConfig: ['Cost Config', 'Versioned operating costs and pricing policy'],
   quoteDecisions: ['Quote Exceptions', 'Pending or underpriced quotes requiring review'],
+  freonEvidence: ['Freon Evidence', 'AI-flagged refrigerant evacuation stickers awaiting verification'],
   itemEvidence: ['Item Evidence Review', 'Review AI-detected items, weights and hazards'],
   aiQuality: ['AI Quality', 'Model performance, correction rate and safety metrics'],
   crew: ['Crew', 'Team roster, onboarding & safety'],
@@ -124,6 +127,7 @@ const VIEWS = {
   growth: GrowthPanel, marketing: MarketingPanel, communications: CommunicationsPanel, calls: CallsPanel, intel: IntelPanel, referrals: ReferralsPanel,
   costConfig: CostConfigPanel,
   quoteDecisions: QuoteDecisionsView,
+  freonEvidence: FreonEvidenceQueue,
   itemEvidence: ItemEvidenceReview,
   aiQuality: AIQualityPanel,
   config: ConfigPanel, audit: AuditTrail, dispatchlog: DispatchLogView,
