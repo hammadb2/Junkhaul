@@ -50,7 +50,7 @@ export async function GET(req) {
     .from('phone_verifications')
     .select('code, expires_at, verified')
     .eq('phone', phone)
-    .order('created_at', { descending: true })
+    .order('created_at', { ascending: false })
     .limit(1)
     .single();
 
