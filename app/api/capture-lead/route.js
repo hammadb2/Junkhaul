@@ -90,16 +90,23 @@ export async function POST(req) {
         consent_source: rest.sms_consent_source || 'booking_phone_gate',
         consent_at: new Date().toISOString(),
       });
-      await sendSMS(
-        normalizedPhone,
-        `Junk Haul Calgary here! Upload your photos and we'll get you an instant price. Questions? Call or text (587) 325-0751`,
-        {
-          lead_id: data.id,
-          campaign_id: attr?.last?.campaign_id || null,
-          message_type: 'lead_welcome',
-          workflow_action: 'booking_phone_capture',
-        }
-      );
+      // An SMS delivery failure (suppression, provider outage, out-of-credit,
+      // etc.) must never block the customer from proceeding past this step —
+      // matches the fire-and-forget pattern used for the out_of_area SMS below.
+      try {
+        await sendSMS(
+          normalizedPhone,
+          `Junk Haul Calgary here! Upload your photos and we'll get you an instant price. Questions? Call or text (587) 325-0751`,
+          {
+            lead_id: data.id,
+            campaign_id: attr?.last?.campaign_id || null,
+            message_type: 'lead_welcome',
+            workflow_action: 'booking_phone_capture',
+          }
+        );
+      } catch (e) {
+        console.error('lead_welcome SMS failed:', e.message);
+      }
     }
     await recordTimelineEvent({
       entity_type: 'lead',
@@ -179,11 +186,17 @@ export async function POST(req) {
     }
 
     if (ai_price_estimate && hasRealPhone) {
-      await sendSMS(
-        normalizedPhone || phone,
-        `Your Junk Haul Calgary quote: $${ai_price_estimate}. $50 deposit locks in your slot. Book here: https://junkhaul.ca/book — quote valid 48 hrs.`,
-        { lead_id: leadRow?.id || null, message_type: 'lead_price_reveal', workflow_action: 'price_reveal' }
-      );
+      // Same rule as the welcome SMS above: never let a failed send block
+      // the customer from seeing their price and continuing to book.
+      try {
+        await sendSMS(
+          normalizedPhone || phone,
+          `Your Junk Haul Calgary quote: $${ai_price_estimate}. $50 deposit locks in your slot. Book here: https://junkhaul.ca/book — quote valid 48 hrs.`,
+          { lead_id: leadRow?.id || null, message_type: 'lead_price_reveal', workflow_action: 'price_reveal' }
+        );
+      } catch (e) {
+        console.error('lead_price_reveal SMS failed:', e.message);
+      }
     }
     if (leadRow?.id) {
       await recordTimelineEvent({
