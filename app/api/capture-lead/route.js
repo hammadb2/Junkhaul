@@ -39,9 +39,16 @@ export async function POST(req) {
       sms_consent_at: hasRealPhone ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     };
-    // price_first: the address may already be known at init time, so attach it.
+    // price_first: the address may already be known at init time, so attach
+    // it. `leads` has no address_data column — writing that object directly
+    // (as this used to) makes Postgres reject the whole upsert, silently
+    // dropping the address too. Pull lat/lng out of it instead, matching
+    // the 'update' action's handling below.
     if (rest.address) leadRow.address = rest.address;
-    if (rest.address_data) leadRow.address_data = rest.address_data;
+    if (rest.address_data?.lat && rest.address_data?.lng) {
+      leadRow.lat = rest.address_data.lat;
+      leadRow.lng = rest.address_data.lng;
+    }
     if (rest.ab_variant) {
       leadRow.ab_variant = rest.ab_variant;
       leadRow.ab_variant_assigned_at = new Date().toISOString();
@@ -119,24 +126,44 @@ export async function POST(req) {
   }
 
   if (action === 'update') {
-    const updateData = { ...rest, updated_at: new Date().toISOString() };
+    // Whitelist to real `leads` columns only. This used to be `{ ...rest }`
+    // (every field the caller sent, blind), which silently broke the ENTIRE
+    // update whenever the caller included a field the table doesn't have —
+    // confirmed live: AddressStep sends `address_data` (a Mapbox object) on
+    // every address selection, but `leads` has no address_data column, so
+    // Postgres rejected the whole statement and the customer's `address`
+    // (which WAS a valid column) never got saved either. Nothing surfaced
+    // this because the result wasn't checked and the client call is
+    // fire-and-forget.
+    const ALLOWED_FIELDS = ['address', 'ab_variant', 'current_step', 'name', 'email'];
+    const updateData = { updated_at: new Date().toISOString() };
+    for (const key of ALLOWED_FIELDS) {
+      if (rest[key] !== undefined) updateData[key] = rest[key];
+    }
 
-    // Geocode address if provided (needed for opportunistic offers)
-    if (rest.address && !rest.lat) {
-      try {
-        const geo = await geocodeAddress(rest.address);
-        if (geo) {
-          updateData.lat = geo.lat;
-          updateData.lng = geo.lng;
-          updateData.quadrant = geo.quadrant;
+    // Geocode address if provided (needed for opportunistic offers). Prefer
+    // lat/lng already resolved client-side (Mapbox's address_data), falling
+    // back to a server-side geocode only if that's missing.
+    if (rest.address) {
+      if (rest.address_data?.lat && rest.address_data?.lng) {
+        updateData.lat = rest.address_data.lat;
+        updateData.lng = rest.address_data.lng;
+      } else {
+        try {
+          const geo = await geocodeAddress(rest.address);
+          if (geo) {
+            updateData.lat = geo.lat;
+            updateData.lng = geo.lng;
+            updateData.quadrant = geo.quadrant;
+          }
+        } catch {
+          // best-effort — don't fail the update over geocoding
         }
-      } catch {
-        // best-effort — don't fail the update over geocoding
       }
     }
 
-    if (rest.current_step) updateData.current_step = rest.current_step;
-    await supabaseAdmin.from('leads').update(updateData).eq('session_id', session_id);
+    const { error: updateError } = await supabaseAdmin.from('leads').update(updateData).eq('session_id', session_id);
+    if (updateError) console.error('capture-lead update failed:', updateError.message, { session_id, fields: Object.keys(updateData) });
     const { data: leadForEvent } = await supabaseAdmin.from('leads').select('id').eq('session_id', session_id).maybeSingle();
     if (leadForEvent?.id) {
       await recordTimelineEvent({
