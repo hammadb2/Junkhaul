@@ -26,7 +26,7 @@ const DEFAULT_RECORD = {
   labor_rate_versions: { role_or_employee: 'default_crew', hourly_rate: 20, burden_percent: 0, overtime_rules: {}, time_block_minutes: 30 },
   facility_rate_versions: { facility: 'East Calgary Landfill', waste_stream: 'general_junk', flat_minimum: 80, per_tonne_rate: 0, surcharges: {}, item_fees: {}, tax_treatment: 'included' },
   overhead_rate_versions: { payment_fees_percent: 0, supplies_per_job: 0, insurance_allocation_per_day: 0, software_per_month: 0, admin_per_month: 0, contingency_percent: 0, risk_reserve_percent: 0 },
-  pricing_policy_versions: { target_margin_percent: 20, minimum_contribution_percent: 0, rounding_rule: 'nearest_dollar', auto_quote_ceiling: '', review_thresholds: {} },
+  pricing_policy_versions: { target_margin_percent: 20, minimum_contribution_percent: 0, minimum_contribution_dollars: 0, rounding_rule: 'nearest_dollar', auto_quote_ceiling: '', review_thresholds: { margin_review_below_percent: 15, owner_review_above_dollar: 1000 } },
 };
 
 const LOAD_LABELS = {
@@ -243,6 +243,8 @@ function CurrentValues({ data }) {
         <Value label="Labor time block" value={c.labor ? `${c.labor.time_block_minutes ?? 30} min` : '—'} />
         <Value label="Facility min" value={c.facility ? `$${c.facility.flat_minimum}` : '—'} />
         <Value label="Target margin" value={c.policy ? `${c.policy.target_margin_percent}%` : '—'} />
+        <Value label="Min profit floor" value={c.policy ? `$${Number(c.policy.minimum_contribution_dollars || 0).toFixed(2)}` : '—'} />
+        <Value label="Min margin floor" value={c.policy ? `${c.policy.minimum_contribution_percent || 0}%` : '—'} />
         <Value label="Rounding" value={c.policy?.rounding_rule || '—'} />
       </div>
     </div>
@@ -415,8 +417,9 @@ const FIELDS_BY_TABLE = {
     { key: 'source', label: 'Source / evidence' },
   ],
   pricing_policy_versions: [
-    { key: 'target_margin_percent', label: 'Target margin %', type: 'number', unit: '%' },
-    { key: 'minimum_contribution_percent', label: 'Minimum contribution %', type: 'number', unit: '%' },
+    { key: 'target_margin_percent', label: 'Target margin %', type: 'number', unit: '% — used to SET the price' },
+    { key: 'minimum_contribution_percent', label: 'Minimum contribution %', type: 'number', unit: '% — hard floor, sends to manual review below this' },
+    { key: 'minimum_contribution_dollars', label: 'Minimum profit', type: 'number', unit: '$ — hard floor per job' },
     { key: 'rounding_rule', label: 'Rounding rule', type: 'select', options: ROUNDING_OPTIONS },
     { key: 'auto_quote_ceiling', label: 'Auto-quote ceiling', type: 'number', unit: '$' },
     { key: 'review_thresholds', label: 'Review thresholds', type: 'json' },

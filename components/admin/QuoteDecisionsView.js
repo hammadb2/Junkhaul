@@ -12,6 +12,12 @@ const stateBadge = {
   superseded: 'bg-gray-100 text-gray-800',
 };
 
+const confidenceBadge = {
+  high: 'bg-green-100 text-green-800',
+  medium: 'bg-amber-100 text-amber-800',
+  low: 'bg-red-100 text-red-800',
+};
+
 function fmtCents(cents) {
   return `$${((cents || 0) / 100).toFixed(2)}`;
 }
@@ -77,6 +83,11 @@ export default function QuoteDecisionsView() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${stateBadge[d.state] || 'bg-gray-100'}`}>{d.state}</span>
+                  {d.confidence_tier && (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${confidenceBadge[d.confidence_tier] || 'bg-gray-100'}`}>
+                      {d.confidence_tier} confidence ({d.confidence_score})
+                    </span>
+                  )}
                   <span className="text-sm text-gray-500">{d.quote_decision_ref}</span>
                 </div>
                 <p className="mt-1 text-sm"><strong>Price:</strong> {fmtCents(d.price_cents)} · <strong>Minimum:</strong> {fmtCents(d.minimum_price_cents)} · <strong>Exposure:</strong> {fmtCents(Math.max(0, d.minimum_price_cents - d.price_cents))}</p>
