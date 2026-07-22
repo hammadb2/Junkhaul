@@ -1136,13 +1136,15 @@ function ReviewStep({ state, update, price, onNext }) {
                         <span className="font-medium text-gray-900 text-sm">{item.name}</span>
                         {item.is_freon && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Freon</span>}
                         {weightKg && <span className="text-[10px] text-gray-400">~{weightKg}kg</span>}
-                        {item.note && <span className="text-[10px] text-gray-400">{item.note}</span>}
+                        {item.note && !item.is_hazmat && <span className="text-[10px] text-gray-400">{item.note}</span>}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
                         {item.disposal === 'donate' ? (
                           <span className="text-green-600 font-medium">Free — donated to charity</span>
                         ) : item.is_hazmat ? (
-                          <span className="text-red-600">Cannot take</span>
+                          <span className="text-red-600 font-medium">
+                            Cannot take{item.note ? ` — ${item.note}` : ''}
+                          </span>
                         ) : (
                           <span>${item.unit_price} each × {item.quantity} = ${item.line_total}</span>
                         )}

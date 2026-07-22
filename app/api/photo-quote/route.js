@@ -17,7 +17,7 @@
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
-import { buildItemizedQuote } from '@/lib/itemPricing';
+import { buildItemizedQuote, checkItemEligibility } from '@/lib/itemPricing';
 import { TRUCK_SIZES } from '@/lib/pricingConstants';
 import crypto from 'crypto';
 import sharp from 'sharp';
@@ -239,7 +239,21 @@ dining chair ~8kg, a tube TV ~30kg, a metal filing cabinet ~50kg. If you
 cannot see the material clearly, estimate conservatively (slightly heavy).
 
 Flag any item that looks hazardous (paint cans, propane, chemicals,
-anything asbestos-suspect). Return ONLY the JSON matching the schema.`;
+anything asbestos-suspect). Also set hazard_flag=true for a WHOLE VEHICLE
+or vehicle shell (car, truck, van, motorcycle, ATV, snowmobile, boat,
+trailer, RV, golf cart) — landfills do not accept intact vehicles and a
+2-person crew cannot lift one into the truck; this is not junk-removal
+work. Note in visual_evidence that it is a vehicle, not a hazardous
+material, so it is clear why it was excluded.
+
+Also set hazard_flag=true for any single item you estimate at over 100kg
+that an ordinary 2-person crew could not carry into a cargo truck without
+a dolly, ramp, or specialised equipment (e.g. a full-size safe, a grand
+piano, an engine block, poured concrete). Ordinary large furniture
+(fridges ~70kg, sofas ~45kg) is fine and should NOT be flagged just for
+being bulky — this is specifically for items beyond a safe 2-person lift.
+
+Return ONLY the JSON matching the schema.`;
 
 async function scanImageWithGemini(rawImageBuffer, mimeType) {
   const enhancedBuffer = await enhanceImage(rawImageBuffer);
@@ -595,16 +609,43 @@ export async function POST(req) {
     const freonRegex = /refrigerator|freezer|fridge|air conditioner|ac unit|water cooler|dehumidifier/i;
     const hasFreon = allItems.some((i) => freonRegex.test(i.label));
     const freonCount = allItems.filter((i) => freonRegex.test(i.label)).reduce((sum, i) => sum + i.count, 0);
-    const hasHazmat = allItems.some((i) => i.hazard_flag);
 
-    // Total weight: use Gemini's per-item weight estimate, fallback to
-    // volume-based rough conversion if the model didn't return one.
-    const totalWeightKg = allItems.reduce((sum, i) => {
+    // Map Gemini scan items to the shape buildItemizedQuote expects, and run
+    // the deterministic eligibility gate (whole vehicles + anything a
+    // 2-person crew can't safely lift) — this is enforced in code, not just
+    // asked of the model, so a prompt/model change can't quietly let a car
+    // or a 300kg safe back into a priced quote. See checkItemEligibility in
+    // lib/itemPricing.js.
+    const itemsForQuote = allItems.map((i) => {
+      const estimatedWeightKg = i.est_weight_kg_each || Math.round((i.est_volume_cuft_each || 20) * 0.45);
+      const eligibility = checkItemEligibility(i.label, estimatedWeightKg);
+      return {
+        name: i.label,
+        quantity: i.count,
+        is_freon: freonRegex.test(i.label),
+        is_hazmat: i.hazard_flag || eligibility.rejected,
+        estimated_weight_kg: estimatedWeightKg,
+      };
+    });
+
+    const itemized = buildItemizedQuote(itemsForQuote, { stairs: 0, same_day: false });
+    const rejectedItems = itemized.rejected_items || [];
+    const hasHazmat = allItems.some((i) => i.hazard_flag) || rejectedItems.length > 0;
+
+    // Total weight/volume for TRUCK SIZING only counts items we're actually
+    // taking — a rejected vehicle or an over-weight single item doesn't get
+    // to inflate the truck recommendation for junk we're not loading.
+    // itemized.items is a 1:1, same-order mapping of itemsForQuote/allItems
+    // (buildItemizedQuote maps items_detected positionally), so index into
+    // it directly rather than matching by name (two different photos can
+    // both detect a "sofa" — matching by label would wrongly conflate them).
+    const acceptedForSizing = allItems.filter((_, idx) => !itemized.items[idx]?.rejected);
+    const totalWeightKg = acceptedForSizing.reduce((sum, i) => {
       const perUnit = i.est_weight_kg_each || Math.round((i.est_volume_cuft_each || 20) * 0.45);
       return sum + perUnit * i.count;
     }, 0);
     const totalWeightLbs = Math.round(totalWeightKg * 2.20462);
-    const totalVolumeCuft = bookingQuote.total_est_volume_cuft;
+    const totalVolumeCuft = acceptedForSizing.reduce((sum, i) => sum + (i.est_volume_cuft_each || 0) * i.count, 0);
 
     // Recommend the smallest truck that handles BOTH volume and weight.
     // 15ft: 764 cuft / 6385 lbs  |  20ft: 1016 cuft / 5700 lbs  |  26ft: 1682 cuft / 12859 lbs
@@ -618,19 +659,10 @@ export async function POST(req) {
         recommendedTruckSize = 20;
       }
     }
-
-    // Map Gemini scan items to the shape buildItemizedQuote expects:
-    //   { name, quantity, is_freon, is_hazmat, estimated_weight_kg }
-    // Gemini gives us: { label, count, hazard_flag, est_volume_cuft_each, est_weight_kg_each, condition }
-    const itemsForQuote = allItems.map((i) => ({
-      name: i.label,
-      quantity: i.count,
-      is_freon: freonRegex.test(i.label),
-      is_hazmat: i.hazard_flag,
-      estimated_weight_kg: i.est_weight_kg_each || Math.round((i.est_volume_cuft_each || 20) * 0.45),
-    }));
-
-    const itemized = buildItemizedQuote(itemsForQuote, { stairs: 0, same_day: false });
+    // Even the largest truck we operate can't take this in one trip —
+    // don't silently cap at 26ft, flag it so a human plans a multi-trip job.
+    const exceedsMaxTruckCapacity =
+      totalWeightLbs > TRUCK_SIZES[26].max_load_lbs || totalVolumeCuft > TRUCK_SIZES[26].volume_cuft;
 
     const analysis = {
       load_size: bookingQuote.load_size,
@@ -638,18 +670,23 @@ export async function POST(req) {
       freon_count: freonCount,
       has_hazmat: hasHazmat,
       hazmat_description: hasHazmat
-        ? allItems.filter((i) => i.hazard_flag).map((i) => i.label).join(', ')
+        ? [...allItems.filter((i) => i.hazard_flag).map((i) => i.label), ...rejectedItems.map((i) => i.note)].join('; ')
         : null,
-      flag_for_review: bookingQuote.hazard_review_required || bookingQuote.low_confidence_total,
-      flag_reason: bookingQuote.low_confidence_total
-        ? 'Scene rated cluttered/packed but few items detected — possible undercount'
-        : bookingQuote.hazard_review_required
-          ? 'Hazardous items detected'
-          : null,
+      rejected_items: rejectedItems.map((i) => ({ name: i.original_name, reason: i.note })),
+      flag_for_review: bookingQuote.hazard_review_required || bookingQuote.low_confidence_total || exceedsMaxTruckCapacity,
+      flag_reason: exceedsMaxTruckCapacity
+        ? `Load exceeds our largest truck's capacity (${TRUCK_SIZES[26].max_load_lbs} lbs / ${TRUCK_SIZES[26].volume_cuft} cuft) — needs a multi-trip plan, not a standard job.`
+        : bookingQuote.low_confidence_total
+          ? 'Scene rated cluttered/packed but few items detected — possible undercount'
+          : bookingQuote.hazard_review_required
+            ? 'Hazardous items detected'
+            : null,
+      exceeds_max_truck_capacity: exceedsMaxTruckCapacity,
       items_detected: itemsForQuote,
       estimated_volume_cuft: totalVolumeCuft,
       estimated_weight_kg: totalWeightKg,
       estimated_weight_lbs: totalWeightLbs,
+      estimated_dump_fee: itemized.estimated_dump_fee,
       recommended_truck_size: recommendedTruckSize,
       photo_quote_tier: bookingQuote.tier,
       items_needing_confirmation: bookingQuote.items_needing_confirmation,
