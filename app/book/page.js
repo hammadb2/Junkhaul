@@ -306,6 +306,7 @@ export default function BookPage() {
               state={state}
               update={update}
               price={price}
+              sessionId={sessionId}
               onCreated={(b) => {
                 setBooking(b);
                 goToStep(getNextStep('details'));
@@ -1743,7 +1744,7 @@ function ScheduleStep({ state, update, onNext }) {
 // ============================================================
 // STEP 4 — EMAIL (optional) + CREATE BOOKING
 // ============================================================
-function DetailsStep({ state, update, price, onCreated }) {
+function DetailsStep({ state, update, price, sessionId, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
