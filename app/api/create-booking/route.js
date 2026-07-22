@@ -53,6 +53,7 @@ export async function POST(req) {
       ai_load_estimate = null,
       ai_weight_estimate_kg = null,
       ai_volume_estimate_cuft = null,
+      ai_landfill_weight_kg = null,
       heavy_item_extra_minutes = 0,
       ai_confidence = null,
       has_hazmat = false,
@@ -202,6 +203,7 @@ export async function POST(req) {
       address,
       weight_kg: ai_weight_estimate_kg || undefined,
       volume_cuft: ai_volume_estimate_cuft || undefined,
+      landfill_weight_kg: ai_landfill_weight_kg ?? undefined,
       heavy_item_extra_minutes,
       pricingConfig,
     });
@@ -230,6 +232,7 @@ export async function POST(req) {
       ai_load_estimate,
       ai_weight_estimate_kg,
       ai_volume_estimate_cuft,
+      ai_landfill_weight_kg,
       heavy_item_extra_minutes,
       ai_confidence,
       has_hazmat,

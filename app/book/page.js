@@ -1805,6 +1805,7 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
           ai_load_estimate: state.analysis?.load_size || null,
           ai_weight_estimate_kg: state.analysis?.estimated_weight_kg || null,
           ai_volume_estimate_cuft: state.analysis?.estimated_volume_cuft || null,
+          ai_landfill_weight_kg: state.analysis?.landfill_weight_kg ?? null,
           heavy_item_extra_minutes: state.analysis?.heavy_item_extra_minutes || 0,
           ai_confidence: state.analysis?.confidence || null,
           has_hazmat: state.analysis?.has_hazmat || false,

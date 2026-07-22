@@ -731,6 +731,11 @@ export async function POST(req) {
       estimated_weight_kg: totalWeightKg,
       estimated_weight_lbs: totalWeightLbs,
       estimated_dump_fee: itemized.estimated_dump_fee,
+      // Pricing Engine Phase 8 — only the actually-landfilled portion of
+      // the load (excludes e-waste routed to the Eco-Centre) drives the
+      // real per-tonne landfill fee; total weight above still drives
+      // truck sizing, since diverted items still need to be hauled.
+      landfill_weight_kg: itemized.landfill_weight_kg,
       recommended_truck_size: recommendedTruckSize,
       photo_quote_tier: bookingQuote.tier,
       items_needing_confirmation: bookingQuote.items_needing_confirmation,
