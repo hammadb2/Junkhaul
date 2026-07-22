@@ -26,6 +26,7 @@ export async function GET(req, { params }) {
     { data: calls },
     { data: serviceRequests },
     { data: refundRequests },
+    { data: quoteDecision },
   ] = await Promise.all([
     booking.lead_id ? supabaseAdmin.from('leads').select('*, quotes:lead_quotes(*)').eq('id', booking.lead_id).maybeSingle() : Promise.resolve({ data: null }),
     supabaseAdmin.from('quote_price_ledger').select('*').eq('booking_id', id).order('created_at', { ascending: true }),
@@ -36,6 +37,12 @@ export async function GET(req, { params }) {
     supabaseAdmin.from('phone_calls').select('*').eq('booking_id', id).order('created_at', { ascending: true }),
     supabaseAdmin.from('service_requests').select('*').or(`booking_id.eq.${id},booking_ref.eq.${booking.booking_ref}`).order('created_at', { ascending: false }),
     supabaseAdmin.from('refund_requests').select('*').or(`booking_id.eq.${id},booking_ref.eq.${booking.booking_ref}`).order('created_at', { ascending: false }),
+    // Full internal cost/profit breakdown (Pricing Engine Phase 9) — the
+    // same cost snapshot that actually set this booking's price, not a
+    // re-derived estimate. See lib/quoteDecision.js.
+    booking.quote_decision_id
+      ? supabaseAdmin.from('quote_decisions').select('*').eq('id', booking.quote_decision_id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   return NextResponse.json({
     booking,
@@ -48,5 +55,6 @@ export async function GET(req, { params }) {
     calls: calls || [],
     service_requests: serviceRequests || [],
     refund_requests: refundRequests || [],
+    quote_decision: quoteDecision || null,
   });
 }

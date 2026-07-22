@@ -553,6 +553,23 @@ export async function POST(req) {
       deposit: PRICING.deposit,
       tracking_token: trackingToken,
       tracking_url: `https://junkhaul.ca/track/${trackingToken}`,
+      // Simplified customer-facing breakdown (Pricing Engine Phase 9) —
+      // only the line items a customer needs to see why their total is
+      // what it is. Deliberately excludes priced.cost_engine/
+      // raw_cost_snapshot (internal cost, margin, vehicle rental/labor
+      // rates, truck selection reasoning) — that detail is for admin/
+      // dispatch only (see components/admin/BookingDetailView.js's
+      // CostBreakdown section, sourced from the linked quote_decision).
+      breakdown: {
+        base_price: priced.base_price,
+        same_day_fee: priced.same_day_fee,
+        stairs_fee: priced.stairs_fee,
+        freon_fee: priced.freon_fee,
+        travel_fee: priced.travel_fee,
+        total: priced.total,
+        deposit: priced.deposit,
+        balance_due: priced.balance_due,
+      },
     });
   } catch (err) {
     console.error('create-booking error:', err);
