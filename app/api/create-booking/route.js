@@ -78,7 +78,7 @@ export async function POST(req) {
     // Enforce 24-hour minimum booking window
     const now = new Date();
     const earliest = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const jobDateTime = new Date(`${job_date}T${job_time}:00-07:00`); // Edmonton timezone
+    const jobDateTime = jobDateTimeUTC(job_date, job_time);
     if (jobDateTime < earliest) {
       return NextResponse.json(
         { error: 'Booking must be at least 24 hours from now. Please pick a later time.' },
