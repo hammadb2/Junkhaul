@@ -261,12 +261,14 @@ trailer, RV, golf cart) — landfills do not accept intact vehicles and a
 work. Note in visual_evidence that it is a vehicle, not a hazardous
 material, so it is clear why it was excluded.
 
-Also set hazard_flag=true for any single item you estimate at over 100kg
-that an ordinary 2-person crew could not carry into a cargo truck without
-a dolly, ramp, or specialised equipment (e.g. a full-size safe, a grand
-piano, an engine block, poured concrete). Ordinary large furniture
-(fridges ~70kg, sofas ~45kg) is fine and should NOT be flagged just for
-being bulky — this is specifically for items beyond a safe 2-person lift.
+Do NOT set hazard_flag=true just because an item is heavy (a safe, a
+piano, an engine block) -- weight is handled separately downstream by
+est_weight_kg_each (100-200kg items get extra handling time and stay in
+the quote; over 200kg goes to manual review), not by hazard_flag. Only
+set hazard_flag=true for genuine hazardous materials or contamination
+(paint, chemicals, propane, asbestos-suspect material, biohazards) --
+being heavy or bulky is not a hazard. Ordinary large furniture
+(fridges ~70kg, sofas ~45kg) is fine and should NOT be flagged at all.
 
 Return ONLY the JSON matching the schema.`;
 
@@ -689,6 +691,14 @@ export async function POST(req) {
     const exceedsMaxTruckCapacity =
       totalWeightLbs > TRUCK_SIZES[26].max_load_lbs || totalVolumeCuft > TRUCK_SIZES[26].volume_cuft;
 
+    // Ultra-heavy items (>200kg, likely needs 3+ crew) are a DIFFERENT
+    // outcome from a vehicle/hazmat rejection: they force manual review
+    // so staff can decide to accept the job (arranging extra crew/
+    // equipment) or confirm it genuinely can't be done, instead of an
+    // automatic hard refusal. See checkItemEligibility in lib/itemPricing.js.
+    const ultraHeavyItems = itemized.ultra_heavy_items || [];
+    const hasUltraHeavyItems = ultraHeavyItems.length > 0;
+
     const analysis = {
       load_size: bookingQuote.load_size,
       has_freon: hasFreon,
@@ -700,14 +710,21 @@ export async function POST(req) {
         ? [...allItems.filter((i) => i.hazard_flag).map((i) => i.label), ...rejectedItems.map((i) => i.note)].join('; ')
         : null,
       rejected_items: rejectedItems.map((i) => ({ name: i.original_name, reason: i.note })),
-      flag_for_review: bookingQuote.hazard_review_required || bookingQuote.low_confidence_total || exceedsMaxTruckCapacity,
+      ultra_heavy_items: ultraHeavyItems.map((i) => ({ name: i.original_name, reason: i.note })),
+      // Extra crew minutes for 100-200kg items (dolly/ramp/extra care) —
+      // threaded into the real booking's on-site time via create-booking,
+      // the same calculated-not-flat-fee pattern as stairs (Phase 4).
+      heavy_item_extra_minutes: itemized.heavy_item_extra_minutes || 0,
+      flag_for_review: bookingQuote.hazard_review_required || bookingQuote.low_confidence_total || exceedsMaxTruckCapacity || hasUltraHeavyItems,
       flag_reason: exceedsMaxTruckCapacity
         ? `Load exceeds our largest truck's capacity (${TRUCK_SIZES[26].max_load_lbs} lbs / ${TRUCK_SIZES[26].volume_cuft} cuft) — needs a multi-trip plan, not a standard job.`
-        : bookingQuote.low_confidence_total
-          ? 'Scene rated cluttered/packed but few items detected — possible undercount'
-          : bookingQuote.hazard_review_required
-            ? 'Hazardous items detected'
-            : null,
+        : hasUltraHeavyItems
+          ? `Ultra-heavy item(s) detected, likely needing 3+ crew: ${ultraHeavyItems.map((i) => i.original_name).join(', ')}.`
+          : bookingQuote.low_confidence_total
+            ? 'Scene rated cluttered/packed but few items detected — possible undercount'
+            : bookingQuote.hazard_review_required
+              ? 'Hazardous items detected'
+              : null,
       exceeds_max_truck_capacity: exceedsMaxTruckCapacity,
       items_detected: itemsForQuote,
       estimated_volume_cuft: totalVolumeCuft,
