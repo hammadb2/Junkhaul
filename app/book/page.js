@@ -468,6 +468,9 @@ function PhoneStep({ sessionId, state, update, variant, onNext }) {
       <p className="text-center text-xs text-gray-400">
         By continuing you agree to receive texts about your booking. Standard rates may apply.
       </p>
+      <p className="text-center text-xs text-gray-400">
+        Prefer to just chat? <a href="/book/chat" className="text-orange-600 underline">Book with our AI assistant</a> instead.
+      </p>
     </div>
   );
 }
