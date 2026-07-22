@@ -23,7 +23,7 @@ const DEFAULT_RECORD = {
   vehicle_profiles: { name: '', vehicle_class: '', volume_cuft: 0, volume_yd3: 0, legal_payload_kg: 0, operational_weight_limit_kg: 0, planned_payload_percent: 0.85, fuel_baseline_l_per_100km: 45, interior_length_ft: 0, interior_width_ft: 0, interior_height_ft: 0, fuel_tank_capacity_l: 0, ramp_details: '', clean_eligible: false, dirty_eligible: true, active: true, source: '' },
   rental_rate_versions: { provider: 'U-Haul', location: 'Gas Plus Balzac, 10070 Hwy 566, Balzac, AB T4B 2T3', daily_rate: 40, included_km: 0, per_mile_rate: 2.4, taxes_percent: 0, protection_fee: 18 },
   fuel_rate_versions: { price_per_litre: 1.75, quote_safety_l_per_100km: 45, fuel_safety_buffer_percent: 10, source: '' },
-  labor_rate_versions: { role_or_employee: 'default_crew', hourly_rate: 20, burden_percent: 0, overtime_rules: {}, time_block_minutes: 30 },
+  labor_rate_versions: { role_or_employee: 'default_crew', hourly_rate: 20, burden_percent: 0, overtime_rules: {}, time_block_minutes: 30, stairs_minutes_per_flight: 8 },
   facility_rate_versions: { facility: 'East Calgary Landfill', waste_stream: 'general_junk', flat_minimum: 80, per_tonne_rate: 0, surcharges: {}, item_fees: {}, tax_treatment: 'included' },
   overhead_rate_versions: { payment_fees_percent: 0, supplies_per_job: 0, insurance_allocation_per_day: 0, software_per_month: 0, admin_per_month: 0, contingency_percent: 0, risk_reserve_percent: 0 },
   pricing_policy_versions: { target_margin_percent: 20, minimum_contribution_percent: 0, minimum_contribution_dollars: 0, rounding_rule: 'nearest_dollar', auto_quote_ceiling: '', review_thresholds: { margin_review_below_percent: 15, owner_review_above_dollar: 1000 } },
@@ -241,6 +241,7 @@ function CurrentValues({ data }) {
         <Value label="Fuel safety buffer" value={c.fuel ? `${c.fuel.fuel_safety_buffer_percent ?? 0}%` : '—'} />
         <Value label="Labor" value={c.labor ? `$${c.labor.hourly_rate}/h` : '—'} />
         <Value label="Labor time block" value={c.labor ? `${c.labor.time_block_minutes ?? 30} min` : '—'} />
+        <Value label="Stairs time/flight" value={c.labor ? `${c.labor.stairs_minutes_per_flight ?? 8} min` : '—'} />
         <Value label="Facility min" value={c.facility ? `$${c.facility.flat_minimum}` : '—'} />
         <Value label="Target margin" value={c.policy ? `${c.policy.target_margin_percent}%` : '—'} />
         <Value label="Min profit floor" value={c.policy ? `$${Number(c.policy.minimum_contribution_dollars || 0).toFixed(2)}` : '—'} />
@@ -393,6 +394,7 @@ const FIELDS_BY_TABLE = {
     { key: 'hourly_rate', label: 'Hourly rate', type: 'number', unit: '$' },
     { key: 'burden_percent', label: 'Burden %', type: 'number', unit: '%' },
     { key: 'time_block_minutes', label: 'Time block size', type: 'number', unit: 'minutes' },
+    { key: 'stairs_minutes_per_flight', label: 'Stairs time per flight', type: 'number', unit: 'minutes — added to on-site time' },
     { key: 'overtime_rules', label: 'Overtime rules', type: 'json' },
     { key: 'source', label: 'Source / evidence' },
   ],
