@@ -74,6 +74,7 @@
     "20260822000003_fuel_price_refresh_cron.sql": "253434d1796f40ab24ef2041ddc3ce97cf8972201dd9712fb4bcebbc0cfa5ce7",
     "20260823000001_pricing_engine_phase2_customer_price.sql": "7e9d9de50d969395334627133e248e3fe6a1ef3d1d21dc5f033b2624649bf09c",
     "20260824000001_pricing_engine_phase3_profit_protection.sql": "87ef19b1a86d4c7eb1bcf3ba6dfa8923d1c4fa97bf4fbd57e602f43a84d8797a",
-    "20260825000001_pricing_engine_phase4_access_difficulty.sql": "7c15215ae0df87f191b4bd3c0ff76426e905235dc2b464eff1fcf32f388d5f6b"
+    "20260825000001_pricing_engine_phase4_access_difficulty.sql": "7c15215ae0df87f191b4bd3c0ff76426e905235dc2b464eff1fcf32f388d5f6b",
+    "20260826000001_pricing_engine_phase5_freon_evidence.sql": "42f9ccbf9a60d52230897673d017e26b57b8511848ff8d0382487575db671378"
   }
 }

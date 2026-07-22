@@ -1559,7 +1559,19 @@ function ReviewStep({ state, update, price, onNext }) {
             <div className="flex justify-between"><span>Base ({LOAD_LABELS[state.load_size]})</span><span>${price.base_price}</span></div>
           )}
           {/* Freon fee only shows for flat-rate pricing — for itemized, it's in the item prices */}
-          {!hasItems && price.freon_fee > 0 && <div className="flex justify-between"><span>Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})</span><span>${price.freon_fee}</span></div>}
+          {!hasItems && price.freon_fee > 0 && (
+            <div className="flex justify-between">
+              <span>
+                Freon ({state.freon_count} item{state.freon_count > 1 ? 's' : ''})
+                {state.analysis?.freon_evacuation_claimed && (
+                  <span className="block text-xs text-gray-400">
+                    We spotted what may be an evacuation sticker — fee still applies until our team verifies it, then we&apos;ll credit it back if confirmed.
+                  </span>
+                )}
+              </span>
+              <span>${price.freon_fee}</span>
+            </div>
+          )}
           {/* Stairs fee for flat-rate */}
           {!hasItems && price.stairs_fee > 0 && <div className="flex justify-between"><span>Stairs ({state.stairs} flight{state.stairs > 1 ? 's' : ''})</span><span>${price.stairs_fee}</span></div>}
           {/* Same-day for flat-rate */}
@@ -1780,6 +1792,7 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
           stairs: state.stairs,
           has_freon: state.has_freon,
           freon_count: state.freon_count,
+          freon_evacuation_claimed: state.analysis?.freon_evacuation_claimed || false,
           truck_size: state.truck_size || 15,
           job_date: state.job_date,
           job_time: state.job_time,

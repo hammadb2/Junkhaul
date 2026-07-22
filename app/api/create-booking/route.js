@@ -39,6 +39,8 @@ export async function POST(req) {
       stairs = 0,
       has_freon = false,
       freon_count = 0,
+      freon_evacuation_claimed = false,
+      freon_evacuation_status = 'not_claimed',
       truck_size = 15,
       job_date,
       job_time,
@@ -336,6 +338,12 @@ export async function POST(req) {
       stairs_fee: priced.stairs_fee,
       has_freon,
       freon_fee: priced.freon_fee,
+      // Photo evidence of an evacuation sticker never auto-waives the
+      // fee (still fully charged above) -- it only flags the booking
+      // for a human to verify against the actual photo. See Phase 5's
+      // migration comment on bookings.freon_evacuation_status.
+      freon_evacuation_claimed: Boolean(freon_evacuation_claimed),
+      freon_evacuation_status: freon_evacuation_claimed ? 'pending_review' : 'not_claimed',
       travel_fee: priced.travel_fee,
       travel_km: travelKm,
       // Engine-selected truck — always the smallest of the 15/20/26ft

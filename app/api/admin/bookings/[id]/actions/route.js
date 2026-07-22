@@ -37,6 +37,8 @@ const ACTION_PERMISSIONS = {
   manual_quote_correction: 'bookings.review_quote',
   flag_hazardous_item: 'bookings.review_quote',
   flag_quote_mismatch: 'bookings.review_quote',
+  verify_freon_evidence: 'bookings.review_quote',
+  reject_freon_evidence: 'bookings.review_quote',
   flag_issue: 'bookings.escalate',
   escalate: 'bookings.escalate',
   mark_ready_for_dispatch: 'bookings.assign',
@@ -318,12 +320,24 @@ export async function POST(req, { params }) {
       .single();
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
     after = data;
-  } else if (['review_quote', 'manual_quote_correction', 'flag_hazardous_item', 'flag_quote_mismatch', 'flag_issue', 'escalate', 'mark_ready_for_dispatch', 'mark_customer_unavailable'].includes(action)) {
+  } else if (['review_quote', 'manual_quote_correction', 'flag_hazardous_item', 'flag_quote_mismatch', 'flag_issue', 'escalate', 'mark_ready_for_dispatch', 'mark_customer_unavailable', 'verify_freon_evidence', 'reject_freon_evidence'].includes(action)) {
     const note = payload.note || reason || action;
     const update = { operator_notes: appendNote(booking.operator_notes, note, auth.context.employee.id) };
     if (action === 'flag_hazardous_item') Object.assign(update, { has_hazmat: true, hazmat_description: payload.hazmat_description || booking.hazmat_description || reason });
     if (action === 'flag_quote_mismatch' || action === 'flag_issue') Object.assign(update, { flag_for_review: true, flag_reason: reason || payload.note || action });
     if (action === 'mark_ready_for_dispatch') Object.assign(update, { crew_status: 'confirmed' });
+    if (action === 'verify_freon_evidence' || action === 'reject_freon_evidence') {
+      // Verifying does NOT auto-refund — the fee was already charged in
+      // full at booking time (see Phase 5). This just records the human
+      // decision; any credit back to the customer is a manual finance
+      // step, noted here for whoever processes it.
+      Object.assign(update, {
+        freon_evacuation_status: action === 'verify_freon_evidence' ? 'verified' : 'rejected',
+        freon_evacuation_reviewed_by: auth.context.employee.id,
+        freon_evacuation_reviewed_at: new Date().toISOString(),
+        freon_evacuation_review_note: payload.note || reason || null,
+      });
+    }
     const { data, error: updateError } = await supabaseAdmin.from('bookings').update(update).eq('id', id).select('*').single();
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
     after = data;
