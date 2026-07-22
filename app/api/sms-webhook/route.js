@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, PHOTO_BUCKET } from '@/lib/supabase';
 import { sendSMS as _sendSMS, setSmsSuppression, liftSmsSuppression } from '@/lib/sms';
-import { calculatePrice, getPricingConfig, LOAD_LABELS, PRICING } from '@/lib/pricing';
+import { calculatePrice, quoteCustomerPrice, getPricingConfig, LOAD_LABELS, PRICING } from '@/lib/pricing';
 import { createQuoteDecision, linkQuoteDecisionToBooking } from '@/lib/quoteDecision';
 import { toCents } from '@/lib/money';
 import { cancelBooking } from '@/lib/cancellations';
@@ -279,13 +279,23 @@ async function getAvailableSlots() {
 // ============================================================
 async function createSmsBooking({ name, phone, address, load_size, job_date, job_time, stairs, has_freon, freon_count }) {
   const pricingConfig = await getPricingConfig();
-  const priced = calculatePrice({ load_size, stairs, has_freon, freon_count, job_date, job_time, pricingConfig });
   const geo = await geocodeAddress(address);
+  let travelFee = 0;
   let travelKm = 0;
   try {
     const t = await calculateTravelFee({ lat: geo.lat, lng: geo.lng });
+    travelFee = t.fee;
     travelKm = t.km;
   } catch {}
+
+  // Real cost-engine price — same source of truth as the web booking flow
+  // (lib/pricing.js's quoteCustomerPrice), so an SMS booking is priced
+  // identically to one made through junkhaul.ca for the same job.
+  const priced = await quoteCustomerPrice({
+    load_size, stairs, has_freon, freon_count, job_date, job_time,
+    travel_fee: travelFee, lat: geo.lat, lng: geo.lng, address,
+    pricingConfig,
+  });
 
   const quoteInput = {
     name, phone, address,
@@ -298,6 +308,7 @@ async function createSmsBooking({ name, phone, address, load_size, job_date, job
   const decision = await createQuoteDecision({
     quoteInput,
     priceCents: toCents(priced.total),
+    costSnapshot: priced.raw_cost_snapshot,
     depositCents: toCents(priced.deposit),
     actorType: 'sms',
   });
@@ -327,7 +338,10 @@ async function createSmsBooking({ name, phone, address, load_size, job_date, job
       load_size,
       base_price: priced.base_price,
       same_day: false, same_day_fee: 0,
-      stairs, has_freon, freon_count, freon_fee: priced.freon_fee,
+      stairs, stairs_fee: priced.stairs_fee,
+      has_freon, freon_count, freon_fee: priced.freon_fee,
+      travel_fee: priced.travel_fee, travel_km: travelKm,
+      truck_size: priced.truck_size,
       total_price: priced.total,
       deposit_amount: priced.deposit,
       deposit_paid: 0, balance_due: priced.balance_due,
@@ -539,6 +553,11 @@ export async function POST(req) {
         const load_size = safeAnalysis.load_size || 'quarter';
         const freon_count = safeAnalysis.freon_count || (safeAnalysis.has_freon ? 1 : 0);
         const pricingConfig = await getPricingConfig();
+        // Flat-rate estimate is intentional here: the address isn't known
+        // yet at this point in the SMS conversation, so a real route
+        // distance can't be computed. createSmsBooking() (below, once the
+        // customer confirms address/date) uses the real cost engine for
+        // the actual charged price.
         const priced = calculatePrice({ load_size, has_freon: safeAnalysis.has_freon, freon_count, pricingConfig });
 
         // Build quote conversationally, no dashes

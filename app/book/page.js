@@ -1791,6 +1791,7 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
           description_text: state.description_text || null,
           ai_load_estimate: state.analysis?.load_size || null,
           ai_weight_estimate_kg: state.analysis?.estimated_weight_kg || null,
+          ai_volume_estimate_cuft: state.analysis?.estimated_volume_cuft || null,
           ai_confidence: state.analysis?.confidence || null,
           has_hazmat: state.analysis?.has_hazmat || false,
           hazmat_description: state.analysis?.hazmat_description || null,
