@@ -25,9 +25,7 @@ export async function GET(req) {
         id,
         first_name,
         last_name,
-        phone,
-        role,
-        crew_assignment_id
+        phone
       )
     `)
     .order('updated_at', { ascending: false });
