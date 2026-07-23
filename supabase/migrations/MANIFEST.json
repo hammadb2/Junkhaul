@@ -84,6 +84,7 @@
     "20260901000001_confirmation_sweep_cron.sql": "c50e37fcdea0e6a9ac17f0cfcf5c70c9e3ddd637e9d90c4c6961accfbf6d4ae7",
     "20260902000001_demand_snapshot_cron_secret_fix.sql": "8db42fe5eb088a43e2ecd6b8e8e22e2fbeac3692b678ed1a9ca930f37f8bea8d",
     "20260903000001_remove_duplicate_payroll_cron.sql": "ec137593e7395435c8c8e788637182b59d4d583ca2f64e7eeea335fee49a134a",
-    "20260904000001_crew_tips_intent_unique.sql": "c3b752e9d69ee47048a37939fbc7961b365dfd39c84a126b69c389e98e11f07f"
+    "20260904000001_crew_tips_intent_unique.sql": "c3b752e9d69ee47048a37939fbc7961b365dfd39c84a126b69c389e98e11f07f",
+    "20260905000001_balance_payment_intent_column.sql": "5cdea986a27627eecaa1b89a9cb781127d6b4100b24f573e5a5db847e90552ab"
   }
 }
