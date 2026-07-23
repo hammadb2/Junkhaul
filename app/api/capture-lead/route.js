@@ -199,7 +199,13 @@ export async function POST(req) {
       updated_at: new Date().toISOString(),
     };
     if (photos) leadUpdate.photos = photos;
-    if (itemized) leadUpdate.description_text = JSON.stringify(itemized);
+    // Previously overwrote description_text with the itemized quote JSON
+    // (audit B14), clobbering any human-typed description the customer
+    // entered via the text-description path (app/book/page.js). The
+    // itemized breakdown is already preserved properly in the lead_quotes
+    // insert below -- nothing reads leads.description_text expecting
+    // itemized JSON, so it's just dropped here rather than duplicated
+    // destructively.
 
     // Fetch lead_id for the quote history insert.
     const { data: leadRow } = await supabaseAdmin
