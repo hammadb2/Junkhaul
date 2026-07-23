@@ -20,6 +20,22 @@ export const runtime = 'nodejs';
 //   (phone number) belongs to an existing customer
 // ============================================================
 
+// Strip the OTHER party's phone number before this ever reaches a
+// response. There's no session/OTP mechanism gating this lookup by the
+// queried phone (audit B11) -- anyone who knows or guesses ANY phone
+// number could otherwise pull every phone number they've ever referred
+// or been referred by. Everything else here (status, reward amounts,
+// dates) is fine to return.
+const sanitizeReferral = (r) => ({
+  id: r.id,
+  booking_id: r.booking_id,
+  status: r.status,
+  referrer_reward_amount: r.referrer_reward_amount,
+  referee_reward_amount: r.referee_reward_amount,
+  created_at: r.created_at,
+  completed_at: r.completed_at,
+});
+
 export async function GET(req) {
   const { searchParams } = req.nextUrl;
   const phone = searchParams.get('phone');
@@ -45,8 +61,8 @@ export async function GET(req) {
   const totalEarned = completedAsReferrer.reduce((s, r) => s + r.referrer_reward_amount, 0);
 
   return NextResponse.json({
-    as_referrer: referrerReferrals || [],
-    as_referee: refereeReferrals || [],
+    as_referrer: (referrerReferrals || []).map(sanitizeReferral),
+    as_referee: (refereeReferrals || []).map(sanitizeReferral),
     total_referrals: (referrerReferrals || []).length,
     completed_referrals: completedAsReferrer.length,
     total_earned: totalEarned,
@@ -70,10 +86,15 @@ export async function POST(req) {
       ? `+1${referral_code.replace(/\D/g, '')}`
       : referral_code;
 
-    // Check if this phone belongs to an existing customer
+    // Check if this phone belongs to an existing customer. We deliberately
+    // don't return their name here (audit B11): this endpoint takes an
+    // arbitrary phone number with no proof the caller actually knows the
+    // person, so echoing back a real customer's name turns it into a
+    // "does this phone number belong to one of your customers, and who"
+    // lookup for anyone willing to guess numbers.
     const { data: existingBookings } = await supabaseAdmin
       .from('bookings')
-      .select('id, name')
+      .select('id')
       .eq('phone', refPhone)
       .limit(1);
 
@@ -81,9 +102,8 @@ export async function POST(req) {
 
     return NextResponse.json({
       valid: isValid,
-      referrer_name: isValid ? existingBookings[0].name?.split(' ')[0] : null,
       message: isValid
-        ? `You and ${existingBookings[0].name?.split(' ')[0] || 'your friend'} both get $20 off!`
+        ? 'Referral code applied — you and your friend will both get $20 off!'
         : 'Referral code not found. Make sure you entered their phone number correctly.',
     });
   }
