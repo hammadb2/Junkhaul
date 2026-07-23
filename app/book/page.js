@@ -147,7 +147,16 @@ export default function BookPage() {
         const parsed = JSON.parse(saved);
         // Don't restore photos as blobs — they can't be serialized.
         // But restore everything else.
-        if (parsed.phone) {
+        //
+        // Gating on parsed.phone alone (audit B13) meant the price_first
+        // variant (STEPS_PRICE_FIRST: address -> photos -> review -> phone
+        // -> ...) never restored anything, since phone isn't captured
+        // until step 4 -- a refresh during AI photo analysis, exactly the
+        // case this restore exists for per the comment above, silently
+        // wiped all progress for that variant. address is the earliest
+        // field either variant sets (phone_first's first step, price_first's
+        // very first step), so check both.
+        if (parsed.phone || parsed.address) {
           setState((s) => ({ ...s, ...parsed, photos: s.photos }));
         }
       }
