@@ -11,6 +11,7 @@ import { calculateTravelFee } from '@/lib/route';
 import { sendDepositLink } from '@/lib/messages';
 import { createDepositPayment } from '@/lib/stripe';
 import { randomBytes } from 'crypto';
+import { WHATSAPP_SIGNATURE_HEADER, verifyWhatsAppWebhookSignature } from '@/lib/whatsappWebhookAuth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -331,9 +332,29 @@ async function uploadPhotoToStorage(base64) {
 // ============================================================
 // MAIN WEBHOOK HANDLER
 // ============================================================
+// Verifies Meta's X-Hub-Signature-256 on the raw request body (audit C3).
+// Fails closed unless WHATSAPP_WEBHOOK_SIGNATURE_REQUIRED=false is
+// explicitly set, matching the same opt-out pattern the Quo SMS webhooks
+// use (lib/quoWebhookAuth.js).
+function verifyRequest(req, rawBody) {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  const signatureHeader = req.headers.get(WHATSAPP_SIGNATURE_HEADER);
+  const requireSignature = process.env.WHATSAPP_WEBHOOK_SIGNATURE_REQUIRED !== 'false';
+  const verification = verifyWhatsAppWebhookSignature({ rawBody, signatureHeader, appSecret });
+  if (!requireSignature) return true;
+  if (!verification.ok) {
+    console.warn('whatsapp-webhook rejected:', { reason: verification.reason });
+  }
+  return verification.ok;
+}
+
 export async function POST(req) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    if (!verifyRequest(req, rawBody)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const body = JSON.parse(rawBody);
 
     // Meta webhook format: entry[].changes[].value
     const entry = body?.entry?.[0];
