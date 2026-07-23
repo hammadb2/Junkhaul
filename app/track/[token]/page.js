@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Star, Phone, MessageSquare, Mail, MapPin, CheckCircle, Circle, Truck, Home, ChevronRight } from 'lucide-react';
+import { isPaidStatus } from '@/lib/paymentStatus';
 
 // ============================================================
 // /track/[token] — customer tracking portal (light theme).
@@ -45,7 +46,7 @@ export default function TrackPage({ params }) {
       if (res.status === 404) { setNotFound(true); setLoading(false); return; }
       const d = await res.json();
       setData(d);
-      setBalancePaid(d.booking?.payment_status === 'paid' || d.booking?.balance_due <= 0);
+      setBalancePaid(isPaidStatus(d.booking?.payment_status) || d.booking?.balance_due <= 0);
       setFeedbackDone(d.feedback_submitted);
       setTipDone(d.tip_submitted);
       setLoading(false);

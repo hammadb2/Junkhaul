@@ -5,6 +5,7 @@ import { isKillSwitchOn } from '@/lib/audit';
 import { getNumberConfig, getBooleanConfig } from '@/lib/config';
 import { callDeepSeek } from '@/lib/deepseek';
 import { requireStaffPermission } from '@/lib/staffAuth';
+import { isPaidStatus } from '@/lib/paymentStatus';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -108,7 +109,9 @@ async function gatherInputSummary() {
 
   const jobs = todayBookings || [];
   const revenueToCollect = jobs.reduce((s, b) => s + (b.balance_due || 0), 0);
-  const revenueCollected = jobs.filter(b => b.status === 'completed' && b.payment_status === 'paid').reduce((s, b) => s + b.total_price, 0);
+  // See audit G3 — payment_status has no plain 'paid' value; isPaidStatus is
+  // the source of truth for "money actually collected".
+  const revenueCollected = jobs.filter(b => b.status === 'completed' && isPaidStatus(b.payment_status)).reduce((s, b) => s + b.total_price, 0);
   const surgeBookings = jobs.filter(b => b.surge_multiplier && b.surge_multiplier !== 1);
 
   const now = new Date().toISOString();
