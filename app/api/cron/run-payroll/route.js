@@ -9,7 +9,23 @@ export const maxDuration = 30;
 // ============================================================
 // /api/cron/run-payroll
 //
-// Runs automatically every other Friday (payday for biweekly).
+// Intended to run every other Friday (payday for biweekly). It's
+// actually invoked every Friday (both pg_cron and vercel.json
+// schedule it weekly -- the pg_cron duplicate is removed by
+// 20260903000001_remove_duplicate_payroll_cron.sql, Vercel's is
+// what remains) plus whenever anyone hits it manually. Rather than
+// rely on getting the cron cadence itself exactly right, the period
+// math below computes each period SEQUENTIALLY from the last pay
+// run's period_end instead of "the trailing 14 days ending today"
+// (audit E3): the old version recomputed a fresh trailing-14-day
+// window relative to *today* on every invocation, so a weekly
+// firing produced a new overlapping 14-day period every week
+// instead of two clean back-to-back fortnights. Computing the next
+// period from the last one makes this idempotent and correctly
+// biweekly regardless of how often the endpoint is actually called
+// -- calling it early just no-ops until the computed period has
+// elapsed.
+//
 // Checks if there are un-paid shifts in the current pay period.
 // If yes, creates a pay run in 'calculated' status and alerts the
 // operator to review + approve it in the admin dashboard.
@@ -24,12 +40,44 @@ export async function GET(req) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Determine the pay period: the two weeks ending today
-  const today = new Date();
-  const periodEnd = today.toISOString().slice(0, 10);
-  const periodStart = new Date(today.getTime() - 13 * 86400000).toISOString().slice(0, 10);
+  // Determine the next pay period sequentially from the last one that was
+  // ever created, so periods never overlap regardless of firing cadence.
+  const { data: lastRun } = await supabaseAdmin
+    .from('pay_runs')
+    .select('period_end')
+    .order('period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  // Check if there's already a pay run for this period
+  let periodStart, periodEnd;
+  if (lastRun?.period_end) {
+    const nextStart = new Date(`${lastRun.period_end}T00:00:00Z`);
+    nextStart.setUTCDate(nextStart.getUTCDate() + 1);
+    periodStart = nextStart.toISOString().slice(0, 10);
+    const nextEnd = new Date(nextStart);
+    nextEnd.setUTCDate(nextEnd.getUTCDate() + 13);
+    periodEnd = nextEnd.toISOString().slice(0, 10);
+  } else {
+    // Bootstrap: no pay runs exist yet, so there's no prior period to
+    // continue from -- use the trailing 14 days ending today.
+    const today = new Date();
+    periodEnd = today.toISOString().slice(0, 10);
+    periodStart = new Date(today.getTime() - 13 * 86400000).toISOString().slice(0, 10);
+  }
+
+  // The next period hasn't finished yet -- nothing to do until it has.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (periodEnd > todayStr) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      message: `Next pay period (${periodStart} to ${periodEnd}) hasn't ended yet`,
+    });
+  }
+
+  // Belt-and-suspenders: guard against an exact-duplicate invocation
+  // (e.g. a race between two schedulers firing the same day) even though
+  // the sequential computation above shouldn't produce one by construction.
   const { data: existing } = await supabaseAdmin
     .from('pay_runs')
     .select('id, status')
