@@ -141,6 +141,10 @@ function assignImageId(imageBuffer) {
 const SCAN_SCHEMA = {
   type: 'object',
   properties: {
+    photo_unusable: {
+      type: 'boolean',
+      description: 'True if the photo is unusable for a junk quote -- see the PHOTO_UNUSABLE rule in the prompt. When true, every other field must be empty/zero and no item may be described.',
+    },
     scene_density: {
       type: 'string',
       enum: ['sparse', 'moderate', 'cluttered', 'packed'],
@@ -177,10 +181,22 @@ const SCAN_SCHEMA = {
     reasoning: { type: 'string' },
     total_est_volume_cuft: { type: 'number' },
   },
-  required: ['scene_density', 'items', 'reasoning', 'total_est_volume_cuft'],
+  required: ['photo_unusable', 'scene_density', 'items', 'reasoning', 'total_est_volume_cuft'],
 };
 
-const SCAN_PROMPT = `You are given the SAME photo multiple times: once as the
+const SCAN_PROMPT = `PHOTO_UNUSABLE -- check this FIRST, before anything else:
+- If anything sexual or intimate is accidentally in frame, the photo is
+  unusable. Set photo_unusable=true and return ONLY photo_unusable=true
+  with every other field empty/zero/null (scene_density can be "sparse",
+  items=[], reasoning="", total_est_volume_cuft=0). Never describe why,
+  never describe what you saw, in reasoning or anywhere else.
+- If the photo shows a person but no junk/items to remove, that's also
+  unusable for a quote -- set photo_unusable=true the same way. Do NOT
+  list a person as an item under any circumstances, whether or not junk
+  is also present.
+- Otherwise set photo_unusable=false and continue with the full scan below.
+
+You are given the SAME photo multiple times: once as the
 full image, and again as NINE overlapping close-up crops on a 3x3 grid
 (top_left, top_center, top_right, mid_left, center, mid_right, bot_left,
 bot_center, bot_right). Each crop is zoomed 1.5x so you can see detail
@@ -613,6 +629,20 @@ export async function POST(req) {
     const perImageResults = [];
     for (const { imageBase64, mimeType } of cleanImages) {
       perImageResults.push(await processOneImage(imageBase64, mimeType));
+    }
+
+    // Photo unusable (e.g. intimate content accidentally in frame, or a
+    // person with no junk in view) -- tell the customer to retake without
+    // ever describing why, no analysis, no price. Critically, bail out
+    // BEFORE uploadPhotos() below: an unusable photo must never be
+    // persisted to storage or itemized (audit B3 -- this check existed on
+    // the old /api/analyze path but was never ported when photo quoting
+    // moved to this Gemini scan route).
+    if (perImageResults.some((r) => r.scan.photo_unusable)) {
+      return NextResponse.json({
+        photo_unusable: true,
+        error: 'Photo unusable — please retake your photo and try again.',
+      });
     }
 
     const bookingQuote = aggregateBookingQuote(perImageResults);
