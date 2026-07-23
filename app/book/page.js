@@ -367,9 +367,14 @@ export default function BookPage() {
             zIndex: 10,
           }}
         >
-          <span style={{ fontSize: 13, color: 'rgba(0,0,0,.5)' }}>Your price</span>
+          <span style={{ fontSize: 13, color: 'rgba(0,0,0,.5)' }}>
+            {booking ? 'Your price' : 'Estimated price'}
+          </span>
           <span style={{ fontSize: 17, fontWeight: 700, color: '#1a1a1a' }}>
-            ${state.itemized ? state.itemized.total : price.total}
+            {/* Once a booking exists, this is the real server-computed
+                total (audit B1) -- the client's flat-rate/itemized
+                estimate above is never what gets charged. */}
+            ${booking ? booking.total : (state.itemized ? state.itemized.total : price.total)}
           </span>
         </div>
       )}
@@ -1248,11 +1253,11 @@ function ReviewStep({ state, update, price, onNext }) {
             <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-semibold text-green-800">Flat rate could save you ${savingsAmount}</span>
+                  <span className="text-sm font-semibold text-green-800">Flat rate could save you an estimated ${savingsAmount}</span>
                   <p className="text-xs text-green-600 mt-0.5">
                     {LOAD_LABELS[state.analysis?.load_size || state.load_size]}
                     {flatRateTruckSize > 15 && ` + ${TRUCK_SIZES[flatRateTruckSize]?.label} truck`}
-                    {' '}at ${flatRateTotal} vs itemized at ${itemizedTotal}
+                    {' '}at ${flatRateTotal} vs itemized at ${itemizedTotal} (both estimates — confirmed at checkout)
                   </p>
                   {flatRateTruckSize > 15 && (
                     <p className="text-[11px] text-green-600 mt-0.5">
@@ -1531,9 +1536,12 @@ function ReviewStep({ state, update, price, onNext }) {
         )}
       </div>
 
-      {/* ===== SECTION: YOUR PRICE (single, authoritative total) ===== */}
+      {/* ===== SECTION: ESTIMATED PRICE (client-side estimate — the
+          real total is computed server-side from live cost data when
+          you submit; see B1 audit note above the price on the next
+          screen) ===== */}
       <div className="flex items-center gap-2 mt-2">
-        <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Your price</span>
+        <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Estimated price</span>
         <div className="flex-1 h-px bg-gray-200" />
       </div>
       <div className="bg-gray-50 rounded-xl p-4">
@@ -1542,7 +1550,7 @@ function ReviewStep({ state, update, price, onNext }) {
             <span className="text-3xl font-bold text-gray-900">
               $<AnimatedPrice price={hasItems ? itemized.total : price.total} />
             </span>
-            <span className="text-sm text-gray-400 ml-2">total</span>
+            <span className="text-sm text-gray-400 ml-2">estimated</span>
           </div>
           <div className="text-right">
             <div className="text-xs text-gray-400">Deposit today</div>
@@ -1583,6 +1591,9 @@ function ReviewStep({ state, update, price, onNext }) {
           {price.truck_fee > 0 && <div className="flex justify-between"><span>Larger truck ({TRUCK_SIZES[state.truck_size || 15]?.label})</span><span>+${price.truck_fee}</span></div>}
           <div className="flex justify-between font-medium text-gray-600 pt-1 border-t border-gray-200"><span>Balance on pickup</span><span>${hasItems ? itemized.balance_due : price.balance_due}</span></div>
         </div>
+        <p className="text-[11px] text-gray-400 mt-2">
+          This is an estimate. Your final price is confirmed on the next screen before you pay a deposit.
+        </p>
       </div>
 
       <BookButton onClick={onNext}>Choose a time →</BookButton>
@@ -1853,7 +1864,7 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-2xl font-bold text-gray-900">Your quote is ready</h2>
+      <h2 className="text-2xl font-bold text-gray-900">Your estimated quote</h2>
 
       {/* Itemized breakdown if available */}
       {state.itemized && state.itemized.items && state.itemized.items.length > 0 && (
@@ -1926,7 +1937,7 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
           </div>
         )}
         <div className="border-t border-gray-200 pt-2 flex items-center justify-between">
-          <span className="font-semibold text-gray-900">Total</span>
+          <span className="font-semibold text-gray-900">Estimated total</span>
           <span className="text-2xl font-bold text-gray-900">${displayTotal}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
@@ -1934,10 +1945,17 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
           <span className="font-medium text-gray-700">$50</span>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Balance on pickup</span>
+          <span className="text-gray-500">Estimated balance on pickup</span>
           <span className="font-medium text-gray-700">${displayBalance}</span>
         </div>
       </div>
+      {/* This screen's total is a client-side estimate (audit B1) --
+          the real price is computed server-side from live cost data
+          when you submit below, and that's what the next screen (and
+          your deposit charge) actually reflects. */}
+      <p className="text-[11px] text-gray-400 -mt-2">
+        This is an estimate. We&apos;ll confirm your exact price after you submit, before you pay anything.
+      </p>
 
       {/* Name + email collected here, right before payment */}
       <Field
