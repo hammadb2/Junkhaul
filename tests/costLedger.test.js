@@ -68,7 +68,12 @@ const BENCHMARK_BOOKING = {
   assert.ok(breakdown.rental.mileage_charge_cents < toCents(99), 'mileage charge < $99');
   assert.equal(breakdown.fuel.total_cents, toCents(65.98 * 0.7875), 'fuel cost at $0.7875/km');
   assert.equal(breakdown.disposal.total_cents, toCents(80), 'disposal flat $80');
-  assert.equal(breakdown.minimum_price_cents, 48000, 'minimum price rounds to $480 for benchmark cost');
+  // Labor is billed on rounded time blocks (roundToTimeBlock, Phase 4): the
+  // raw 3.1529 h rounds up to 3.5 h, so labor is 3.5 h x 2 crew x $18 = $126
+  // (not the raw-hours $113.50). Total cost $396.36 / 0.8 target margin =
+  // $495.45, which rounds to $495. This golden value was $480 before the
+  // time-block rounding landed and was never updated with it.
+  assert.equal(breakdown.minimum_price_cents, 49500, 'minimum price rounds to $495 for benchmark cost (labor on 3.5h time block)');
   assert.equal(breakdown.decision, 'accept', 'benchmark is accept at minimum price');
   assert.deepEqual(result.rateVersionIds, {
     vehicle_profile_id: 'veh-1',
