@@ -77,6 +77,7 @@
     "20260825000001_pricing_engine_phase4_access_difficulty.sql": "7c15215ae0df87f191b4bd3c0ff76426e905235dc2b464eff1fcf32f388d5f6b",
     "20260826000001_pricing_engine_phase5_freon_evidence.sql": "42f9ccbf9a60d52230897673d017e26b57b8511848ff8d0382487575db671378",
     "20260827000001_pricing_engine_phase7_weight_based_disposal.sql": "7dd1c21147caf08063929ae5aaa0287d1cac5fedfc28c816babc6abcb57dfb0d",
-    "20260828000001_pricing_engine_phase10_chat_booking.sql": "59e7bf4a77c51776cff27b7017dce0432b179a6f05b60f489412f6457917c8d5"
+    "20260828000001_pricing_engine_phase10_chat_booking.sql": "59e7bf4a77c51776cff27b7017dce0432b179a6f05b60f489412f6457917c8d5",
+    "20260829000001_bookings_create_permission.sql": "af65a5428c0cdfc4d7dcc56d1fb8e4bc6d5ea3c6555c9bde19c79114173366b5"
   }
 }
