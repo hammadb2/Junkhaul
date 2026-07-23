@@ -100,8 +100,11 @@ export async function POST(req) {
       crew_status: booking.crew_status === 'awaiting_payment' ? 'complete' : booking.crew_status,
       status: 'completed',
       receipt_sent: true,
-      review_requested: true,
-      review_requested_at: now,
+      // review_requested is left false here (audit F4): it's the flag the
+      // review-request cron checks before sending the real tracking/
+      // feedback/tip link. Pre-setting it true at payment time made every
+      // cash job permanently skip that cron -- cash customers never got
+      // the real link, only the dead /review/[id] URL below.
     })
     .eq('id', booking_id)
     .or('payment_status.in.(pending,unpaid),payment_status.is.null')
@@ -120,12 +123,15 @@ export async function POST(req) {
     );
   }
 
-  // Send receipt email (via the existing email system)
-  // For now, we send an SMS confirmation since the email system is in vapiTools.js
+  // Send receipt SMS. The review/tracking/tip ask is deliberately NOT
+  // included here -- that's the review-request cron's job (audit F4), and
+  // it already sends the real, working tracking link
+  // (junkhaul.ca/track/[tracking_token]). This route previously linked to
+  // https://junkhaul.ca/review/[booking_id], a route that doesn't exist.
   try {
     await sendSMS(
       booking.phone,
-      `Thanks ${booking.name}! $${amount} cash received for your Junk Haul Calgary pickup. Receipt sent to your email. We'd love a review: https://junkhaul.ca/review/${booking_id}`,
+      `Thanks ${booking.name}! $${amount} cash received for your Junk Haul Calgary pickup. Receipt sent to your email.`,
       booking_id,
       'receipt'
     );
