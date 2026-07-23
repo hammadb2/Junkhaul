@@ -1767,11 +1767,16 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
   const [error, setError] = useState(null);
 
   const nameValid = state.name.trim().length >= 2;
-  const valid = nameValid && state.phone && state.address;
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((state.email || '').trim());
+  const valid = nameValid && emailValid && state.phone && state.address;
 
   const submit = async () => {
     if (!nameValid) {
       setError('Please enter your full name.');
+      return;
+    }
+    if (!emailValid) {
+      setError('Please enter a valid email address.');
       return;
     }
 
@@ -1785,7 +1790,7 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
           name: state.name,
           phone: state.phone,
           session_id: sessionId,
-          email: state.email || null,
+          email: state.email.trim(),
           address: state.address,
           unit: state.unit || null,
           address_data: state.address_data || null,
@@ -1943,7 +1948,7 @@ function DetailsStep({ state, update, price, sessionId, onCreated }) {
       />
 
       <Field
-        label="Email (optional — for your receipt)"
+        label="Email (for your receipt and booking confirmation)"
         value={state.email}
         onChange={(v) => update({ email: v })}
         placeholder="you@email.com"
