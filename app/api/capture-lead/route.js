@@ -5,6 +5,7 @@ import { geocodeAddress } from '@/lib/geocode';
 import { normalizePhone } from '@/lib/phone';
 import { captureAttribution } from '@/lib/attribution';
 import { recordTimelineEvent } from '@/lib/timeline';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -100,19 +101,29 @@ export async function POST(req) {
       // An SMS delivery failure (suppression, provider outage, out-of-credit,
       // etc.) must never block the customer from proceeding past this step —
       // matches the fire-and-forget pattern used for the out_of_area SMS below.
-      try {
-        await sendSMS(
-          normalizedPhone,
-          `Junk Haul Calgary here! Upload your photos and we'll get you an instant price. Questions? Call or text (587) 325-0751`,
-          {
-            lead_id: data.id,
-            campaign_id: attr?.last?.campaign_id || null,
-            message_type: 'lead_welcome',
-            workflow_action: 'booking_phone_capture',
-          }
-        );
-      } catch (e) {
-        console.error('lead_welcome SMS failed:', e.message);
+      //
+      // Rate-limited by phone (audit B10): 'init' can be called repeatedly
+      // with a real phone and a fresh session_id each time (nothing
+      // deduplicates by phone, only by session_id), which without a limit
+      // is an unauthenticated way to SMS-bomb any number. This is a
+      // nice-to-have welcome text, not a blocking step, so a rate-limited
+      // send is silently skipped rather than surfaced as an error to the
+      // customer.
+      if (checkRateLimit({ scope: 'lead_welcome_sms_phone', key: normalizedPhone, limit: 3, windowMs: 60 * 60 * 1000 }).ok) {
+        try {
+          await sendSMS(
+            normalizedPhone,
+            `Junk Haul Calgary here! Upload your photos and we'll get you an instant price. Questions? Call or text (587) 325-0751`,
+            {
+              lead_id: data.id,
+              campaign_id: attr?.last?.campaign_id || null,
+              message_type: 'lead_welcome',
+              workflow_action: 'booking_phone_capture',
+            }
+          );
+        } catch (e) {
+          console.error('lead_welcome SMS failed:', e.message);
+        }
       }
     }
     await recordTimelineEvent({
