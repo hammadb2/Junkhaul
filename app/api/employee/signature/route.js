@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getAuthedEmployee } from '@/lib/employeeAuth';
 import { checkRouteVersion, staleRouteResponse, missingVersionResponse } from '@/lib/routeVersionGuard';
+import { bookingPaymentFields } from '@/lib/paymentStatus';
 
 export const runtime = 'nodejs';
 
@@ -46,15 +47,22 @@ export async function POST(req) {
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Update booking payment status
-  await supabaseAdmin
+  // Job is physically complete regardless of payment method — that's true
+  // whether the crew collected cash, will bill via a card on file, or sent
+  // an SMS payment link. Only overlay payment_status/payment_method when the
+  // crew's selection represents an actually-collected payment (see
+  // bookingPaymentFields above); otherwise leave whatever payment state is
+  // already on the booking untouched.
+  const { error: updateErr } = await supabaseAdmin
     .from('bookings')
     .update({
-      payment_status: 'paid',
-      payment_method: payment_method || null,
+      ...bookingPaymentFields(payment_method),
       status: 'completed',
     })
     .eq('id', booking_id);
+  if (updateErr) {
+    console.error(`Signature captured but booking update failed for ${booking_id}:`, updateErr.message);
+  }
 
   return NextResponse.json({ ok: true, signature: data });
 }
