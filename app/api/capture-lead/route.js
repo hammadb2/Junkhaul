@@ -295,6 +295,14 @@ export async function POST(req) {
   if (action === 'out_of_area') {
     // Customer is outside our service area — save their info so we can
     // reach out when we expand. Still valuable as a lead.
+    //
+    // `leads` has no address_data column: writing that Mapbox object (as this
+    // used to) makes Postgres reject the ENTIRE upsert, so the lead was
+    // silently dropped AND the operator SMS below never fired (the handler
+    // 500s first, and the client call is fire-and-forget) — audit finding B2.
+    // Pull lat/lng out of address_data like the 'init'/'update' actions do,
+    // and set the out_of_area flags in the same upsert (those columns exist),
+    // instead of the fragile separate follow-up update.
     const leadData = {
       phone: normalizedPhone || phone,
       normalized_phone: normalizedPhone,
@@ -302,26 +310,20 @@ export async function POST(req) {
       source: rest.source || 'web',
       name: rest.name || null,
       address: rest.address || null,
-      address_data: rest.address_data || null,
       email: rest.email || null,
+      out_of_area: true,
+      out_of_area_notes: rest.notes || null,
       updated_at: new Date().toISOString(),
     };
+    if (rest.address_data?.lat && rest.address_data?.lng) {
+      leadData.lat = rest.address_data.lat;
+      leadData.lng = rest.address_data.lng;
+    }
 
-    // Try with out_of_area columns — if they don't exist yet, the upsert
-    // will still work with the base fields
     const { error } = await supabaseAdmin.from('leads').upsert(
       leadData,
       { onConflict: 'session_id' }
     );
-
-    // Try to update out_of_area flag separately (may fail if column doesn't exist)
-    if (!error) {
-      try {
-        await supabaseAdmin.from('leads')
-          .update({ out_of_area: true, out_of_area_notes: rest.notes || null })
-          .eq('session_id', session_id);
-      } catch {}
-    }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
