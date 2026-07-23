@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { normalizePhone } from '@/lib/phone';
 import { recordTimelineEvent } from '@/lib/timeline';
+import { placeVapiOutboundCall } from '@/lib/vapiOutbound';
 
 export const runtime = 'nodejs';
 
@@ -86,19 +87,13 @@ export async function POST(req) {
       console.error('Operator SMS failed:', e);
     }
 
-    // Trigger Vapi follow-up call (via Quo bridge)
+    // Trigger Vapi follow-up call (via Quo bridge) -- in-process (audit C6),
+    // not a self-referential HTTP call to this app's own production URL.
     try {
-      await fetch('https://junkhaul.ca/api/vapi-outbound', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-vapi-secret': process.env.VAPI_SERVER_SECRET || '',
-        },
-        body: JSON.stringify({
-          phone: normalizedPhone || phone,
-          agent_type: 'service',
-          context: `Service request from ${name}. Type: ${request_type}. Details: ${details}. Booking ref: ${booking_ref || 'none'}.`,
-        }),
+      await placeVapiOutboundCall({
+        phone: normalizedPhone || phone,
+        agent_type: 'service',
+        context: `Service request from ${name}. Type: ${request_type}. Details: ${details}. Booking ref: ${booking_ref || 'none'}.`,
       });
     } catch (e) {
       console.error('Vapi follow-up trigger failed:', e);
