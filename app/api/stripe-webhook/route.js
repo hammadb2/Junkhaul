@@ -5,6 +5,7 @@ import { handleBookingConfirmed } from '@/lib/bookingActions';
 import { confirmQuoteDecisionBooking } from '@/lib/quoteDecision';
 import { createAlert } from '@/lib/alerts';
 import { getTenantBySlug } from '@/lib/rehaul';
+import { isPaidStatus } from '@/lib/paymentStatus';
 
 export const runtime = 'nodejs';
 
@@ -31,7 +32,46 @@ export async function POST(req) {
         const intent = event.data.object;
         const booking_id = intent.metadata?.booking_id;
         if (!booking_id) break;
+        const paymentType = intent.metadata?.type || 'deposit';
 
+        // Balance payment reconciliation (audit finding F1). The customer
+        // paid their remaining balance online via /pay/[booking_id]. The
+        // deposit branch below early-returns for already-deposited bookings,
+        // so without this a successful balance charge was never recorded —
+        // the customer was shown "Payment Successful" while the booking still
+        // read unpaid, revenue dashboards missed it, and the crew could ask
+        // for payment again.
+        if (paymentType === 'balance') {
+          const { data: balBooking } = await supabaseAdmin
+            .from('bookings')
+            .select('id, payment_status')
+            .eq('id', booking_id)
+            .maybeSingle();
+          if (!balBooking) break;
+          if (isPaidStatus(balBooking.payment_status)) break; // idempotent / already collected
+          // 'paid_card' is the constraint-valid status for an online card
+          // payment (there is no plain 'paid' value — see lib/paymentStatus).
+          // Zero the balance so the customer's tracker and the /pay page both
+          // read as settled and revenue-owed reports stop counting it.
+          const { error: balErr } = await supabaseAdmin
+            .from('bookings')
+            .update({
+              payment_status: 'paid_card',
+              payment_collected_at: new Date().toISOString(),
+              balance_due: 0,
+            })
+            .eq('id', booking_id);
+          if (balErr) {
+            console.error(`Balance reconciliation failed for booking ${booking_id}:`, balErr.message);
+          }
+          break;
+        }
+
+        // Crew tips are recorded directly by app/api/track/[token]/tip when
+        // the customer confirms them; nothing to reconcile here.
+        if (paymentType === 'tip') break;
+
+        // Deposit (default, and legacy intents created without a type).
         const { data: booking } = await supabaseAdmin
           .from('bookings')
           .select('*')
