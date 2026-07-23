@@ -60,10 +60,20 @@ async function groqChat(messages, maxTokens = 300) {
   }
 }
 
-// Wrapper that strips ALL dashes and apostrophes from outgoing SMS
+// Previously stripped every dash and apostrophe from ALL outgoing SMS
+// through this route, not just AI-generated replies (audit C7). Fixed
+// template strings in this file already avoid apostrophes manually
+// ("Youre", "Ill", "havent") for the AI's texting-style voice, but dynamic
+// content doesn't get that luxury -- booking refs are formatted like
+// "JH-A54DD3" and were being corrupted to "JHA54DD3" on every booking
+// confirmation text, and any hyphen or apostrophe in a customer's raw
+// inbound message (forwarded to the operator below) was silently mangled.
+// The one place that genuinely needs this defense -- the AI-generated
+// reply, since the model doesn't always follow the system prompt's
+// no-dashes instruction -- keeps its own scoped strip a few hundred lines
+// down (`reply.replace(...)` before the ai_reply send).
 async function sendSMS(to, body, booking_id = null, message_type = null) {
-  const clean = body.replace(/-/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ').trim();
-  return _sendSMS(to, clean, booking_id, message_type);
+  return _sendSMS(to, body, booking_id, message_type);
 }
 
 // ============================================================
