@@ -4,11 +4,32 @@ import { ADMIN_COOKIE, adminToken } from '@/lib/adminAuth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyPassword, createSession, sessionCookieHeader, clearCookieHeader } from '@/lib/employeeAuth';
 import { getStaffRoles } from '@/lib/permissions';
+import { assertRateLimit, getClientKey } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
 export async function POST(req) {
   const { email, password } = await req.json();
+  // No lockout/backoff previously existed on either login path here --
+  // unlimited attempts against a known staff email, or against the single
+  // shared ADMIN_PASSWORD, is unimpeded credential stuffing/brute force
+  // (audit I2). Rate-limit both branches before touching either check.
+  try {
+    if (email) {
+      assertRateLimit({ scope: 'admin_login_email', key: email.toLowerCase(), limit: 5, windowMs: 15 * 60 * 1000 });
+    } else {
+      // Legacy shared-password path has no per-identity key to scope by --
+      // IP is the only lever, so it's tighter than the per-email limit.
+      assertRateLimit({ scope: 'admin_login_legacy_password', key: getClientKey(req), limit: 5, windowMs: 15 * 60 * 1000 });
+    }
+    assertRateLimit({ scope: 'admin_login_ip', key: getClientKey(req), limit: 20, windowMs: 15 * 60 * 1000 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Too many login attempts. Please try again later.' },
+      { status: err.status || 429, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+    );
+  }
+
   if (email) {
     if (!password) return NextResponse.json({ error: 'Email and password required.' }, { status: 400 });
     const { data: employee } = await supabaseAdmin
