@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { edmontonNowParts } from '@/lib/dates';
 import { requireStaffPermission } from '@/lib/staffAuth';
+import { isPaidStatus } from '@/lib/paymentStatus';
 
 export const runtime = 'nodejs';
 
@@ -22,7 +23,11 @@ export async function GET(req) {
     if (bookingError) throw bookingError;
 
     const revenueToCollect = (todayBookings || []).reduce((sum, b) => sum + (b.balance_due || 0), 0);
-    const revenueCollected = (todayBookings || []).filter(b => b.status === 'completed' && b.payment_status === 'paid').reduce((sum, b) => sum + b.total_price, 0);
+    // payment_status is constrained to unpaid/paid_card/paid_apple_pay/
+    // paid_google_pay/cash_declared/cash_crew — there is no plain 'paid'
+    // value, so this always evaluated to 0 (audit G3). isPaidStatus is the
+    // single source of truth for "money actually collected".
+    const revenueCollected = (todayBookings || []).filter(b => b.status === 'completed' && isPaidStatus(b.payment_status)).reduce((sum, b) => sum + b.total_price, 0);
 
     const surgeBookings = (todayBookings || []).filter(b => b.surge_multiplier && b.surge_multiplier !== 1);
 
