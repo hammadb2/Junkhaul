@@ -32,11 +32,23 @@ export async function GET(_req, { params }) {
     return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
   }
 
-  // ── Crew: find crew_assignments for the booking's job_date ──
-  const { data: assignments } = await supabaseAdmin
-    .from('crew_assignments')
-    .select('id, driver_employee_id, secondary_employee_id')
-    .eq('assignment_date', booking.job_date);
+  // ── Crew: resolve strictly to the truck actually assigned to this
+  // booking (bookings.crew_assignment_id, set by resolveDispatch), never
+  // every truck running that day. Filtering by assignment_date alone
+  // (the previous query) leaked other customers' crew names/selfies,
+  // live GPS -- possibly a truck en route to a different job -- and
+  // donation-run photos to anyone holding this tracking link (audit B9).
+  // If the booking hasn't been dispatched to a specific truck yet, there
+  // is genuinely nothing correct to show, so an empty crew list here is
+  // the honest result, not a regression.
+  let assignments = [];
+  if (booking.crew_assignment_id) {
+    const { data } = await supabaseAdmin
+      .from('crew_assignments')
+      .select('id, driver_employee_id, secondary_employee_id')
+      .eq('id', booking.crew_assignment_id);
+    assignments = data || [];
+  }
 
   const crewIds = new Set();
   const assignmentIds = new Set();
