@@ -366,7 +366,12 @@ export async function POST(req) {
       dynamic_multiplier: priced.dynamic_multiplier,
       surge_multiplier: priced.surge_multiplier,
       surge_mode: surge.mode,
-      deposit_amount: PRICING.deposit,
+      // The amount actually charged (decision.deposit_cents, set from the
+      // live pricing config a few steps up), not the static PRICING
+      // constant (audit B7) -- they agree today only because no admin UI
+      // ever overrides pricing_deposit in system_config, but nothing
+      // enforced that.
+      deposit_amount: decision.deposit_cents / 100,
       balance_due: priced.balance_due,
       job_date,
       job_time,
@@ -452,7 +457,7 @@ export async function POST(req) {
       pricing: {
         ...priced,
         total: priced.total,
-        deposit: PRICING.deposit,
+        deposit: decision.deposit_cents / 100,
         balance: priced.balance_due,
         travel_km: travelKm,
         truck_size: insert.truck_size,
@@ -489,7 +494,7 @@ export async function POST(req) {
       entity_id: booking.id,
       event_type: 'payment_intent_created',
       source: 'stripe',
-      metadata: { payment_intent_id: intent.id, deposit: PRICING.deposit },
+      metadata: { payment_intent_id: intent.id, deposit: decision.deposit_cents / 100 },
     });
 
     // ── Tracking token (customer portal link) ─────────────
@@ -554,7 +559,7 @@ export async function POST(req) {
       client_secret: intent.client_secret,
       total: priced.total,
       balance_due: priced.balance_due,
-      deposit: PRICING.deposit,
+      deposit: decision.deposit_cents / 100,
       tracking_token: trackingToken,
       tracking_url: `https://junkhaul.ca/track/${trackingToken}`,
       // Simplified customer-facing breakdown (Pricing Engine Phase 9) —

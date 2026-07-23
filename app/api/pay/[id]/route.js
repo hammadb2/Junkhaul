@@ -35,10 +35,15 @@ export async function GET(_req, { params }) {
   }
 
   if (!clientSecret) {
+    // Charge whatever this booking's real deposit_amount is (audit B7) --
+    // not a hardcoded $50. deposit_amount is set from the actual charged
+    // amount at booking-creation time (create-booking/route.js), so this
+    // stays correct even if the live pricing_deposit config ever diverges
+    // from the static $50 default.
     const intent = await createDepositPayment({
       booking_id: booking.id,
       customer_name: booking.name,
-      amount_cents: 5000,
+      amount_cents: Math.round((booking.deposit_amount || 50) * 100),
       quote_decision_id: booking.quote_decision_id || null,
     });
     await supabaseAdmin
