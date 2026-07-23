@@ -79,6 +79,7 @@
     "20260827000001_pricing_engine_phase7_weight_based_disposal.sql": "7dd1c21147caf08063929ae5aaa0287d1cac5fedfc28c816babc6abcb57dfb0d",
     "20260828000001_pricing_engine_phase10_chat_booking.sql": "59e7bf4a77c51776cff27b7017dce0432b179a6f05b60f489412f6457917c8d5",
     "20260829000001_bookings_create_permission.sql": "af65a5428c0cdfc4d7dcc56d1fb8e4bc6d5ea3c6555c9bde19c79114173366b5",
-    "20260830000001_cron_secret_from_guc.sql": "6aa0061ca1eaa26963c10019a4921c1174dd3eda9f4a7c75818cf1fb95db87f8"
+    "20260830000001_cron_secret_from_guc.sql": "6aa0061ca1eaa26963c10019a4921c1174dd3eda9f4a7c75818cf1fb95db87f8",
+    "20260831000001_day_of_reminder_cron.sql": "a52505c2287fa560c88b2e03b99cc0c0d1410dbaa216cdb8774dd7f1888eeb1d"
   }
 }
