@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyPassword, createSession, sessionCookieHeader } from '@/lib/employeeAuth';
+import { assertRateLimit, getClientKey } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -9,6 +10,20 @@ export async function POST(req) {
   const { email, password } = await req.json().catch(() => ({}));
   if (!email || !password) {
     return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
+  }
+
+  // No lockout/backoff previously existed -- unlimited password attempts
+  // against a known email is unimpeded credential stuffing (audit I2).
+  // Email-scoped is the real protection (stops brute-forcing one account);
+  // IP-scoped catches one caller spraying many emails.
+  try {
+    assertRateLimit({ scope: 'employee_login_email', key: email.toLowerCase(), limit: 5, windowMs: 15 * 60 * 1000 });
+    assertRateLimit({ scope: 'employee_login_ip', key: getClientKey(req), limit: 20, windowMs: 15 * 60 * 1000 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Too many login attempts. Please try again later.' },
+      { status: err.status || 429, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+    );
   }
 
   const { data: emp } = await supabaseAdmin
