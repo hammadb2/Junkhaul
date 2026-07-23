@@ -445,172 +445,202 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Could not create booking.' }, { status: 500 });
     }
 
-    const cookieSession = (await cookies()).get(ATTRIBUTION_COOKIE)?.value;
-    const attributionSession = session_id || linkedLead?.session_id || cookieSession || null;
-    if (attributionSession) {
-      const attr = await captureAttribution({
-        session_id: attributionSession,
-        lead_id: linkedLead?.id || null,
+    // Everything from here through the success response is wrapped so a
+    // failure anywhere in it (most realistically the Stripe deposit-intent
+    // call) cleans up the booking row just inserted above instead of
+    // leaving an orphaned pending_payment row with no way to pay it
+    // (audit B5) -- previously a customer retry after a mid-flow failure
+    // just created ANOTHER row on top of the stuck one, with nothing ever
+    // cleaning up the orphan.
+    let intent;
+    try {
+      const cookieSession = (await cookies()).get(ATTRIBUTION_COOKIE)?.value;
+      const attributionSession = session_id || linkedLead?.session_id || cookieSession || null;
+      if (attributionSession) {
+        const attr = await captureAttribution({
+          session_id: attributionSession,
+          lead_id: linkedLead?.id || null,
+          booking_id: booking.id,
+          customer_id: normalizedPhone || phone,
+          touch: {
+            source,
+            channel: body.channel || null,
+            landing_path: body.landing_path || '/book',
+            referrer: body.referrer || null,
+            tracking_code: body.tracking_code || body.code || null,
+            code: body.code || body.tracking_code || null,
+            utm_source: body.utm_source || null,
+            utm_medium: body.utm_medium || null,
+            utm_campaign: body.utm_campaign || null,
+            utm_content: body.utm_content || null,
+            utm_term: body.utm_term || null,
+            gclid: body.gclid || null,
+            fbclid: body.fbclid || null,
+          },
+        });
+        if (attr?.first || attr?.last) {
+          try {
+            await supabaseAdmin.from('bookings').update({
+              attribution_record_id: attr.last?.id || attr.first?.id || null,
+              first_touch_attribution_id: attr.first?.id || null,
+              last_touch_attribution_id: attr.last?.id || null,
+            }).eq('id', booking.id);
+          } catch {}
+        }
+      }
+
+      await createPriceLedgerEntry({
         booking_id: booking.id,
-        customer_id: normalizedPhone || phone,
-        touch: {
-          source,
-          channel: body.channel || null,
-          landing_path: body.landing_path || '/book',
-          referrer: body.referrer || null,
-          tracking_code: body.tracking_code || body.code || null,
-          code: body.code || body.tracking_code || null,
-          utm_source: body.utm_source || null,
-          utm_medium: body.utm_medium || null,
-          utm_campaign: body.utm_campaign || null,
-          utm_content: body.utm_content || null,
-          utm_term: body.utm_term || null,
-          gclid: body.gclid || null,
-          fbclid: body.fbclid || null,
+        lead_id: linkedLead?.id || null,
+        quote_decision_id: decision.id,
+        ledger_type: 'initial_quote',
+        pricing: {
+          ...priced,
+          total: priced.total,
+          deposit: decision.deposit_cents / 100,
+          balance: priced.balance_due,
+          travel_km: travelKm,
+          truck_size: insert.truck_size,
+          truck_fee: priced.truck_fee,
+          surge_multiplier: surge.multiplier,
+          pricing_config_version: 'runtime_system_config',
+        },
+        actor_type: 'customer',
+        reason: 'Customer accepted website quote before deposit payment',
+        customer_notification_status: 'shown_in_checkout',
+      });
+
+      // Link the approved quote decision to the booking.
+      await linkQuoteDecisionToBooking({ decisionId: decision.id, bookingId: booking.id });
+
+      await recordTimelineEvent({
+        entity_type: 'booking',
+        entity_id: booking.id,
+        event_type: 'booking_created_pending_payment',
+        actor_type: 'customer',
+        source: 'booking_flow',
+        after: insert,
+        metadata: { lead_id: linkedLead?.id || null, sms_consent_source },
+      });
+
+      // Create the $50 deposit PaymentIntent (with receipt email if provided).
+      intent = await createDepositPayment({ booking_id: booking.id, customer_name: name, receipt_email: email, amount_cents: decision.deposit_cents, quote_decision_ref: decision.quote_decision_ref });
+      await supabaseAdmin
+        .from('bookings')
+        .update({ stripe_payment_intent_id: intent.id })
+        .eq('id', booking.id);
+      await recordTimelineEvent({
+        entity_type: 'booking',
+        entity_id: booking.id,
+        event_type: 'payment_intent_created',
+        source: 'stripe',
+        metadata: { payment_intent_id: intent.id, deposit: decision.deposit_cents / 100 },
+      });
+
+      // ── Tracking token (customer portal link) ─────────────
+      // Generate an unguessable token so the customer can track their
+      // job, pay the balance, leave feedback, and tip the crew — all
+      // without logging in. The token IS the auth.
+      const trackingToken = randomBytes(16).toString('hex');
+      await supabaseAdmin
+        .from('bookings')
+        .update({ tracking_token: trackingToken })
+        .eq('id', booking.id);
+      await recordTimelineEvent({
+        entity_type: 'booking',
+        entity_id: booking.id,
+        event_type: 'tracking_token_created',
+        source: 'booking_flow',
+        metadata: { tracking_url: `https://junkhaul.ca/track/${trackingToken}` },
+      });
+
+      // ── Dynamic dispatch (24-hour guarantee) ──────────────
+      // Resolve which crew assignment handles this booking — either
+      // an existing truck with capacity, or a new one. Best-effort:
+      // if it fails, the booking still goes through (admin can assign
+      // manually).
+      try {
+        const dispatch = await resolveDispatch({
+          id: booking.id,
+          job_date,
+          lat: geo.lat,
+          lng: geo.lng,
+          load_size,
+          ai_weight_estimate_kg: ai_weight_estimate_kg || null,
+        });
+        console.log(`[dispatch] booking ${booking.booking_ref}: ${dispatch.action} — ${dispatch.reason}`);
+      } catch (e) {
+        console.error('[dispatch] resolveDispatch failed:', e.message);
+      }
+
+      // ── Referral processing (Step 7) ──────────────────────
+      // If a referral code was provided, create a pending referral record.
+      // The reward is fulfilled when the booking is completed.
+      if (referral_code) {
+        // Normalize: referral code can be a phone number or a code
+        const refPhone = referral_code.replace(/\D/g, '').length === 10
+          ? `+1${referral_code.replace(/\D/g, '')}`
+          : null;
+        try {
+          await supabaseAdmin.from('referrals').insert({
+            referrer_phone: refPhone || referral_code,
+            referee_phone: normalizedPhone || phone,
+            booking_id: booking.id,
+            status: 'pending',
+          });
+        } catch {
+          // best-effort — don't fail the booking over a referral error
+        }
+      }
+
+      return NextResponse.json({
+        booking_id: booking.id,
+        booking_ref: booking.booking_ref,
+        client_secret: intent.client_secret,
+        total: priced.total,
+        balance_due: priced.balance_due,
+        deposit: decision.deposit_cents / 100,
+        tracking_token: trackingToken,
+        tracking_url: `https://junkhaul.ca/track/${trackingToken}`,
+        // Simplified customer-facing breakdown (Pricing Engine Phase 9) —
+        // only the line items a customer needs to see why their total is
+        // what it is. Deliberately excludes priced.cost_engine/
+        // raw_cost_snapshot (internal cost, margin, vehicle rental/labor
+        // rates, truck selection reasoning) — that detail is for admin/
+        // dispatch only (see components/admin/BookingDetailView.js's
+        // CostBreakdown section, sourced from the linked quote_decision).
+        breakdown: {
+          base_price: priced.base_price,
+          same_day_fee: priced.same_day_fee,
+          stairs_fee: priced.stairs_fee,
+          freon_fee: priced.freon_fee,
+          travel_fee: priced.travel_fee,
+          total: priced.total,
+          deposit: priced.deposit,
+          balance_due: priced.balance_due,
         },
       });
-      if (attr?.first || attr?.last) {
+    } catch (innerErr) {
+      // Clean up the orphaned booking row (and any Stripe intent that did
+      // get created before whatever failed) rather than leaving it stuck
+      // in pending_payment with no way to pay it and no way to retry
+      // without creating yet another duplicate (audit B5).
+      console.error('create-booking post-insert step failed, cleaning up booking', booking.id, innerErr);
+      if (intent?.id) {
         try {
-          await supabaseAdmin.from('bookings').update({
-            attribution_record_id: attr.last?.id || attr.first?.id || null,
-            first_touch_attribution_id: attr.first?.id || null,
-            last_touch_attribution_id: attr.last?.id || null,
-          }).eq('id', booking.id);
-        } catch {}
+          const { stripe } = await import('@/lib/stripe');
+          await stripe.paymentIntents.cancel(intent.id);
+        } catch (cancelErr) {
+          console.error('Failed to cancel orphaned PaymentIntent', intent.id, cancelErr.message);
+        }
       }
-    }
-
-    await createPriceLedgerEntry({
-      booking_id: booking.id,
-      lead_id: linkedLead?.id || null,
-      quote_decision_id: decision.id,
-      ledger_type: 'initial_quote',
-      pricing: {
-        ...priced,
-        total: priced.total,
-        deposit: decision.deposit_cents / 100,
-        balance: priced.balance_due,
-        travel_km: travelKm,
-        truck_size: insert.truck_size,
-        truck_fee: priced.truck_fee,
-        surge_multiplier: surge.multiplier,
-        pricing_config_version: 'runtime_system_config',
-      },
-      actor_type: 'customer',
-      reason: 'Customer accepted website quote before deposit payment',
-      customer_notification_status: 'shown_in_checkout',
-    });
-
-    // Link the approved quote decision to the booking.
-    await linkQuoteDecisionToBooking({ decisionId: decision.id, bookingId: booking.id });
-
-    await recordTimelineEvent({
-      entity_type: 'booking',
-      entity_id: booking.id,
-      event_type: 'booking_created_pending_payment',
-      actor_type: 'customer',
-      source: 'booking_flow',
-      after: insert,
-      metadata: { lead_id: linkedLead?.id || null, sms_consent_source },
-    });
-
-    // Create the $50 deposit PaymentIntent (with receipt email if provided).
-    const intent = await createDepositPayment({ booking_id: booking.id, customer_name: name, receipt_email: email, amount_cents: decision.deposit_cents, quote_decision_ref: decision.quote_decision_ref });
-    await supabaseAdmin
-      .from('bookings')
-      .update({ stripe_payment_intent_id: intent.id })
-      .eq('id', booking.id);
-    await recordTimelineEvent({
-      entity_type: 'booking',
-      entity_id: booking.id,
-      event_type: 'payment_intent_created',
-      source: 'stripe',
-      metadata: { payment_intent_id: intent.id, deposit: decision.deposit_cents / 100 },
-    });
-
-    // ── Tracking token (customer portal link) ─────────────
-    // Generate an unguessable token so the customer can track their
-    // job, pay the balance, leave feedback, and tip the crew — all
-    // without logging in. The token IS the auth.
-    const trackingToken = randomBytes(16).toString('hex');
-    await supabaseAdmin
-      .from('bookings')
-      .update({ tracking_token: trackingToken })
-      .eq('id', booking.id);
-    await recordTimelineEvent({
-      entity_type: 'booking',
-      entity_id: booking.id,
-      event_type: 'tracking_token_created',
-      source: 'booking_flow',
-      metadata: { tracking_url: `https://junkhaul.ca/track/${trackingToken}` },
-    });
-
-    // ── Dynamic dispatch (24-hour guarantee) ──────────────
-    // Resolve which crew assignment handles this booking — either
-    // an existing truck with capacity, or a new one. Best-effort:
-    // if it fails, the booking still goes through (admin can assign
-    // manually).
-    try {
-      const dispatch = await resolveDispatch({
-        id: booking.id,
-        job_date,
-        lat: geo.lat,
-        lng: geo.lng,
-        load_size,
-        ai_weight_estimate_kg: ai_weight_estimate_kg || null,
-      });
-      console.log(`[dispatch] booking ${booking.booking_ref}: ${dispatch.action} — ${dispatch.reason}`);
-    } catch (e) {
-      console.error('[dispatch] resolveDispatch failed:', e.message);
-    }
-
-    // ── Referral processing (Step 7) ──────────────────────
-    // If a referral code was provided, create a pending referral record.
-    // The reward is fulfilled when the booking is completed.
-    if (referral_code) {
-      // Normalize: referral code can be a phone number or a code
-      const refPhone = referral_code.replace(/\D/g, '').length === 10
-        ? `+1${referral_code.replace(/\D/g, '')}`
-        : null;
       try {
-        await supabaseAdmin.from('referrals').insert({
-          referrer_phone: refPhone || referral_code,
-          referee_phone: normalizedPhone || phone,
-          booking_id: booking.id,
-          status: 'pending',
-        });
-      } catch {
-        // best-effort — don't fail the booking over a referral error
+        await supabaseAdmin.from('bookings').delete().eq('id', booking.id);
+      } catch (deleteErr) {
+        console.error('Failed to delete orphaned booking', booking.id, deleteErr.message);
       }
+      return NextResponse.json({ error: 'Could not create booking. Please try again.' }, { status: 500 });
     }
-
-    return NextResponse.json({
-      booking_id: booking.id,
-      booking_ref: booking.booking_ref,
-      client_secret: intent.client_secret,
-      total: priced.total,
-      balance_due: priced.balance_due,
-      deposit: decision.deposit_cents / 100,
-      tracking_token: trackingToken,
-      tracking_url: `https://junkhaul.ca/track/${trackingToken}`,
-      // Simplified customer-facing breakdown (Pricing Engine Phase 9) —
-      // only the line items a customer needs to see why their total is
-      // what it is. Deliberately excludes priced.cost_engine/
-      // raw_cost_snapshot (internal cost, margin, vehicle rental/labor
-      // rates, truck selection reasoning) — that detail is for admin/
-      // dispatch only (see components/admin/BookingDetailView.js's
-      // CostBreakdown section, sourced from the linked quote_decision).
-      breakdown: {
-        base_price: priced.base_price,
-        same_day_fee: priced.same_day_fee,
-        stairs_fee: priced.stairs_fee,
-        freon_fee: priced.freon_fee,
-        travel_fee: priced.travel_fee,
-        total: priced.total,
-        deposit: priced.deposit,
-        balance_due: priced.balance_due,
-      },
-    });
   } catch (err) {
     console.error('create-booking error:', err);
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
