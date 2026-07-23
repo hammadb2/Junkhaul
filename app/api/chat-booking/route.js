@@ -107,8 +107,13 @@ export async function POST(req) {
 
       if (finish_reason === 'tool_calls' && assistantMessage.tool_calls?.length) {
         for (const call of assistantMessage.tool_calls) {
+          // Groq can return a literal JSON "null" (not just an empty/missing
+          // string) for a tool called with no arguments — a default
+          // parameter (`= {}`) only covers `undefined`, not `null`, so the
+          // tool functions' own destructuring would crash on it. Guard here
+          // once, centrally, rather than in every tool function.
           let args = {};
-          try { args = JSON.parse(call.function.arguments || '{}'); } catch { /* keep empty */ }
+          try { args = JSON.parse(call.function.arguments || '{}') ?? {}; } catch { /* keep empty */ }
           const result = await runChatBookingTool(call.function.name, args, {
             ...collectedData,
             sessionId: session_id,
