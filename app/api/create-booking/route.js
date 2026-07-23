@@ -73,20 +73,24 @@ export async function POST(req) {
     const normalizedPhone = normalizePhone(phone);
 
     // Required-field validation
-    if (!name || !phone || !address || !load_size || !job_date || !job_time) {
+    if (!name || !phone || !email || !address || !load_size || !job_date || !job_time) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
     }
     if (!LOAD_ORDER.includes(load_size)) {
       return NextResponse.json({ error: 'Invalid load size.' }, { status: 400 });
     }
 
-    // Enforce 24-hour minimum booking window
+    // Reject slots that have already passed. Our guarantee is "gone within
+    // 24 hours" of booking, not "24 hours' notice required" — same-day slots
+    // are intentionally offered by /api/slots and must be accepted here too.
     const now = new Date();
-    const earliest = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const jobDateTime = jobDateTimeUTC(job_date, job_time);
-    if (jobDateTime < earliest) {
+    if (jobDateTime < now) {
       return NextResponse.json(
-        { error: 'Booking must be at least 24 hours from now. Please pick a later time.' },
+        { error: 'That time has already passed. Please pick another slot.' },
         { status: 400 }
       );
     }
