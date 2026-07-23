@@ -17,6 +17,7 @@ import { createPriceLedgerEntry } from '@/lib/priceLedger';
 import { recordTimelineEvent } from '@/lib/timeline';
 import { toCents } from '@/lib/money';
 import { createQuoteDecision, linkQuoteDecisionToBooking } from '@/lib/quoteDecision';
+import { getStringConfig } from '@/lib/config';
 
 export const runtime = 'nodejs';
 
@@ -107,6 +108,36 @@ export async function POST(req) {
 
     if (!slot) {
       if (isCustomSlot) {
+        // is_custom_slot is client-supplied and previously trusted outright
+        // (audit B6): any caller could set it true and create an arbitrary
+        // schedule row for any date/time, bypassing /api/slots' feasibility
+        // logic entirely. /api/slots only ever offers a custom slot at
+        // exactly the configured morning- or afternoon-window start time
+        // (see app/api/slots/route.js) -- verify job_time actually matches
+        // one of those before creating a real slot, and use the server's
+        // own config-derived window fields rather than whatever
+        // job_window_label/start/end the client sent.
+        const morningStart = await getStringConfig('dispatch_morning_window_start') || '07:30';
+        const morningEnd = await getStringConfig('dispatch_morning_window_end') || '11:00';
+        const afternoonStart = await getStringConfig('dispatch_afternoon_window_start') || '11:00';
+        const afternoonEnd = await getStringConfig('dispatch_afternoon_window_end') || '15:00';
+
+        let windowLabel, windowStart, windowEnd;
+        if (job_time === morningStart) {
+          windowLabel = 'Morning';
+          windowStart = morningStart;
+          windowEnd = morningEnd;
+        } else if (job_time === afternoonStart) {
+          windowLabel = 'Afternoon';
+          windowStart = afternoonStart;
+          windowEnd = afternoonEnd;
+        } else {
+          return NextResponse.json(
+            { error: 'That time slot is not available. Please pick another.' },
+            { status: 409 }
+          );
+        }
+
         // Create the slot on the fly for custom bookings
         const { error: createErr } = await supabaseAdmin
           .from('schedule')
@@ -117,9 +148,9 @@ export async function POST(req) {
             is_available: true,
             max_jobs: 5,
             jobs_booked: 0,
-            window_label: job_window_label || null,
-            window_start: job_window_start || null,
-            window_end: job_window_end || null,
+            window_label: windowLabel,
+            window_start: windowStart,
+            window_end: windowEnd,
           });
         if (createErr) {
           return NextResponse.json(
