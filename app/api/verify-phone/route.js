@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
+import { assertRateLimit, getClientKey } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -8,6 +9,20 @@ export const runtime = 'nodejs';
 export async function POST(req) {
   const { phone } = await req.json();
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+
+  // Unauthenticated, phone-triggered SMS send -- without a limit this is an
+  // open relay for SMS bombing/cost abuse (audit B10). Phone-scoped stops
+  // hammering one number; IP-scoped stops one caller cycling through many
+  // numbers.
+  try {
+    assertRateLimit({ scope: 'verify_phone_send_phone', key: phone, limit: 3, windowMs: 10 * 60 * 1000 });
+    assertRateLimit({ scope: 'verify_phone_send_ip', key: getClientKey(req), limit: 10, windowMs: 60 * 60 * 1000 });
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: 'Too many verification requests. Please try again later.' },
+      { status: err.status || 429, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+    );
+  }
 
   // Generate 6-digit code
   const code = String(Math.floor(100000 + Math.random() * 900000));
@@ -45,6 +60,17 @@ export async function GET(req) {
   const phone = searchParams.get('phone');
   const code = searchParams.get('code');
   if (!phone || !code) return NextResponse.json({ error: 'phone and code required' }, { status: 400 });
+
+  // A 6-digit code has only 1M combinations; without a limit on attempts
+  // this is brute-forceable well within its 10-minute expiry (audit B10).
+  try {
+    assertRateLimit({ scope: 'verify_phone_check', key: phone, limit: 10, windowMs: 10 * 60 * 1000 });
+  } catch (err) {
+    return NextResponse.json(
+      { verified: false, error: 'Too many attempts. Please request a new code.' },
+      { status: err.status || 429, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+    );
+  }
 
   const { data, error } = await supabaseAdmin
     .from('phone_verifications')
