@@ -67,9 +67,42 @@ export async function POST(req) {
           break;
         }
 
-        // Crew tips are recorded directly by app/api/track/[token]/tip when
-        // the customer confirms them; nothing to reconcile here.
-        if (paymentType === 'tip') break;
+        // Crew tip reconciliation (audit F5). The customer-facing tip flow
+        // (app/track/[token]/page.js TipSection) only ever calls this
+        // route's GET handler to create the PaymentIntent, then confirms
+        // it directly client-side via Stripe Elements
+        // (stripe.confirmPayment) -- it never calls the route's POST
+        // handler, which was the only place that used to insert into
+        // crew_tips. That meant a customer could be successfully charged
+        // for a tip with no record of it ever created: tip_submitted
+        // stayed false forever, and the crew was never credited. This is
+        // the actual, webhook-driven recording step, and it links to the
+        // crew truck actually assigned to this booking
+        // (booking.crew_assignment_id) rather than guessing by
+        // assignment_date, which could credit a different truck running
+        // that same day (same bug class as audit B9).
+        if (paymentType === 'tip') {
+          const { data: tipBooking } = await supabaseAdmin
+            .from('bookings')
+            .select('id, crew_assignment_id')
+            .eq('id', booking_id)
+            .maybeSingle();
+          const { error: tipErr } = await supabaseAdmin.from('crew_tips').insert({
+            booking_id,
+            assignment_id: tipBooking?.crew_assignment_id || null,
+            amount_cad: intent.amount / 100,
+            stripe_payment_intent_id: intent.id,
+            stripe_charge_id: intent.latest_charge || null,
+            status: 'succeeded',
+          });
+          if (tipErr && tipErr.code !== '23505') {
+            // 23505 = unique violation on stripe_payment_intent_id -- this
+            // event was already processed (Stripe redelivery); anything
+            // else is a real failure worth logging.
+            console.error(`Tip recording failed for booking ${booking_id}:`, tipErr.message);
+          }
+          break;
+        }
 
         // Deposit (default, and legacy intents created without a type).
         const { data: booking } = await supabaseAdmin
