@@ -9,7 +9,7 @@ import { analysePhotos, handleSafetyAlert, stripInternalFields } from '@/lib/ai'
 import { edmontonNowParts, formatDateLong, formatTime, jobDateTimeUTC } from '@/lib/dates';
 import { geocodeAddress } from '@/lib/geocode';
 import { calculateTravelFee } from '@/lib/route';
-import { sendDepositLink } from '@/lib/messages';
+import { sendDepositLink, sendOperatorAlert } from '@/lib/messages';
 import { createDepositPayment } from '@/lib/stripe';
 import { randomBytes } from 'crypto';
 import { QUO_SIGNATURE_HEADER, verifyQuoWebhookSignature } from '@/lib/quoWebhookAuth';
@@ -386,6 +386,14 @@ async function createSmsBooking({ name, phone, address, load_size, job_date, job
   // NOTE: Slot is NOT incremented here — it's incremented in the Stripe webhook
   // when the deposit is actually paid. This prevents slots being reserved by
   // customers who never pay.
+
+  // Operator alert — SMS bookings never sent this (audit C1); only the web
+  // flow (via the Stripe deposit webhook's handleBookingConfirmed) did.
+  try {
+    await sendOperatorAlert(booking);
+  } catch (e) {
+    console.error('[sms-webhook] operator alert failed:', e.message);
+  }
 
   return { success: true, booking };
 }
