@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { groqToolCallCompletion, analysePhotos, analyseDescription, handleSafetyAlert } from '@/lib/ai';
 import { CHAT_BOOKING_TOOL_SCHEMAS, runChatBookingTool } from '@/lib/chatBookingTools';
 import { checkWeightFlag } from '@/lib/pricing';
+import { assertRateLimit, getClientKey } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -52,6 +53,13 @@ export async function POST(req) {
     const body = await req.json();
     const { session_id, message = '', photos = [] } = body;
     if (!session_id) return NextResponse.json({ error: 'session_id is required' }, { status: 422 });
+
+    // Unauthenticated LLM (+ vision, when photos are attached) loop with no
+    // other gate (audit B10) -- an unbounded cost-abuse vector. Session-scoped
+    // covers one runaway conversation; IP-scoped covers one caller cycling
+    // through many session_ids.
+    assertRateLimit({ scope: 'chat_booking_session', key: session_id, limit: 30, windowMs: 60 * 60 * 1000 });
+    assertRateLimit({ scope: 'chat_booking_ip', key: getClientKey(req), limit: 60, windowMs: 60 * 60 * 1000 });
 
     const session = await loadOrCreateSession(session_id);
     const messages = Array.isArray(session.messages) ? [...session.messages] : [{ role: 'system', content: SYSTEM_PROMPT }];
@@ -149,6 +157,12 @@ export async function POST(req) {
       ...toolResultPayload,
     });
   } catch (err) {
+    if (err.status === 429) {
+      return NextResponse.json(
+        { error: "You're sending messages a bit fast — give it a moment and try again." },
+        { status: 429, headers: err.retryAfterSeconds ? { 'Retry-After': String(err.retryAfterSeconds) } : undefined }
+      );
+    }
     console.error('chat-booking error:', err);
     return NextResponse.json({ error: 'Something went wrong. Please try again or call (587) 325-0751.' }, { status: 500 });
   }
