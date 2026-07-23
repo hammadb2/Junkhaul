@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { stripe } from '@/lib/stripe';
+import { stripe, isIntentReusable } from '@/lib/stripe';
 
 export const runtime = 'nodejs';
 
@@ -40,10 +40,15 @@ export async function GET(_req, { params }) {
     type: 'balance',
   };
 
-  if (booking.stripe_payment_intent_id) {
+  // Uses its own column (audit F7) -- stripe_payment_intent_id is the
+  // DEPOSIT intent, read by app/api/pay/[id] to resume an in-progress
+  // deposit payment and by lib/cancellations.js to issue the deposit
+  // refund on cancellation. Overwriting it with a balance intent silently
+  // broke both of those.
+  if (booking.stripe_balance_payment_intent_id) {
     try {
-      const intent = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
-      if (intent.metadata?.type === 'balance' && intent.status !== 'succeeded') {
+      const intent = await stripe.paymentIntents.retrieve(booking.stripe_balance_payment_intent_id);
+      if (isIntentReusable(intent)) {
         clientSecret = intent.client_secret;
       }
     } catch {
@@ -66,7 +71,7 @@ export async function GET(_req, { params }) {
 
     await supabaseAdmin
       .from('bookings')
-      .update({ stripe_payment_intent_id: intent.id })
+      .update({ stripe_balance_payment_intent_id: intent.id })
       .eq('id', booking.id);
 
     clientSecret = intent.client_secret;

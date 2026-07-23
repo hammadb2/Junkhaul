@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { createDepositPayment } from '@/lib/stripe';
+import { createDepositPayment, isIntentReusable } from '@/lib/stripe';
 
 export const runtime = 'nodejs';
 
@@ -26,8 +26,15 @@ export async function GET(_req, { params }) {
   if (booking.stripe_payment_intent_id) {
     const { stripe } = await import('@/lib/stripe');
     const intent = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
-    clientSecret = intent.client_secret;
-  } else {
+    if (isIntentReusable(intent)) {
+      clientSecret = intent.client_secret;
+    }
+    // Otherwise (canceled/expired/succeeded) fall through and create a
+    // fresh intent below instead of handing back a dead client_secret the
+    // customer could never actually pay (audit B8).
+  }
+
+  if (!clientSecret) {
     const intent = await createDepositPayment({
       booking_id: booking.id,
       customer_name: booking.name,
