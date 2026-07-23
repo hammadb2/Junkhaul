@@ -78,51 +78,63 @@ export async function POST(req) {
           .eq('id', booking_id)
           .single();
 
-        if (!booking || booking.deposit_paid) break; // idempotent
+        if (!booking) break;
 
-        await supabaseAdmin
-          .from('bookings')
-          .update({
-            deposit_paid: true,
-            deposit_paid_at: new Date().toISOString(),
-            stripe_charge_id: intent.latest_charge,
-            status: 'confirmed',
-          })
-          .eq('id', booking_id);
+        // Only run the deposit-recording side effects (slot reservation,
+        // quote-decision confirmation) once -- those aren't safe to repeat.
+        // But handleBookingConfirmed is always attempted below, even when
+        // deposit_paid was already true from an earlier delivery of this
+        // event: it has its own idempotency guard now tied to whether the
+        // customer confirmation SMS actually succeeded (audit F3/B4), so
+        // this is what lets a booking recover from a transient failure on
+        // a prior delivery instead of being permanently stuck -- skipping
+        // this call entirely whenever deposit_paid was already true is
+        // exactly what made that failure unrecoverable before.
+        if (!booking.deposit_paid) {
+          await supabaseAdmin
+            .from('bookings')
+            .update({
+              deposit_paid: true,
+              deposit_paid_at: new Date().toISOString(),
+              stripe_charge_id: intent.latest_charge,
+              status: 'confirmed',
+            })
+            .eq('id', booking_id);
 
-        // Confirm the quote decision once payment has succeeded.
-        if (booking.quote_decision_id) {
-          try {
-            await confirmQuoteDecisionBooking({ decisionId: booking.quote_decision_id, bookingId: booking_id });
-          } catch (err) {
-            console.error('Quote decision confirmation failed:', err.message);
+          // Confirm the quote decision once payment has succeeded.
+          if (booking.quote_decision_id) {
+            try {
+              await confirmQuoteDecisionBooking({ decisionId: booking.quote_decision_id, bookingId: booking_id });
+            } catch (err) {
+              console.error('Quote decision confirmation failed:', err.message);
+            }
           }
-        }
 
-        // Reserve the slot. increment_slot() only applies if capacity
-        // remains and reports whether it actually reserved one — a paid
-        // booking can still race another paid booking for the last slot,
-        // so this must be detected rather than silently oversold.
-        const { data: reserved } = await supabaseAdmin.rpc('increment_slot', {
-          p_date: booking.job_date,
-          p_time: booking.job_time,
-        });
+          // Reserve the slot. increment_slot() only applies if capacity
+          // remains and reports whether it actually reserved one — a paid
+          // booking can still race another paid booking for the last slot,
+          // so this must be detected rather than silently oversold.
+          const { data: reserved } = await supabaseAdmin.rpc('increment_slot', {
+            p_date: booking.job_date,
+            p_time: booking.job_time,
+          });
 
-        if (reserved === false) {
-          console.error(`Slot oversold: booking ${booking_id} paid but ${booking.job_date} ${booking.job_time} was already full.`);
-          try {
-            const tenant = await getTenantBySlug('junkhaul');
-            await createAlert({
-              tenantId: tenant.id,
-              category: 'capacity_oversold',
-              severity: 'critical',
-              title: 'Slot oversold after payment',
-              description: `Booking ${booking.booking_ref || booking_id} paid successfully for ${booking.job_date} ${booking.job_time}, but that slot was already at capacity. Needs manual reschedule or capacity review — do not cancel automatically.`,
-              entityType: 'booking',
-              entityId: booking_id,
-            });
-          } catch (alertErr) {
-            console.error('Failed to create capacity_oversold alert:', alertErr.message);
+          if (reserved === false) {
+            console.error(`Slot oversold: booking ${booking_id} paid but ${booking.job_date} ${booking.job_time} was already full.`);
+            try {
+              const tenant = await getTenantBySlug('junkhaul');
+              await createAlert({
+                tenantId: tenant.id,
+                category: 'capacity_oversold',
+                severity: 'critical',
+                title: 'Slot oversold after payment',
+                description: `Booking ${booking.booking_ref || booking_id} paid successfully for ${booking.job_date} ${booking.job_time}, but that slot was already at capacity. Needs manual reschedule or capacity review — do not cancel automatically.`,
+                entityType: 'booking',
+                entityId: booking_id,
+              });
+            } catch (alertErr) {
+              console.error('Failed to create capacity_oversold alert:', alertErr.message);
+            }
           }
         }
 
