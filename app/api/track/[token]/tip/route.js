@@ -9,10 +9,21 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // ============================================================
 // /api/track/[token]/tip — public tip endpoint (token IS auth).
 //
-// GET  ?amount=10  → creates a Stripe PaymentIntent for the tip
-//                    and returns { client_secret } for Stripe Elements.
-// POST { amount, payment_method_id } → confirms the PaymentIntent
-//                    server-side and records the tip in crew_tips.
+// GET ?amount=10 → creates a Stripe PaymentIntent for the tip and
+// returns { client_secret }. The customer confirms it directly
+// client-side via Stripe Elements (app/track/[token]/page.js
+// TipSection, stripe.confirmPayment) -- there is no separate
+// server-side confirm step here. The actual crew_tips row is
+// inserted by the Stripe webhook on payment_intent.succeeded
+// (see app/api/stripe-webhook/route.js), not by this route, since
+// that's the only step guaranteed to run regardless of what happens
+// to the customer's browser after Stripe confirms the charge.
+//
+// A previous POST handler here duplicated that recording (and, since
+// nothing ever called it, was dead code -- audit F5) by creating a
+// SECOND PaymentIntent server-side and confirming it directly with a
+// client-supplied payment_method_id. It was removed rather than
+// fixed in place.
 // ============================================================
 
 async function resolveBooking(token) {
@@ -55,80 +66,4 @@ export async function GET(req, { params }) {
   });
 
   return NextResponse.json({ client_secret: intent.client_secret, amount });
-}
-
-// POST — confirm the PaymentIntent server-side and record the tip
-export async function POST(req, { params }) {
-  const { token } = await params;
-  if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
-
-  const booking = await resolveBooking(token);
-  if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
-
-  const body = await req.json().catch(() => ({}));
-  const { amount, payment_method_id } = body;
-
-  if (!amount || amount < 1) {
-    return NextResponse.json({ error: 'amount must be at least $1' }, { status: 400 });
-  }
-  if (!payment_method_id) {
-    return NextResponse.json({ error: 'payment_method_id is required' }, { status: 400 });
-  }
-
-  // Create + confirm a PaymentIntent server-side
-  const intent = await stripe.paymentIntents.create({
-    amount: Math.round(amount * 100),
-    currency: 'cad',
-    payment_method: payment_method_id,
-    confirm: true,
-    description: `Junk Haul Calgary crew tip — ${booking.booking_ref}`,
-    statement_descriptor: 'JUNK HAUL CALGARY',
-    statement_descriptor_suffix: 'CREW TIP',
-    receipt_email: booking.email || undefined,
-    metadata: {
-      booking_id: booking.id,
-      booking_ref: booking.booking_ref,
-      customer_name: booking.name || '',
-      type: 'tip',
-    },
-    automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-  });
-
-  const succeeded = intent.status === 'succeeded';
-
-  // Find the assignment for this booking's date (to link the tip)
-  const { data: assignment } = await supabaseAdmin
-    .from('crew_assignments')
-    .select('id')
-    .eq('assignment_date', booking.job_date)
-    .limit(1)
-    .maybeSingle();
-
-  const { data: tip, error: tipErr } = await supabaseAdmin
-    .from('crew_tips')
-    .insert({
-      booking_id: booking.id,
-      assignment_id: assignment?.id || null,
-      amount_cad: amount,
-      stripe_payment_intent_id: intent.id,
-      stripe_charge_id: intent.latest_charge || null,
-      status: succeeded ? 'succeeded' : intent.status,
-    })
-    .select()
-    .single();
-
-  if (tipErr) {
-    return NextResponse.json({ error: tipErr.message }, { status: 500 });
-  }
-
-  if (!succeeded) {
-    return NextResponse.json({
-      ok: false,
-      status: intent.status,
-      tip,
-      error: 'Tip payment did not succeed',
-    }, { status: 402 });
-  }
-
-  return NextResponse.json({ ok: true, tip });
 }
