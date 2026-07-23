@@ -8,7 +8,7 @@ import { analysePhotos, handleSafetyAlert, stripInternalFields } from '@/lib/ai'
 import { edmontonNowParts, formatDateLong, formatTime, jobDateTimeUTC } from '@/lib/dates';
 import { geocodeAddress } from '@/lib/geocode';
 import { calculateTravelFee } from '@/lib/route';
-import { sendDepositLink } from '@/lib/messages';
+import { sendDepositLink, sendOperatorAlert } from '@/lib/messages';
 import { createDepositPayment } from '@/lib/stripe';
 import { randomBytes } from 'crypto';
 
@@ -308,6 +308,14 @@ async function createWhatsAppBooking({ name, phone, address, load_size, job_date
   // Tracking token
   const trackingToken = randomBytes(16).toString('hex');
   await supabaseAdmin.from('bookings').update({ tracking_token: trackingToken }).eq('id', booking.id);
+
+  // Operator alert — WhatsApp bookings never sent this (audit C1); only the
+  // web flow (via the Stripe deposit webhook's handleBookingConfirmed) did.
+  try {
+    await sendOperatorAlert(booking);
+  } catch (e) {
+    console.error('[whatsapp] operator alert failed:', e.message);
+  }
 
   return { success: true, booking };
 }
