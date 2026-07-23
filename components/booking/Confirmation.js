@@ -57,7 +57,7 @@ export default function Confirmation({ booking }) {
         </div>
         <div className="flex justify-between">
           <span className="text-gray-500">Deposit paid</span>
-          <span className="font-semibold text-green-600">$50</span>
+          <span className="font-semibold text-green-600">${booking.total - booking.balance_due}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-500">Balance on day</span>

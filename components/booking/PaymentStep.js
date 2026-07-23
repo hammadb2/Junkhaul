@@ -29,6 +29,10 @@ function InnerForm({ total, balance_due, breakdown, onPaid }) {
   const elements = useElements();
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
+  // Derived from the two real numbers the server already computed (audit
+  // B7), instead of a hardcoded "$50" that could silently disagree with
+  // whatever was actually charged if the live deposit config ever changes.
+  const deposit = total - balance_due;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -81,7 +85,7 @@ function InnerForm({ total, balance_due, breakdown, onPaid }) {
         </div>
         <div className="flex justify-between mt-1">
           <span className="text-gray-500">Deposit due now</span>
-          <span className="font-semibold text-orange-600">$50</span>
+          <span className="font-semibold text-orange-600">${deposit}</span>
         </div>
         <div className="flex justify-between mt-1">
           <span className="text-gray-500">Balance on pickup day</span>
@@ -94,7 +98,7 @@ function InnerForm({ total, balance_due, breakdown, onPaid }) {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <BookButton type="submit" disabled={!stripe || processing}>
-        {processing ? 'Processing…' : 'Pay $50 deposit & confirm'}
+        {processing ? 'Processing…' : `Pay $${deposit} deposit & confirm`}
       </BookButton>
       <p className="text-center text-xs text-gray-400">
         🔒 Secure payment via Stripe. 24-hour free cancellation.

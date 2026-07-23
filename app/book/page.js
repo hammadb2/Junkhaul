@@ -327,7 +327,7 @@ export default function BookPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-1">Confirm & pay</h2>
               <p className="text-gray-500 text-sm mb-5">
-                Just a $50 deposit today, the rest on pickup day.
+                Just a ${booking.total - booking.balance_due} deposit today, the rest on pickup day.
               </p>
               <PaymentStep
                 clientSecret={booking.client_secret}
